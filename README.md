@@ -1,7 +1,7 @@
 See [Maproulette](https://mpr.lt/c/45294) challenge to bring the map of Bikeshare stations up to date!
 
 
-query to examine existing stations:
+[query to examine existing stations](https://overpass-turbo.eu/s/1LGI):
 ```
 [out:json];
 
