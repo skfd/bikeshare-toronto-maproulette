@@ -3,22 +3,17 @@ See [Maproulette](https://mpr.lt/c/45294) challenge to bring the map of Bikeshar
 
 query to examine existing stations:
 ```
-// @name Cycle Network
-
-/*
-This shows the cycleway and cycleroute network.
-*/
-
 [out:json];
 
+area[name="Toronto"]->.to;
 (
-  node[bicycle_rental=docking_station]  ({{bbox}});
-  way[bicycle_rental=docking_station]  ({{bbox}});
-  area[bicycle_rental=docking_station]  ({{bbox}});
-
+  node(area.to)[bicycle_rental=docking_station];
+  way(area.to)[bicycle_rental=docking_station];
+  area(area.to)[bicycle_rental=docking_station];
 );
 
 out body;
 >;
 out skel qt;
+
 ```
