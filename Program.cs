@@ -1,5 +1,6 @@
 ﻿// See https://aka.ms/new-console-template for more information
 using AngleSharp.Html.Parser;
+using prepareBikeParking;
 using System.Text.Json;
 
 
@@ -33,6 +34,12 @@ var items = locationsList.OrderBy(x => x.id).Select(x => string.Format(template,
 // join lines and save as geojson file
 var geojson = string.Join("\n", items);
 File.WriteAllText("../../../bikeshare.geojson", geojson);
+
+
+var latestVsPrevious = GitDiffToGeojson.LatestVsPrevious();
+
+File.WriteAllText("../../../bikeshare_diff.geojson", string.Join("\n", latestVsPrevious));
+
 
 //amenity = bicycle_rental
 //bicycle_rental = docking_station
