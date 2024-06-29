@@ -3,7 +3,8 @@ See [Maproulette](https://mpr.lt/c/45294) challenge to bring the map of Bikeshar
 
 Current state is in `bikeshare_stations.geojson`.
 
-Weekly diff is in `bikeshare_diff.geojson`.
+* Weekly points to review: `bikeshare_toreview.geojson`.
+* Weekly points to remove: `bikeshare_removed.geojson`.
 
 TODO:
 	- Auto-creator of Maproulette challenges

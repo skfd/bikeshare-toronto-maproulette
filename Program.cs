@@ -4,7 +4,6 @@ using prepareBikeParking;
 using System.Text.Json;
 
 
-
 //dowload html from url
 var url = "https://bikesharetoronto.com/system-map/";
 var client = new HttpClient();
@@ -25,20 +24,45 @@ var json = JsonSerializer.Deserialize<Dictionary<string, string>>(locations);
 //dictionary with value split by "_" symbol
 var locationsDict = json.ToDictionary(x => x.Key, x => x.Value.Split("_"));
 // dictionary converted to list of objects with id, lat, lon values.
-var locationsList = locationsDict.Select(x => new { id = x.Key, lat = x.Value[0], lon = x.Value[1] }).ToList();
+var locationsList = locationsDict.Select(x => new GeoPoint { id = x.Key, lat = x.Value[0], lon = x.Value[1] }).ToList();
 
-var template = "\u001e{{\"type\":\"FeatureCollection\",\"features\":[{{\"type\":\"Feature\",\"geometry\":{{\"type\":\"Point\",\"coordinates\":[{0},{1}]}},\"properties\":{{\"address\":\"{2}\",\"latitude\":\"{1}\",\"longitude\":\"{0}\",\"operator\":\"{3}\"}}}}]}}";
 // convert each line into this template:
-var items = locationsList.OrderBy(x => x.id).Select(x => string.Format(template, x.lon, x.lat, x.id, "BikeShare Toronto"));
+var items = locationsList.OrderBy(x => x.id).Select(generateGeojsonLine);
 
 // join lines and save as geojson file
 var geojson = string.Join("\n", items);
 File.WriteAllText("../../../bikeshare.geojson", geojson);
 
 
-var latestVsPrevious = GitDiffToGeojson.LatestVsPrevious();
 
-File.WriteAllText("../../../bikeshare_diff.geojson", string.Join("\n", latestVsPrevious));
+var (addedlines, removedObjects) = GitDiffToGeojson.LatestVsPrevious();
+
+var addedPoints = addedlines.Select(GeoPoint.ParseLine).ToList();
+
+var removedPoints = removedObjects.Select(GeoPoint.ParseLine).ToList();
+
+
+var addedIds = addedPoints.Select(x => x.id).ToList();
+var removedIds = removedPoints.Select(x => x.id).ToList();
+var movedIds = addedIds.Intersect(removedIds).ToList();
+
+var movedPointsFinal = addedPoints.Where(x => movedIds.Contains(x.id)).ToList();
+var addedPointsFinal = addedPoints.Where(x => !movedIds.Contains(x.id)).ToList();
+var removedPointsFinal = removedPoints.Where(x => !movedIds.Contains(x.id)).ToList();
+
+
+
+File.WriteAllText("../../../bikeshare_added.geojson", string.Join("\n", addedPointsFinal.OrderBy(x => x.id).Select(generateGeojsonLine)));
+File.WriteAllText("../../../bikeshare_toreview.geojson", string.Join("\n", addedPoints.OrderBy(x => x.id).Select(generateGeojsonLine)));
+File.WriteAllText("../../../bikeshare_removed.geojson", string.Join("\n", removedPointsFinal.OrderBy(x => x.id).Select(generateGeojsonLine)));
+File.WriteAllText("../../../bikeshare_moved.geojson", string.Join("\n", movedPointsFinal.OrderBy(x => x.id).Select(generateGeojsonLine)));
+
+static string generateGeojsonLine(GeoPoint x)
+{
+    var template = "\u001e{{\"type\":\"FeatureCollection\",\"features\":[{{\"type\":\"Feature\",\"geometry\":{{\"type\":\"Point\",\"coordinates\":[{0},{1}]}},\"properties\":{{\"address\":\"{2}\",\"latitude\":\"{1}\",\"longitude\":\"{0}\",\"operator\":\"{3}\"}}}}]}}";
+
+    return string.Format(template, x.lon, x.lat, x.id, "BikeShare Toronto");
+}
 
 
 //amenity = bicycle_rental
