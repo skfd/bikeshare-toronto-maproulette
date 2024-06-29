@@ -16,7 +16,7 @@ namespace prepareBikeParking
 
         private static string RunGitDiffCommand()
         {
-            string command = "--no-pager diff --unified=0 3a71a411 \"../../../bikeshare.geojson\"";
+            string command = "--no-pager diff --unified=0 HEAD \"../../../bikeshare.geojson\"";
             string arguments = "";
 
             ProcessStartInfo startInfo = new ProcessStartInfo
