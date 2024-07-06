@@ -1,2 +1,1 @@
-{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[-79.399993,43.716652]},"properties":{"address":"7485","latitude":"43.716652","longitude":"-79.399993","operator":"BikeShare Toronto"}}]}
-{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[-79.412666442599,43.66215531482]},"properties":{"address":"7905","latitude":"43.66215531482","longitude":"-79.412666442599","operator":"BikeShare Toronto"}}]}
+{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[-79.382668961517,43.669337508936]},"properties":{"address":"7795","latitude":"43.669337508936","longitude":"-79.382668961517","operator":"BikeShare Toronto"}}]}
