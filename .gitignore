@@ -396,3 +396,7 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+/bikeshare_added.geojson
+/bikeshare_moved.geojson
+/bikeshare_removed.geojson
+/bikeshare_toreview.geojson
