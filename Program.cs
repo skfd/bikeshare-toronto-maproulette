@@ -35,7 +35,7 @@ File.WriteAllText("../../../bikeshare.geojson", geojson);
 
 
 
-var (addedlines, removedObjects) = GitDiffToGeojson.LatestVsPrevious();
+var (addedlines, removedObjects) = GitDiffToGeojson.Compare("HEAD");
 
 var addedPoints = addedlines.Select(GeoPoint.ParseLine).ToList();
 

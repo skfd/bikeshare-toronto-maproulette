@@ -1,5 +1,4 @@
-﻿using System;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Text;
 
 namespace prepareBikeParking
@@ -8,15 +7,23 @@ namespace prepareBikeParking
     {
         public static (List<string>, List<string>) LatestVsPrevious()
         {
-            var diffOutput = RunGitDiffCommand();
+            var diffOutput = RunGitDiffCommand("0");
             var (addedlines, removedObjects) = ExtractDiffedLines(diffOutput);
 
             return (addedlines, removedObjects);
         }
 
-        private static string RunGitDiffCommand()
+        public static (List<string>, List<string>) Compare(string old = "", string @new = "HEAD")
         {
-            string command = "--no-pager diff --unified=0 HEAD \"../../../bikeshare.geojson\"";
+            var diffOutput = RunGitDiffCommand(old, @new);
+            var (addedlines, removedObjects) = ExtractDiffedLines(diffOutput);
+
+            return (addedlines, removedObjects);
+        }
+
+        private static string RunGitDiffCommand(string @new = "", string old = "HEAD")
+        {
+            string command = $"--no-pager diff --unified=0 {@new} {old} \"../../../bikeshare.geojson\"";
             string arguments = "";
 
             ProcessStartInfo startInfo = new ProcessStartInfo
