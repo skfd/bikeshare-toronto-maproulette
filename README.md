@@ -1,4 +1,4 @@
-See [Maproulette](https://mpr.lt/c/45294) challenge to bring the map of Bikeshare stations up to date!
+See [Maproulette](https://maproulette.org/browse/projects/53785) project to bring the map of Bikeshare stations up to date!
 
 
 Current state is in `bikeshare_stations.geojson`.
