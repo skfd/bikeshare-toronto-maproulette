@@ -11,6 +11,7 @@ TODO:
 
 [Follow BikeShareTO socials to get pictures of new stations](https://x.com/BikeShareTO)
 [query to examine existing stations](https://overpass-turbo.eu/s/1LGI):
+[rogue stations without `ref` tag](https://overpass-turbo.eu/s/1QGK)
 ```
 [out:json];
 
