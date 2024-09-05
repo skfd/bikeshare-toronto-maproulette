@@ -6,6 +6,8 @@ using System.Text.Json.Nodes;
 internal class GeoPoint
 {
     public string id { get; set; }
+    public string name { get; set; }
+    public int capacity { get; set; }
     public string lat { get; set; }
     public string lon { get; set; }
 
@@ -17,6 +19,8 @@ internal class GeoPoint
         var result = new GeoPoint
         {
             id = (string)dynamicPoint["features"][0]["properties"]["address"],
+            name = (string)dynamicPoint["features"][0]["properties"]["name"],
+            capacity = int.Parse((string)dynamicPoint["features"][0]["properties"]["capacity"] ?? "0"),
             lat = (string)dynamicPoint["features"][0]["properties"]["latitude"],
             lon = (string)dynamicPoint["features"][0]["properties"]["longitude"],
         };

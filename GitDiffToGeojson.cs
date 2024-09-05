@@ -13,18 +13,20 @@ namespace prepareBikeParking
             return (addedlines, removedObjects);
         }
 
-        public static (List<string>, List<string>) Compare(string old = "", string @new = "HEAD")
+        public static (List<string>, List<string>) Compare(string @new = "HEAD", string old = "")
         {
-            var diffOutput = RunGitDiffCommand(old, @new);
+            var diffOutput = RunGitDiffCommand(@new, old);
             var (addedlines, removedObjects) = ExtractDiffedLines(diffOutput);
 
             return (addedlines, removedObjects);
         }
 
-        private static string RunGitDiffCommand(string @new = "", string old = "HEAD")
+        private static string RunGitDiffCommand(string @new = "HEAD", string old = "")
         {
             string command = $"--no-pager diff --unified=0 {@new} {old} \"../../../bikeshare.geojson\"";
             string arguments = "";
+
+            Console.WriteLine($"Running git {command} {arguments}");
 
             ProcessStartInfo startInfo = new ProcessStartInfo
             {

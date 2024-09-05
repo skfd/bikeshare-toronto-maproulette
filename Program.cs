@@ -2,6 +2,7 @@
 using AngleSharp.Html.Parser;
 using prepareBikeParking;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 
 //dowload html from url
@@ -13,18 +14,37 @@ var html = await client.GetStringAsync(url);
 var parser = new HtmlParser();
 var document = parser.ParseDocument(html);
 
-//get element by id icon_txt
-var bikes = document.GetElementById("icon_txt");
-var ebikes = document.GetElementById("e_icon_txt");
-var arr_adr = document.GetElementById("arr_adr");
+var displaylist = document.GetElementById("infoWind");
+var namesAndCapacities =
+    Enumerable.Select(displaylist.Children
+, x => new
+{
+    id = x.GetAttribute("id"),
+    name = x.Children[0].TextContent,
+    aproxCapacity = x.Children.Length == 4 ?
+            IntParseOrZero(x.Children[1].TextContent) +
+            IntParseOrZero(x.Children[3].TextContent) +
+            IntParseOrZero(x.Children[2].TextContent) : 0,
+});
 
-var locations = arr_adr.GetAttribute("value");
+var locations = document.GetElementById("arr_adr").GetAttribute("value");
+
 //parse json
 var json = JsonSerializer.Deserialize<Dictionary<string, string>>(locations);
 //dictionary with value split by "_" symbol
 var locationsDict = json.ToDictionary(x => x.Key, x => x.Value.Split("_"));
 // dictionary converted to list of objects with id, lat, lon values.
-var locationsList = locationsDict.Select(x => new GeoPoint { id = x.Key, lat = x.Value[0], lon = x.Value[1] }).ToList();
+var locationsList = locationsDict
+    .Select(x =>
+        new GeoPoint
+        {
+            id = x.Key,
+            name = namesAndCapacities.Single(y => y.id == x.Key).name,
+            capacity = namesAndCapacities.Single(y => y.id == x.Key).aproxCapacity,
+            lat = x.Value[0],
+            lon = x.Value[1]
+        })
+    .ToList();
 
 // convert each line into this template:
 var items = locationsList.OrderBy(x => x.id).Select(generateGeojsonLine);
@@ -59,9 +79,24 @@ File.WriteAllText("../../../bikeshare_moved.geojson", string.Join("\n", movedPoi
 
 static string generateGeojsonLine(GeoPoint x)
 {
-    var template = "\u001e{{\"type\":\"FeatureCollection\",\"features\":[{{\"type\":\"Feature\",\"geometry\":{{\"type\":\"Point\",\"coordinates\":[{0},{1}]}},\"properties\":{{\"address\":\"{2}\",\"latitude\":\"{1}\",\"longitude\":\"{0}\",\"operator\":\"{3}\"}}}}]}}";
+    var template = "\u001e{{\"type\":\"FeatureCollection\"" +
+        ",\"features\":[{{\"type\":\"Feature\",\"geometry\":{{\"type\":\"Point\"," +
+        "\"coordinates\":[{0},{1}]}},\"properties\":{{" +
+        "\"address\":\"{2}\"," +
+        "\"latitude\":\"{1}\"," +
+        "\"longitude\":\"{0}\"," +
+        "\"name\":\"{3}\"," +
+        "\"capacity\":\"{4}\"," +
+        "\"operator\":\"{5}\"}}}}]}}";
 
-    return string.Format(template, x.lon, x.lat, x.id, "BikeShare Toronto");
+    return string.Format(template, x.lon, x.lat, x.id, x.name, x.capacity, "BikeShare Toronto");
+}
+
+static int IntParseOrZero(string inp)
+{
+    var yes = int.TryParse(Regex.Match(inp, @"\d+").Value, out var result);
+
+    return yes ? result : 0;
 }
 
 
