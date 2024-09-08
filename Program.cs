@@ -54,24 +54,53 @@ var geojson = string.Join("\n", items);
 File.WriteAllText("../../../bikeshare.geojson", geojson);
 
 
+// Get the last committed version of the file
+string lastCommittedVersion = GitDiffToGeojson.GetLastCommittedVersion();
 
-var (addedlines, removedObjects) = GitDiffToGeojson.Compare("HEAD");
+// Parse the last committed version into a list of GeoPoints
+List<GeoPoint> lastCommittedPoints = lastCommittedVersion
+    .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+    .Select(GeoPoint.ParseLine)
+    .ToList();
 
-var addedPoints = addedlines.Select(GeoPoint.ParseLine).ToList();
+// Compare the current points with the last committed points
+var currentPoints = locationsList;
 
-var removedPoints = removedObjects.Select(GeoPoint.ParseLine).ToList();
+var addedPoints = currentPoints.ExceptBy(lastCommittedPoints.Select(p => p.id), p => p.id).ToList();
+var removedPoints = lastCommittedPoints.ExceptBy(currentPoints.Select(p => p.id), p => p.id).ToList();
+
+var movedOrRenamedPoints = currentPoints
+    .Join(lastCommittedPoints,
+        current => current.id,
+        last => last.id,
+        (current, last) => new
+        {
+            Current = current,
+            Last = last,
+            HasMoved = current.lat != last.lat || current.lon != last.lon,
+            HasRenamed = current.name != last.name
+        })
+    .Where(p => p.HasMoved || p.HasRenamed)
+    .ToList();
+
+var movedPointsFinal = movedOrRenamedPoints
+    .Where(p => p.HasMoved)
+    .Select(p => p.Current)
+    .ToList();
+
+var renamedPoints = movedOrRenamedPoints
+    .Where(p => p.HasRenamed && !p.HasMoved)
+    .Select(p => p.Current)
+    .ToList();
+
+var addedPointsFinal = addedPoints.ToList();
+var removedPointsFinal = removedPoints.ToList();
 
 
-var addedIds = addedPoints.Select(x => x.id).ToList();
-var removedIds = removedPoints.Select(x => x.id).ToList();
-var movedIds = addedIds.Intersect(removedIds).ToList();
-
-var movedPointsFinal = addedPoints.Where(x => movedIds.Contains(x.id)).ToList();
-var addedPointsFinal = addedPoints.Where(x => !movedIds.Contains(x.id)).ToList();
-var removedPointsFinal = removedPoints.Where(x => !movedIds.Contains(x.id)).ToList();
 
 
 
+File.WriteAllText("../../../bikeshare_renamed.geojson", string.Join("\n", renamedPoints.OrderBy(x => x.id).Select(generateGeojsonLine)));
 File.WriteAllText("../../../bikeshare_added.geojson", string.Join("\n", addedPointsFinal.OrderBy(x => x.id).Select(generateGeojsonLine)));
 File.WriteAllText("../../../bikeshare_toreview.geojson", string.Join("\n", addedPoints.OrderBy(x => x.id).Select(generateGeojsonLine)));
 File.WriteAllText("../../../bikeshare_removed.geojson", string.Join("\n", removedPointsFinal.OrderBy(x => x.id).Select(generateGeojsonLine)));
@@ -82,11 +111,11 @@ static string generateGeojsonLine(GeoPoint x)
     var template = "\u001e{{\"type\":\"FeatureCollection\"" +
         ",\"features\":[{{\"type\":\"Feature\",\"geometry\":{{\"type\":\"Point\"," +
         "\"coordinates\":[{0},{1}]}},\"properties\":{{" +
-        "\"address\":\"{2}\"," +
-        "\"latitude\":\"{1}\"," +
-        "\"longitude\":\"{0}\"," +
-        "\"name\":\"{3}\"," +
-        "\"capacity\":\"{4}\"," +
+                "\"address\":\"{2}\"," +
+                "\"latitude\":\"{1}\"," +
+                "\"longitude\":\"{0}\"," +
+                "\"name\":\"{3}\"," +
+                "\"capacity\":\"{4}\"," +
         "\"operator\":\"{5}\"}}}}]}}";
 
     return string.Format(template, x.lon, x.lat, x.id, x.name, x.capacity, "BikeShare Toronto");

@@ -1,14 +1,5 @@
 See [Maproulette](https://maproulette.org/browse/projects/53785) project to bring the map of Bikeshare stations up to date!
 
-
-Current state is in `bikeshare_stations.geojson`.
-
-* Weekly points to review: `bikeshare_toreview.geojson`.
-* Weekly points to remove: `bikeshare_removed.geojson`.
-
-TODO:
-	- Auto-creator of Maproulette challenges
-
 [Follow BikeShareTO socials to get pictures of new stations](https://x.com/BikeShareTO)
 [query to examine existing stations](https://overpass-turbo.eu/s/1LGI):
 [rogue stations without `ref` tag](https://overpass-turbo.eu/s/1QGK)
@@ -27,3 +18,18 @@ out body;
 out skel qt;
 
 ```
+
+## Generated Files
+
+The following files are generated and updated regularly:
+
+* `bikeshare.geojson`: Contains all current Bikeshare Toronto stations.
+* `bikeshare_added.geojson`: New stations added since the last update.
+* `bikeshare_removed.geojson`: Stations removed since the last update.
+* `bikeshare_moved.geojson`: Stations that have changed location.
+* `bikeshare_renamed.geojson`: Stations that have been renamed.
+
+## TODO
+
+- [ ] Implement automatic creation of Maproulette challenges based on weekly changes.
+- [ ] Develop a script to automatically update OSM with new/removed stations.

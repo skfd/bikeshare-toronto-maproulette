@@ -13,6 +13,50 @@ namespace prepareBikeParking
             return (addedlines, removedObjects);
         }
 
+        public static string GetLastCommittedVersion()
+        {
+            string command = "show HEAD:../../../bikeshare.geojson";
+            string arguments = "";
+
+            ProcessStartInfo startInfo = new ProcessStartInfo
+            {
+                FileName = "git",
+                Arguments = $"{command} {arguments}",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            StringBuilder output = new StringBuilder();
+            StringBuilder errorOutput = new StringBuilder();
+
+            using (Process process = Process.Start(startInfo))
+            {
+                if (process != null)
+                {
+                    while (!process.StandardOutput.EndOfStream)
+                    {
+                        output.AppendLine(process.StandardOutput.ReadLine());
+                    }
+
+                    while (!process.StandardError.EndOfStream)
+                    {
+                        errorOutput.AppendLine(process.StandardError.ReadLine());
+                    }
+
+                    process.WaitForExit();
+
+                    if (process.ExitCode != 0)
+                    {
+                        throw new Exception($"Git command failed: {errorOutput}");
+                    }
+                }
+            }
+
+            return output.ToString();
+        }
+
         public static (List<string>, List<string>) Compare(string @new = "HEAD", string old = "")
         {
             var diffOutput = RunGitDiffCommand(@new, old);

@@ -14,7 +14,7 @@ internal class GeoPoint
     internal static GeoPoint ParseLine(string line)
     {
 
-        var dynamicPoint = JsonSerializer.Deserialize<JsonObject>(line);
+        var dynamicPoint = JsonSerializer.Deserialize<JsonObject>(line.TrimStart('\u001e'));
 
         var result = new GeoPoint
         {
