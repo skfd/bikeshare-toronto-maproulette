@@ -20,7 +20,7 @@ var namesAndCapacities =
 , x => new
 {
     id = x.GetAttribute("id"),
-    name = x.Children[0].TextContent,
+    name = x.Children[0].TextContent.Trim(),
     aproxCapacity = x.Children.Length == 4 ?
             IntParseOrZero(x.Children[1].TextContent) +
             IntParseOrZero(x.Children[3].TextContent) +
