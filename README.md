@@ -28,3 +28,8 @@ The following files are generated and updated regularly:
 * `bikeshare_removed.geojson`: Stations removed since the last update.
 * `bikeshare_moved.geojson`: Stations that have changed location.
 * `bikeshare_renamed.geojson`: Stations that have been renamed.
+
+
+## Docs
+
+https://github.com/maproulette/maproulette-backend/blob/main/docs/challenge_api.md#manually-building-a-challenge
