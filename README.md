@@ -28,8 +28,3 @@ The following files are generated and updated regularly:
 * `bikeshare_removed.geojson`: Stations removed since the last update.
 * `bikeshare_moved.geojson`: Stations that have changed location.
 * `bikeshare_renamed.geojson`: Stations that have been renamed.
-
-## TODO
-
-- [ ] Implement automatic creation of Maproulette challenges based on weekly changes.
-- [ ] Develop a script to automatically update OSM with new/removed stations.
