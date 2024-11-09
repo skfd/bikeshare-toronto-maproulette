@@ -19,12 +19,18 @@ internal class GeoPoint
         var result = new GeoPoint
         {
             id = (string)dynamicPoint["features"][0]["properties"]["address"],
-            name = (string)dynamicPoint["features"][0]["properties"]["name"],
+            name = ((string)dynamicPoint["features"][0]["properties"]["name"]).Trim(),
             capacity = int.Parse((string)dynamicPoint["features"][0]["properties"]["capacity"] ?? "0"),
-            lat = (string)dynamicPoint["features"][0]["properties"]["latitude"],
-            lon = (string)dynamicPoint["features"][0]["properties"]["longitude"],
+            lat = ParseCoords((string)dynamicPoint["features"][0]["properties"]["latitude"]).ToString(System.Globalization.CultureInfo.InvariantCulture),
+            lon = ParseCoords((string)dynamicPoint["features"][0]["properties"]["longitude"]).ToString(System.Globalization.CultureInfo.InvariantCulture),
         };
 
+        return result;
+    }
+
+    public static double ParseCoords(string inp)
+    {
+        var result = Math.Round(double.Parse(inp, System.Globalization.CultureInfo.InvariantCulture), 5);
         return result;
     }
 }

@@ -39,8 +39,10 @@ var movedOrRenamedPoints = currentPoints
         {
             Current = current,
             Last = last,
-            HasMoved = current.lat != last.lat || current.lon != last.lon,
-            HasRenamed = current.name != last.name
+            HasMoved =
+                GeoPoint.ParseCoords(current.lat) != GeoPoint.ParseCoords(last.lat) ||
+                GeoPoint.ParseCoords(current.lon) != GeoPoint.ParseCoords(last.lon),
+            HasRenamed = current.name.Trim() != last.name.Trim()
         })
     .Where(p => p.HasMoved || p.HasRenamed)
     .ToList();
@@ -68,7 +70,7 @@ File.WriteAllText("../../../bikeshare_toreview.geojson", string.Join("\n", added
 File.WriteAllText("../../../bikeshare_removed.geojson", string.Join("\n", removedPointsFinal.OrderBy(x => x.id).Select(generateGeojsonLine)));
 File.WriteAllText("../../../bikeshare_moved.geojson", string.Join("\n", movedPointsFinal.OrderBy(x => x.id).Select(generateGeojsonLine)));
 
-
+return;
 // Call the function to create the Maproulette task
 await CreateMaprouletteRemoveTask(53785);
 
@@ -141,7 +143,7 @@ async Task CreateMaprouletteRemoveTask(int projectId)
 
     client.DefaultRequestHeaders.Add("apiKey", apiKey);
 
-    var challengeName = $"API TEST: Remove Bikeshare Toronto stations - {DateTime.Now:yyyy-MM-dd}";
+    var challengeName = $"API TEST: Remove Bikeshare Toronto stations - {DateTime.Now:yyyy-MM-dd} {DateTime.Now}";
 
     // Create challenge
     var challengeData = new
@@ -150,7 +152,7 @@ async Task CreateMaprouletteRemoveTask(int projectId)
         description = "Remove Bikeshare Toronto stations that no longer exist",
         instruction = "Please verify and remove the Bikeshare Toronto station from OpenStreetMap.",
         blurb = "Please verify and remove the Bikeshare Toronto station from OpenStreetMap.",
-        enabled = true,
+        enabled = false,
         difficulty = 2,
         requiresLocal = false,
         // localGeoJSON = File.ReadAllText("../../../bikeshare_removed.geojson"),
@@ -172,8 +174,9 @@ async Task CreateMaprouletteRemoveTask(int projectId)
     var challengeResult = JsonSerializer.Deserialize<JsonElement>(await challengeResponse.Content.ReadAsStringAsync());
     var challengeId = challengeResult.GetProperty("id").GetInt32();
 
-    var values = File.ReadAllText("../../../bikeshare_removed.geojson");
-    var taskResponse = await client.PostAsync(
+    //var values = File.ReadAllText("../../../bikeshare_removed.geojson").Replace("\u001e", "");
+    var values = File.ReadAllText("../../../linebyline.geojson").Replace("\u001e", "");
+    var taskResponse = await client.PutAsync(
         $"https://maproulette.org/api/v2/challenge/{challengeId}/addTasks",
         new StringContent(values, Encoding.UTF8, "application/json")
     );
@@ -202,7 +205,14 @@ static string generateGeojsonLine(GeoPoint x)
                 "\"capacity\":\"{4}\"," +
         "\"operator\":\"{5}\"}}}}]}}";
 
-    return string.Format(template, x.lon, x.lat, x.id, x.name, x.capacity, "BikeShare Toronto");
+    return string.Format(
+        template, 
+        GeoPoint.ParseCoords( x.lon).ToString(System.Globalization.CultureInfo.InvariantCulture), 
+        GeoPoint.ParseCoords(x.lat).ToString(System.Globalization.CultureInfo.InvariantCulture), 
+        x.id, 
+        x.name.Trim(), 
+        x.capacity, 
+        "BikeShare Toronto");
 }
 
 static int IntParseOrZero(string inp)
@@ -211,6 +221,7 @@ static int IntParseOrZero(string inp)
 
     return yes ? result : 0;
 }
+
 
 
 //amenity = bicycle_rental
