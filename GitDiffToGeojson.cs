@@ -25,7 +25,9 @@ namespace prepareBikeParking
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
-                CreateNoWindow = true
+                CreateNoWindow = true,
+                StandardOutputEncoding = Encoding.UTF8, // Ensure UTF-8 encoding
+                StandardErrorEncoding = Encoding.UTF8 // Ensure UTF-8 encoding for error output
             };
 
             StringBuilder output = new StringBuilder();

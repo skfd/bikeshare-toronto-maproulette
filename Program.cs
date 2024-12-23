@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 using System.Text;
 
 // Fetch bike share locations
-var locationsList = await FetchBikeShareLocations();
+var locationsList = await FetchBikeShareLocations2();
 
 // convert each line into this template:
 var items = locationsList.OrderBy(x => x.id).Select(generateGeojsonLine);
@@ -75,8 +75,92 @@ return;
 await CreateMaprouletteRemoveTask(53785);
 
 
+/*
+{
+  "last_updated": 1734912066,
+  "ttl": 6,
+  "data": {
+    "stations": [
+      {
+        "station_id": "7000",
+        "name": "Fort York  Blvd / Capreol Ct",
+        "physical_configuration": "REGULAR",
+        "lat": 43.639832,
+        "lon": -79.395954,
+        "altitude": null,
+        "address": "Fort York  Blvd / Capreol Ct",
+        "capacity": 47,
+        "is_charging_station": false,
+        "rental_methods": [
+          "KEY",
+          "TRANSITCARD",
+          "CREDITCARD",
+          "PHONE"
+        ],
+        "groups": [
+          "South"
+        ],
+        "obcn": "647-643-9607",
+        "short_name": "647-643-9607",
+        "nearby_distance": 500,
+        "_ride_code_support": true,
+        "rental_uris": {}
+      },
+      {
+        "station_id": "7001",
+        "name": "Wellesley Station Green P",
+        "physical_configuration": "ELECTRICBIKESTATION",
+        "lat": 43.66496415990742,
+        "lon": -79.38355031526893,
+        "altitude": null,
+        "address": "Yonge / Wellesley",
+        "post_code": "M4Y 1G7",
+        "capacity": 23,
+        "is_charging_station": true,
+        "rental_methods": [
+          "KEY",
+          "TRANSITCARD",
+          "CREDITCARD",
+          "PHONE"
+        ],
+        "groups": [
+          "E-Charging ",
+          "South"
+        ],
+        "obcn": "416-617-9576",
+        "short_name": "416-617-9576",
+        "nearby_distance": 500,
+        "_ride_code_support": true,
+        "rental_uris": {}
+      }]
+   }
+}
+ */
+async Task<List<GeoPoint>> FetchBikeShareLocations2()
+{
+    //download html from url
+    var url = "https://tor.publicbikesystem.net/ube/gbfs/v1/en/station_information";
 
-async Task<List<GeoPoint>> FetchBikeShareLocations()
+    var fetchedJson = await new HttpClient().GetStringAsync(url);
+    var parsedJson = JsonSerializer.Deserialize<JsonElement>(fetchedJson);
+
+    var a = parsedJson.GetProperty("data").GetProperty("stations");
+    var locationsDict = a.EnumerateArray().ToList();
+    var locationList =
+        locationsDict
+        .Select(x => new GeoPoint
+        {
+            id = x.GetProperty("station_id").GetString(),
+            name = x.GetProperty("name").GetString(),
+            capacity = x.GetProperty("capacity").GetInt32(),
+            lat = x.GetProperty("lat").GetDouble().ToString(System.Globalization.CultureInfo.InvariantCulture),
+            lon = x.GetProperty("lon").GetDouble().ToString(System.Globalization.CultureInfo.InvariantCulture)
+        });
+
+    return locationList.ToList();
+}
+
+async Task<List<GeoPoint>> FetchBikeShareLocations1()
 {
     //download html from url
     var url = "https://bikesharetoronto.com/system-map/";
