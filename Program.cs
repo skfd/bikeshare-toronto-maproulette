@@ -84,7 +84,7 @@ async Task CompareAndGenerateDiffFiles(List<GeoPoint> currentPoints)
     Console.WriteLine($"Generated diff files: {addedPoints.Count} added, {removedPoints.Count} removed, {movedPoints.Count} moved, {renamedPoints.Count} renamed");
 }
 
-(List<GeoPoint> added, List<GeoPoint> removed, List<GeoPoint> moved, List<GeoPoint> renamed) CompareBikeSharePoints(
+(List<GeoPoint> added, List<GeoPoint> removed, List<GeoPoint> moved, List<(GeoPoint current, GeoPoint old)> renamed) CompareBikeSharePoints(
     List<GeoPoint> currentPoints, 
     List<GeoPoint> lastCommittedPoints)
 {
@@ -114,17 +114,17 @@ async Task CompareAndGenerateDiffFiles(List<GeoPoint> currentPoints)
 
     var renamedPoints = movedOrRenamedPoints
         .Where(p => p.HasRenamed && !p.HasMoved)
-        .Select(p => p.Current)
+        .Select(p => (current: p.Current, old: p.Last))
         .ToList();
 
     return (addedPoints, removedPoints, movedPoints, renamedPoints);
 }
 
-async Task GenerateDiffFiles(List<GeoPoint> addedPoints, List<GeoPoint> removedPoints, List<GeoPoint> movedPoints, List<GeoPoint> renamedPoints)
+async Task GenerateDiffFiles(List<GeoPoint> addedPoints, List<GeoPoint> removedPoints, List<GeoPoint> movedPoints, List<(GeoPoint current, GeoPoint old)> renamedPoints)
 {
     Console.WriteLine("Generating diff files...");
     
-    File.WriteAllText("../../../bikeshare_renamed.geojson", string.Join("\n", renamedPoints.OrderBy(x => x.id).Select(generateGeojsonLine)));
+    File.WriteAllText("../../../bikeshare_renamed.geojson", string.Join("\n", renamedPoints.OrderBy(x => x.current.id).Select(x => generateGeojsonLineWithOldName(x.current, x.old.name))));
     File.WriteAllText("../../../bikeshare_added.geojson", string.Join("\n", addedPoints.OrderBy(x => x.id).Select(generateGeojsonLine)));
     File.WriteAllText("../../../bikeshare_toreview.geojson", string.Join("\n", addedPoints.OrderBy(x => x.id).Select(generateGeojsonLine)));
     File.WriteAllText("../../../bikeshare_removed.geojson", string.Join("\n", removedPoints.OrderBy(x => x.id).Select(generateGeojsonLine)));
@@ -357,6 +357,30 @@ static string generateGeojsonLine(GeoPoint x)
         x.name.Trim(), 
         x.capacity, 
         "BikeShare Toronto");
+}
+
+static string generateGeojsonLineWithOldName(GeoPoint x, string oldName)
+{
+    var template = "\u001e{{\"type\":\"FeatureCollection\"" +
+        ",\"features\":[{{\"type\":\"Feature\",\"geometry\":{{\"type\":\"Point\"," +
+        "\"coordinates\":[{0},{1}]}},\"properties\":{{" +
+                "\"address\":\"{2}\"," +
+                "\"latitude\":\"{1}\"," +
+                "\"longitude\":\"{0}\"," +
+                "\"name\":\"{3}\"," +
+                "\"oldName\":\"{6}\"," +
+                "\"capacity\":\"{4}\"," +
+        "\"operator\":\"{5}\"}}}}]}}";
+
+    return string.Format(
+        template, 
+        GeoPoint.ParseCoords( x.lon).ToString(System.Globalization.CultureInfo.InvariantCulture), 
+        GeoPoint.ParseCoords(x.lat).ToString(System.Globalization.CultureInfo.InvariantCulture), 
+        x.id, 
+        x.name.Trim(), 
+        x.capacity, 
+        "BikeShare Toronto",
+        oldName.Trim());
 }
 
 static int IntParseOrZero(string inp)
