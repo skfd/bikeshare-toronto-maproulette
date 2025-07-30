@@ -5,75 +5,139 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Text;
 
-// Fetch bike share locations
-var locationsList = await FetchBikeShareLocations2();
+// Main execution flow - comment out any step you don't want to run
+await RunBikeShareLocationComparison();
 
-// convert each line into this template:
-var items = locationsList.OrderBy(x => x.id).Select(generateGeojsonLine);
+async Task RunBikeShareLocationComparison()
+{
+    // Step 1: Get bike share locations data
+    // Option A: Fetch new bike share locations from API (comment out if you want to use existing data)
+    var locationsList = await FetchNewBikeShareLocations();
+    
+    // Option B: Read bike share locations from existing file (uncomment to use instead of fetching)
+    // var locationsList = await ReadBikeShareLocationsFromFile();
+    
+    // Step 2: Generate and save the main geojson file
+    await GenerateMainGeojsonFile(locationsList);
+    
+    // Step 3: Compare with last committed version and generate diff files
+    await CompareAndGenerateDiffFiles(locationsList);
+    
+    // Step 4: Create Maproulette task (comment out if you don't want to create tasks)
+    // await CreateMaprouletteTask(53785);
+}
 
-// join lines and save as geojson file
-var geojson = string.Join("\n", items);
-File.WriteAllText("../../../bikeshare.geojson", geojson);
+async Task<List<GeoPoint>> FetchNewBikeShareLocations()
+{
+    Console.WriteLine("Fetching new bike share locations...");
+    return await FetchBikeShareLocations2();
+}
 
+async Task<List<GeoPoint>> ReadBikeShareLocationsFromFile()
+{
+    Console.WriteLine("Reading bike share locations from file...");
+    string filePath = "../../../bikeshare.geojson";
+    
+    if (!File.Exists(filePath))
+    {
+        throw new FileNotFoundException($"File not found: {filePath}. Please ensure the file exists or use FetchNewBikeShareLocations() instead.");
+    }
+    
+    string fileContent = File.ReadAllText(filePath);
+    var locationsList = fileContent
+        .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+        .Select(GeoPoint.ParseLine)
+        .ToList();
+    
+    Console.WriteLine($"Read {locationsList.Count} locations from file.");
+    return locationsList;
+}
 
-// Get the last committed version of the file
-string lastCommittedVersion = GitDiffToGeojson.GetLastCommittedVersion();
+async Task GenerateMainGeojsonFile(List<GeoPoint> locationsList)
+{
+    Console.WriteLine("Generating main geojson file...");
+    var items = locationsList.OrderBy(x => x.id).Select(generateGeojsonLine);
+    var geojson = string.Join("\n", items);
+    File.WriteAllText("../../../bikeshare.geojson", geojson);
+    Console.WriteLine("Main geojson file saved.");
+}
 
-// Parse the last committed version into a list of GeoPoints
-List<GeoPoint> lastCommittedPoints = lastCommittedVersion
-    .Split('\n', StringSplitOptions.RemoveEmptyEntries)
-    .Select(GeoPoint.ParseLine)
-    .ToList();
+async Task CompareAndGenerateDiffFiles(List<GeoPoint> currentPoints)
+{
+    Console.WriteLine("Comparing with last committed version...");
+    
+    // Get the last committed version of the file
+    string lastCommittedVersion = GitDiffToGeojson.GetLastCommittedVersion();
 
-// Compare the current points with the last committed points
-var currentPoints = locationsList;
+    // Parse the last committed version into a list of GeoPoints
+    List<GeoPoint> lastCommittedPoints = lastCommittedVersion
+        .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+        .Select(GeoPoint.ParseLine)
+        .ToList();
 
-var addedPoints = currentPoints.ExceptBy(lastCommittedPoints.Select(p => p.id), p => p.id).ToList();
-var removedPoints = lastCommittedPoints.ExceptBy(currentPoints.Select(p => p.id), p => p.id).ToList();
+    // Compare the current points with the last committed points
+    var (addedPoints, removedPoints, movedPoints, renamedPoints) = CompareBikeSharePoints(currentPoints, lastCommittedPoints);
 
-var movedOrRenamedPoints = currentPoints
-    .Join(lastCommittedPoints,
-        current => current.id,
-        last => last.id,
-        (current, last) => new
-        {
-            Current = current,
-            Last = last,
-            HasMoved =
-                GeoPoint.ParseCoords(current.lat) != GeoPoint.ParseCoords(last.lat) ||
-                GeoPoint.ParseCoords(current.lon) != GeoPoint.ParseCoords(last.lon),
-            HasRenamed = current.name.Trim() != last.name.Trim()
-        })
-    .Where(p => p.HasMoved || p.HasRenamed)
-    .ToList();
+    // Generate diff files
+    await GenerateDiffFiles(addedPoints, removedPoints, movedPoints, renamedPoints);
+    
+    Console.WriteLine($"Generated diff files: {addedPoints.Count} added, {removedPoints.Count} removed, {movedPoints.Count} moved, {renamedPoints.Count} renamed");
+}
 
-var movedPointsFinal = movedOrRenamedPoints
-    .Where(p => p.HasMoved)
-    .Select(p => p.Current)
-    .ToList();
+(List<GeoPoint> added, List<GeoPoint> removed, List<GeoPoint> moved, List<GeoPoint> renamed) CompareBikeSharePoints(
+    List<GeoPoint> currentPoints, 
+    List<GeoPoint> lastCommittedPoints)
+{
+    var addedPoints = currentPoints.ExceptBy(lastCommittedPoints.Select(p => p.id), p => p.id).ToList();
+    var removedPoints = lastCommittedPoints.ExceptBy(currentPoints.Select(p => p.id), p => p.id).ToList();
 
-var renamedPoints = movedOrRenamedPoints
-    .Where(p => p.HasRenamed && !p.HasMoved)
-    .Select(p => p.Current)
-    .ToList();
+    var movedOrRenamedPoints = currentPoints
+        .Join(lastCommittedPoints,
+            current => current.id,
+            last => last.id,
+            (current, last) => new
+            {
+                Current = current,
+                Last = last,
+                HasMoved =
+                    GeoPoint.ParseCoords(current.lat) != GeoPoint.ParseCoords(last.lat) ||
+                    GeoPoint.ParseCoords(current.lon) != GeoPoint.ParseCoords(last.lon),
+                HasRenamed = current.name.Trim() != last.name.Trim()
+            })
+        .Where(p => p.HasMoved || p.HasRenamed)
+        .ToList();
 
-var addedPointsFinal = addedPoints.ToList();
-var removedPointsFinal = removedPoints.ToList();
+    var movedPoints = movedOrRenamedPoints
+        .Where(p => p.HasMoved)
+        .Select(p => p.Current)
+        .ToList();
 
+    var renamedPoints = movedOrRenamedPoints
+        .Where(p => p.HasRenamed && !p.HasMoved)
+        .Select(p => p.Current)
+        .ToList();
 
+    return (addedPoints, removedPoints, movedPoints, renamedPoints);
+}
 
+async Task GenerateDiffFiles(List<GeoPoint> addedPoints, List<GeoPoint> removedPoints, List<GeoPoint> movedPoints, List<GeoPoint> renamedPoints)
+{
+    Console.WriteLine("Generating diff files...");
+    
+    File.WriteAllText("../../../bikeshare_renamed.geojson", string.Join("\n", renamedPoints.OrderBy(x => x.id).Select(generateGeojsonLine)));
+    File.WriteAllText("../../../bikeshare_added.geojson", string.Join("\n", addedPoints.OrderBy(x => x.id).Select(generateGeojsonLine)));
+    File.WriteAllText("../../../bikeshare_toreview.geojson", string.Join("\n", addedPoints.OrderBy(x => x.id).Select(generateGeojsonLine)));
+    File.WriteAllText("../../../bikeshare_removed.geojson", string.Join("\n", removedPoints.OrderBy(x => x.id).Select(generateGeojsonLine)));
+    File.WriteAllText("../../../bikeshare_moved.geojson", string.Join("\n", movedPoints.OrderBy(x => x.id).Select(generateGeojsonLine)));
+    
+    Console.WriteLine("Diff files generated successfully.");
+}
 
-
-File.WriteAllText("../../../bikeshare_renamed.geojson", string.Join("\n", renamedPoints.OrderBy(x => x.id).Select(generateGeojsonLine)));
-File.WriteAllText("../../../bikeshare_added.geojson", string.Join("\n", addedPointsFinal.OrderBy(x => x.id).Select(generateGeojsonLine)));
-File.WriteAllText("../../../bikeshare_toreview.geojson", string.Join("\n", addedPoints.OrderBy(x => x.id).Select(generateGeojsonLine)));
-File.WriteAllText("../../../bikeshare_removed.geojson", string.Join("\n", removedPointsFinal.OrderBy(x => x.id).Select(generateGeojsonLine)));
-File.WriteAllText("../../../bikeshare_moved.geojson", string.Join("\n", movedPointsFinal.OrderBy(x => x.id).Select(generateGeojsonLine)));
-
-return;
-// Call the function to create the Maproulette task
-await CreateMaprouletteRemoveTask(53785);
-
+async Task CreateMaprouletteTask(int projectId)
+{
+    Console.WriteLine("Creating Maproulette task...");
+    await CreateMaprouletteRemoveTask(projectId);
+}
 
 /*
 {
@@ -273,10 +337,6 @@ async Task CreateMaprouletteRemoveTask(int projectId)
     Console.WriteLine($"Maproulette challenge created: {challengeName} (ID: {challengeId})");
 }
 
-
-
-
-
 static string generateGeojsonLine(GeoPoint x)
 {
     var template = "\u001e{{\"type\":\"FeatureCollection\"" +
@@ -305,8 +365,6 @@ static int IntParseOrZero(string inp)
 
     return yes ? result : 0;
 }
-
-
 
 //amenity = bicycle_rental
 //bicycle_rental = docking_station
