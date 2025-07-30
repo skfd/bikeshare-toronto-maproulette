@@ -13,10 +13,10 @@ async Task RunBikeShareLocationComparison()
 
     // Step 1: Get bike share locations data
     // Option A: Fetch new bike share locations from API (comment out if you want to use existing data)
-    //var locationsList = await BikeShareDataFetcher.FetchFromApiAsync();
+    var locationsList = await BikeShareDataFetcher.FetchFromApiAsync();
 
     // Option B: Read bike share locations from existing file (uncomment to use instead of fetching)
-    var locationsList = await BikeShareDataFetcher.ReadFromFileAsync();
+    //var locationsList = await BikeShareDataFetcher.ReadFromFileAsync();
 
     // Step 2: Generate and save the main geojson file
     await GeoJsonGenerator.GenerateMainFileAsync(locationsList);
@@ -25,7 +25,7 @@ async Task RunBikeShareLocationComparison()
     await CompareAndGenerateDiffFiles(locationsList);
 
     // Step 4: Create Maproulette task (comment out if you don't want to create tasks)
-    await MaprouletteTaskCreator.CreateTasksAsync(53785, lastSyncDate);
+    await MaprouletteTaskCreator.CreateTasksAsync(60735, lastSyncDate);
 }
 
 async Task CompareAndGenerateDiffFiles(List<GeoPoint> currentPoints)
