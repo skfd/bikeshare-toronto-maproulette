@@ -3,7 +3,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
-internal class GeoPoint
+public class GeoPoint
 {
     public string id { get; set; }
     public string name { get; set; }
@@ -11,7 +11,7 @@ internal class GeoPoint
     public string lat { get; set; }
     public string lon { get; set; }
 
-    internal static GeoPoint ParseLine(string line)
+    public static GeoPoint ParseLine(string line)
     {
 
         var dynamicPoint = JsonSerializer.Deserialize<JsonObject>(line.TrimStart('\u001e'));
