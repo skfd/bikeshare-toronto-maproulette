@@ -9,19 +9,20 @@ namespace prepareBikeParking
         {
             Console.WriteLine("Creating Maproulette tasks...");
 
-            // Create challenges for each type of change
+             //Create challenges for each type of change
             await CreateTaskForTypeAsync(projectId, "removed", $"Bikeshare Toronto -- Removed stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
                 "../../../instructions/removed.md", "../../../bikeshare_removed.geojson");
 
-            //await CreateTaskForTypeAsync(projectId, "added", $"Bikeshare Toronto -- Added stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
-            //    "../../../instructions/added.md", "../../../bikeshare_added.geojson");
+            await CreateTaskForTypeAsync(projectId, "added", $"Bikeshare Toronto -- Added stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
+                "../../../instructions/added.md", "../../../bikeshare_added.geojson");
 
-            //await CreateTaskForTypeAsync(projectId, "moved", $"Bikeshare Toronto -- Moved stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
-            //    "../../../instructions/moved.md", "../../../bikeshare_moved.geojson");
+            await CreateTaskForTypeAsync(projectId, "moved", $"Bikeshare Toronto -- Moved stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
+                "../../../instructions/moved.md", "../../../bikeshare_moved.geojson");
 
-            //await CreateTaskForTypeAsync(projectId, "renamed", $"Bikeshare Toronto -- Renamed stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
-            //    "../../../instructions/renamed.md", "../../../bikeshare_renamed.geojson");
+            await CreateTaskForTypeAsync(projectId, "renamed", $"Bikeshare Toronto -- Renamed stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
+                "../../../instructions/renamed.md", "../../../bikeshare_renamed.geojson");
         }
+
 
         private async static Task CreateTaskForTypeAsync(int projectId, string taskType, string challengeDescription, string instructionFilePath, string filePath)
         {
@@ -76,7 +77,7 @@ namespace prepareBikeParking
                 return;
             }
 
-            var challengeName = $"1 {challengeDescription}";
+            var challengeName = $"226 {challengeDescription}";
 
             // Create challenge
             var challengeData = new
@@ -136,8 +137,25 @@ namespace prepareBikeParking
                 await Task.Delay(100);
             }
 
+            //await ResetTaskInstructionsAsync(taskType, client, challengeName, challengeId);
+
             Console.WriteLine($"{taskType.ToUpper()} challenge creation completed: {challengeName} (ID: {challengeId})");
             Console.WriteLine($"Tasks created successfully: {successCount}, Failed: {failureCount}, Total: {stations.Count}");
+        }
+
+        private static async Task ResetTaskInstructionsAsync(string taskType, HttpClient client, string challengeName, int challengeId)
+        {
+            var resetResponse = await client.PutAsync(
+                $"https://maproulette.org/api/v2/challenge/{challengeId}/resetTaskInstructions", null);
+
+            if (resetResponse.IsSuccessStatusCode)
+            {
+                Console.WriteLine($"Successfully reset task instructions for {taskType} challenge {challengeName} (ID: {challengeId})");
+            }
+            else
+            {
+                Console.WriteLine($"Failed to reset task instructions for {taskType} challenge {challengeName} (ID: {challengeId}): {await resetResponse.Content.ReadAsStringAsync()}");
+            }
         }
     }
 }
