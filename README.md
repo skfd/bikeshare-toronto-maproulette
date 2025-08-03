@@ -1,3 +1,6 @@
+Hand made tool to automatically update the Bikeshare Toronto stations in OpeoStreetMap. Current version can downlaod infomration about Bikeshare stations from Vendor API, and create Maproulette challenges. Future ambition is to automate this some more.
+
+
 See [Bike Share Toronto project](https://maproulette.org/admin/project/60735) on Maproulette to bring the map of Bikeshare stations up to date!
 
 [Follow BikeShareTO socials to get pictures of new stations](https://x.com/BikeShareTO)
