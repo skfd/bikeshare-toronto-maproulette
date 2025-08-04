@@ -77,7 +77,7 @@ namespace prepareBikeParking
                 return;
             }
 
-            var challengeName = $"226 {challengeDescription}";
+            var challengeName = $"{challengeDescription}";
 
             // Create challenge
             var challengeData = new
