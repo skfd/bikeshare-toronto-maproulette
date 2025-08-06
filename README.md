@@ -1,4 +1,21 @@
-Hand made tool to automatically update the Bikeshare Toronto stations in OpeoStreetMap. Current version can downlaod infomration about Bikeshare stations from Vendor API, and create Maproulette challenges. Future ambition is to automate this some more.
+Hand made tool to automatically update the Bikeshare Toronto stations in OpenStreetMap. Current version can download information about Bikeshare stations from Vendor API, compare with OpenStreetMap data, and create Maproulette challenges. Future ambition is to automate this some more.
+
+## New Features
+
+### OSM Data Download and Comparison
+
+The tool now supports downloading current bikeshare station data from OpenStreetMap using the Overpass API. This enables comparison between the official BikeShare Toronto API data and what's currently mapped in OpenStreetMap.
+
+To enable OSM comparison, uncomment the following line in `Program.cs`:
+```csharp
+//await CompareWithOSMData(locationsList);
+```
+
+This will generate additional comparison files:
+* `bikeshare_missing_in_osm.geojson`: Stations that exist in the API but are missing from OSM
+* `bikeshare_extra_in_osm.geojson`: Stations that exist in OSM but not in the current API
+* `bikeshare_moved_in_osm.geojson`: Stations that have different coordinates between API and OSM
+* `bikeshare_renamed_in_osm.geojson`: Stations that have different names between API and OSM
 
 
 See [Bike Share Toronto project](https://maproulette.org/admin/project/60735) on Maproulette to bring the map of Bikeshare stations up to date!
