@@ -24,6 +24,16 @@ async Task RunBikeShareLocationComparison()
     // Step 3: Compare with last committed version and generate diff files
     await CompareAndGenerateDiffFiles(locationsList);
 
+
+    Console.WriteLine("Do you want to create Maproulette tasks for the new locations? (y/N)");
+    var confirm = Console.ReadKey().KeyChar;
+    if (confirm.ToString().ToLower() != "y")
+    {
+        Console.WriteLine("Skipping Maproulette task creation.");
+        return;
+    }
+
+
     // Step 4: Create Maproulette task (comment out if you don't want to create tasks)
     await MaprouletteTaskCreator.CreateTasksAsync(60735, lastSyncDate);
 }
