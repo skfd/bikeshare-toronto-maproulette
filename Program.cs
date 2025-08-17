@@ -6,7 +6,7 @@ await RunBikeShareLocationComparison();
 
 async Task RunBikeShareLocationComparison()
 {
-    var lastSyncDate = 
+    var lastSyncDate =
         GitFunctions.GetLastCommitDateForFile("../../../bikeshare.geojson") ??
         throw new Exception("Failed to retrieve last sync date. Ensure the file exists and is committed in the git repository.");
     Console.WriteLine($"Last sync date: {lastSyncDate}");
@@ -67,26 +67,20 @@ async Task CompareAndGenerateDiffFiles(List<GeoPoint> currentPoints)
 
 async Task CompareWithOSMData(List<GeoPoint> bikeshareApiPoints)
 {
-    try
-    {
-        Console.WriteLine("Fetching current bikeshare stations from OpenStreetMap...");
-        
-        // Fetch current OSM data
-        var osmPoints = await OSMDataFetcher.FetchFromOverpassApiAsync();
-        Console.WriteLine($"Found {osmPoints.Count} bikeshare stations in OSM");
 
-        // Compare BikeShare API data with OSM data
-        var (missingInOSM, extraInOSM, differentInOSM, renamedInOSM) = BikeShareComparer.ComparePoints(bikeshareApiPoints, osmPoints);
+    Console.WriteLine("Fetching current bikeshare stations from OpenStreetMap...");
 
-        // Generate comparison files
-        await GeoJsonGenerator.GenerateOSMComparisonFilesAsync(missingInOSM, extraInOSM, differentInOSM, renamedInOSM);
+    // Fetch current OSM data
+    var osmPoints = await OSMDataFetcher.FetchFromOverpassApiAsync();
+    Console.WriteLine($"Found {osmPoints.Count} bikeshare stations in OSM");
 
-        Console.WriteLine($"OSM comparison: {missingInOSM.Count} missing in OSM, {extraInOSM.Count} extra in OSM, {differentInOSM.Count} moved in OSM, {renamedInOSM.Count} renamed in OSM");
-        Console.WriteLine("Generated OSM comparison files: bikeshare_missing_in_osm.geojson, bikeshare_extra_in_osm.geojson, bikeshare_moved_in_osm.geojson, bikeshare_renamed_in_osm.geojson");
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"Error comparing with OSM data: {ex.Message}");
-        Console.WriteLine("Skipping OSM comparison...");
-    }
+    // Compare BikeShare API data with OSM data
+    var (missingInOSM, extraInOSM, differentInOSM, renamedInOSM) = BikeShareComparer.ComparePoints(bikeshareApiPoints, osmPoints);
+
+    // Generate comparison files
+    await GeoJsonGenerator.GenerateOSMComparisonFilesAsync(missingInOSM, extraInOSM, differentInOSM, renamedInOSM);
+
+    Console.WriteLine($"OSM comparison: {missingInOSM.Count} missing in OSM, {extraInOSM.Count} extra in OSM, {differentInOSM.Count} moved in OSM, {renamedInOSM.Count} renamed in OSM");
+    Console.WriteLine("Generated OSM comparison files: bikeshare_missing_in_osm.geojson, bikeshare_extra_in_osm.geojson, bikeshare_moved_in_osm.geojson, bikeshare_renamed_in_osm.geojson");
+
 }
