@@ -26,6 +26,9 @@ async Task RunBikeShareLocationComparison()
 
     Console.WriteLine("Do you want to create Maproulette tasks for the new locations? (y/N)");
 
+    // NEW: Step 5: Compare with OSM data (uncomment to enable OSM comparison)
+    await CompareWithOSMData(locationsList);
+
     var confirm = Console.ReadKey().KeyChar;
     if (confirm.ToString().ToLower() != "y")
     {
@@ -33,12 +36,11 @@ async Task RunBikeShareLocationComparison()
         Console.WriteLine("Skipping Maproulette task creation.");
         return;
     }
-
-    // Step 4: Create Maproulette task (comment out if you don't want to create tasks)
-    await MaprouletteTaskCreator.CreateTasksAsync(60735, lastSyncDate);
-
-    // NEW: Step 5: Compare with OSM data (uncomment to enable OSM comparison)
-    //await CompareWithOSMData(locationsList);
+    else
+    {
+        // Step 4: Create Maproulette task (comment out if you don't want to create tasks)
+        await MaprouletteTaskCreator.CreateTasksAsync(60735, lastSyncDate);
+    }
 }
 
 async Task CompareAndGenerateDiffFiles(List<GeoPoint> currentPoints)
