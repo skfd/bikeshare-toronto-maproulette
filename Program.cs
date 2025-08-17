@@ -6,7 +6,7 @@ await RunBikeShareLocationComparison();
 
 async Task RunBikeShareLocationComparison()
 {
-    var lastSyncDate = 
+    var lastSyncDate =
         GitFunctions.GetLastCommitDateForFile("../../../bikeshare.geojson") ??
         throw new Exception("Failed to retrieve last sync date. Ensure the file exists and is committed in the git repository.");
     Console.WriteLine($"Last sync date: {lastSyncDate}");
@@ -24,18 +24,23 @@ async Task RunBikeShareLocationComparison()
     // Step 3: Compare with last committed version and generate diff files
     await CompareAndGenerateDiffFiles(locationsList);
 
-
     Console.WriteLine("Do you want to create Maproulette tasks for the new locations? (y/N)");
+
+    // NEW: Step 5: Compare with OSM data (uncomment to enable OSM comparison)
+    await CompareWithOSMData(locationsList);
+
     var confirm = Console.ReadKey().KeyChar;
     if (confirm.ToString().ToLower() != "y")
     {
+
         Console.WriteLine("Skipping Maproulette task creation.");
         return;
     }
-
-
-    // Step 4: Create Maproulette task (comment out if you don't want to create tasks)
-    await MaprouletteTaskCreator.CreateTasksAsync(60735, lastSyncDate);
+    else
+    {
+        // Step 4: Create Maproulette task (comment out if you don't want to create tasks)
+        await MaprouletteTaskCreator.CreateTasksAsync(60735, lastSyncDate);
+    }
 }
 
 async Task CompareAndGenerateDiffFiles(List<GeoPoint> currentPoints)
@@ -58,4 +63,24 @@ async Task CompareAndGenerateDiffFiles(List<GeoPoint> currentPoints)
     await GeoJsonGenerator.GenerateDiffFilesAsync(addedPoints, removedPoints, movedPoints, renamedPoints);
 
     Console.WriteLine($"Generated diff files: {addedPoints.Count} added, {removedPoints.Count} removed, {movedPoints.Count} moved, {renamedPoints.Count} renamed");
+}
+
+async Task CompareWithOSMData(List<GeoPoint> bikeshareApiPoints)
+{
+
+    Console.WriteLine("Fetching current bikeshare stations from OpenStreetMap...");
+
+    // Fetch current OSM data
+    var osmPoints = await OSMDataFetcher.FetchFromOverpassApiAsync();
+    Console.WriteLine($"Found {osmPoints.Count} bikeshare stations in OSM");
+
+    // Compare BikeShare API data with OSM data
+    var (missingInOSM, extraInOSM, differentInOSM, renamedInOSM) = BikeShareComparer.ComparePoints(bikeshareApiPoints, osmPoints);
+
+    // Generate comparison files
+    await GeoJsonGenerator.GenerateOSMComparisonFilesAsync(missingInOSM, extraInOSM, differentInOSM, renamedInOSM);
+
+    Console.WriteLine($"OSM comparison: {missingInOSM.Count} missing in OSM, {extraInOSM.Count} extra in OSM, {differentInOSM.Count} moved in OSM, {renamedInOSM.Count} renamed in OSM");
+    Console.WriteLine("Generated OSM comparison files: bikeshare_missing_in_osm.geojson, bikeshare_extra_in_osm.geojson, bikeshare_moved_in_osm.geojson, bikeshare_renamed_in_osm.geojson");
+
 }
