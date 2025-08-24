@@ -11,16 +11,16 @@ namespace prepareBikeParking
 
              //Create challenges for each type of change
             await CreateTaskForTypeAsync(projectId, "removed", $"Bikeshare Toronto -- Removed stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
-                "../../../instructions/removed.md", "../../../bikeshare_removed.geojson");
+                "../../../instructions/removed.md", "../../../bikeshare_extra_in_osm.geojson");
 
             await CreateTaskForTypeAsync(projectId, "added", $"Bikeshare Toronto -- Added stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
-                "../../../instructions/added.md", "../../../bikeshare_added.geojson");
+                "../../../instructions/added.md", "../../../bikeshare_missing_in_osm.geojson");
 
             await CreateTaskForTypeAsync(projectId, "moved", $"Bikeshare Toronto -- Moved stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
                 "../../../instructions/moved.md", "../../../bikeshare_moved.geojson");
 
             await CreateTaskForTypeAsync(projectId, "renamed", $"Bikeshare Toronto -- Renamed stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
-                "../../../instructions/renamed.md", "../../../bikeshare_renamed.geojson");
+                "../../../instructions/renamed.md", "../../../bikeshare_renamed_in_osm.geojson");
         }
 
 
@@ -87,7 +87,7 @@ namespace prepareBikeParking
                 instruction = instruction,
                 checkinComment = $"{taskType} stations changeset for {challengeName}",
                 blurb = instruction,
-                enabled = false,
+                enabled = true,
                 difficulty = taskType == "removed" ? 2 : (taskType == "added" ? 3 : 2),
                 requiresLocal = false,
                 parent = projectId

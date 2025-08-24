@@ -24,11 +24,10 @@ async Task RunBikeShareLocationComparison()
     // Step 3: Compare with last committed version and generate diff files
     await CompareAndGenerateDiffFiles(locationsList);
 
-    Console.WriteLine("Do you want to create Maproulette tasks for the new locations? (y/N)");
-
     // NEW: Step 5: Compare with OSM data (uncomment to enable OSM comparison)
     await CompareWithOSMData(locationsList);
 
+    Console.WriteLine("Do you want to create Maproulette tasks for the new locations? (y/N)");
     var confirm = Console.ReadKey().KeyChar;
     if (confirm.ToString().ToLower() != "y")
     {
