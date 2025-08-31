@@ -56,7 +56,8 @@ async Task CompareAndGenerateDiffFiles(List<GeoPoint> currentPoints)
         .ToList();
 
     // Compare the current points with the last committed points
-    var (addedPoints, removedPoints, movedPoints, renamedPoints) = BikeShareComparer.ComparePoints(currentPoints, lastCommittedPoints);
+    var (addedPoints, removedPoints, movedPoints, renamedPoints) = 
+        BikeShareComparer.ComparePoints(currentPoints, lastCommittedPoints, moveThreshold: 3);
 
     // Generate diff files
     await GeoJsonGenerator.GenerateDiffFilesAsync(addedPoints, removedPoints, movedPoints, renamedPoints);
@@ -74,10 +75,13 @@ async Task CompareWithOSMData(List<GeoPoint> bikeshareApiPoints)
     Console.WriteLine($"Found {osmPoints.Count} bikeshare stations in OSM");
 
     // Compare BikeShare API data with OSM data
-    var (missingInOSM, extraInOSM, differentInOSM, renamedInOSM) = BikeShareComparer.ComparePoints(bikeshareApiPoints, osmPoints);
+    var (missingInOSM, extraInOSM, differentInOSM, renamedInOSM) = 
+        BikeShareComparer.ComparePoints(bikeshareApiPoints, osmPoints, moveThreshold: 30);
 
     // Generate comparison files
     await GeoJsonGenerator.GenerateOSMComparisonFilesAsync(missingInOSM, extraInOSM, differentInOSM, renamedInOSM);
+
+    await OsmFileFunctions.GenerateRenameOsmChangeFile(renamedInOSM);
 
     Console.WriteLine($"OSM comparison: {missingInOSM.Count} missing in OSM, {extraInOSM.Count} extra in OSM, {differentInOSM.Count} moved in OSM, {renamedInOSM.Count} renamed in OSM");
     Console.WriteLine("Generated OSM comparison files: bikeshare_missing_in_osm.geojson, bikeshare_extra_in_osm.geojson, bikeshare_moved_in_osm.geojson, bikeshare_renamed_in_osm.geojson");

@@ -405,3 +405,4 @@ FodyWeavers.xsd
 /bikeshare_missing_in_osm.geojson
 /bikeshare_moved_in_osm.geojson
 /bikeshare_renamed_in_osm.geojson
+/bikeshare_renames.osc

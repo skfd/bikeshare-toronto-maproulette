@@ -10,6 +10,10 @@ public class GeoPoint
     public int capacity { get; set; }
     public string lat { get; set; }
     public string lon { get; set; }
+    public string osmId { get; set; }
+    public string osmType { get; internal set; }
+    public int osmVersion { get; internal set; }
+    public JsonElement osmXmlElement { get; internal set; }
 
     public static GeoPoint ParseLine(string line)
     {

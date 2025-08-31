@@ -19,8 +19,10 @@ namespace prepareBikeParking
             await CreateTaskForTypeAsync(projectId, "moved", $"Bikeshare Toronto -- Moved stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
                 "../../../instructions/moved.md", "../../../bikeshare_moved.geojson");
 
-            await CreateTaskForTypeAsync(projectId, "renamed", $"Bikeshare Toronto -- Renamed stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
-                "../../../instructions/renamed.md", "../../../bikeshare_renamed_in_osm.geojson");
+            //NOTE: Renames are handled in bulk via changeset, so no need to create individual tasks
+            Console.WriteLine("Skipping 'renamed' challenge creation as renames are handled via changeset.");
+            //await CreateTaskForTypeAsync(projectId, "renamed", $"Bikeshare Toronto -- Renamed stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
+            //    "../../../instructions/renamed.md", "../../../bikeshare_renamed_in_osm.geojson");
         }
 
 

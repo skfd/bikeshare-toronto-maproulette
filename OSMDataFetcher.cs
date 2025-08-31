@@ -19,9 +19,7 @@ namespace prepareBikeParking
                   relation(area.to)[bicycle_rental=docking_station];
                 );
 
-                out body;
-                >;
-                out skel qt;
+                out meta;
                 ";
 
             var url = "https://overpass-api.de/api/interpreter";
@@ -77,6 +75,10 @@ namespace prepareBikeParking
                         rentalProp.GetString() == "docking_station")
                     {
                         var geoPoint = new GeoPoint();
+                        geoPoint.osmId = element.GetProperty("id").GetInt64().ToString();
+                        geoPoint.osmType = type;
+                        geoPoint.osmVersion = element.GetProperty("version").GetInt32();
+                        geoPoint.osmXmlElement = element;
 
                         // Get coordinates
                         if (element.TryGetProperty("lat", out var latProp))
@@ -188,6 +190,11 @@ namespace prepareBikeParking
         private static void ProcessWayElement(JsonElement element, JsonElement tags, JsonElement nodeElement, List<GeoPoint> geoPoints)
         {
             var geoPoint = new GeoPoint();
+
+            geoPoint.osmId = element.GetProperty("id").GetInt64().ToString();
+            geoPoint.osmType = "way";
+            geoPoint.osmVersion = element.GetProperty("version").GetInt32();
+            geoPoint.osmXmlElement = element;
 
             // Get coordinates from the referenced node
             if (nodeElement.TryGetProperty("lat", out var latProp))

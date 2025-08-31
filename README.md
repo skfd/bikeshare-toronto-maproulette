@@ -11,11 +11,14 @@ To enable OSM comparison, uncomment the following line in `Program.cs`:
 //await CompareWithOSMData(locationsList);
 ```
 
+The tool now generates osmChange file for renames, that can be uploaded to OSM using JOSM.
+
 This will generate additional comparison files:
 * `bikeshare_missing_in_osm.geojson`: Stations that exist in the API but are missing from OSM
 * `bikeshare_extra_in_osm.geojson`: Stations that exist in OSM but not in the current API
 * `bikeshare_moved_in_osm.geojson`: Stations that have different coordinates between API and OSM
 * `bikeshare_renamed_in_osm.geojson`: Stations that have different names between API and OSM
+* `bikeshare_renames.osc`: Changeset file that can be uploaded to OSM using JOSM
 
 
 See [Bike Share Toronto project](https://maproulette.org/admin/project/60735) on Maproulette to bring the map of Bikeshare stations up to date!
