@@ -5,23 +5,23 @@ namespace prepareBikeParking
 {
     public static class MaprouletteTaskCreator
     {
-        public async static Task CreateTasksAsync(int projectId, DateTime lastSyncDate, string cityName = "Toronto")
+        public async static Task CreateTasksAsync(int projectId, DateTime lastSyncDate, string systemName = "Toronto")
         {
             Console.WriteLine("Creating Maproulette tasks...");
 
              //Create challenges for each type of change
-            await CreateTaskForTypeAsync(projectId, "removed", $"Bikeshare {cityName} -- Removed stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
+            await CreateTaskForTypeAsync(projectId, "removed", $"{systemName} -- Removed stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
                 "../../../instructions/removed.md", "../../../bikeshare_extra_in_osm.geojson");
 
-            await CreateTaskForTypeAsync(projectId, "added", $"Bikeshare {cityName} -- Added stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
+            await CreateTaskForTypeAsync(projectId, "added", $"{systemName} -- Added stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
                 "../../../instructions/added.md", "../../../bikeshare_missing_in_osm.geojson");
 
-            await CreateTaskForTypeAsync(projectId, "moved", $"Bikeshare {cityName} -- Moved stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
+            await CreateTaskForTypeAsync(projectId, "moved", $"{systemName} -- Moved stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
                 "../../../instructions/moved.md", "../../../bikeshare_moved.geojson");
 
             //NOTE: Renames are handled in bulk via changeset, so no need to create individual tasks
             Console.WriteLine("Skipping 'renamed' challenge creation as renames are handled via changeset.");
-            //await CreateTaskForTypeAsync(projectId, "renamed", $"Bikeshare {cityName} -- Renamed stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
+            //await CreateTaskForTypeAsync(projectId, "renamed", $"{systemName} -- Renamed stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
             //    "../../../instructions/renamed.md", "../../../bikeshare_renamed_in_osm.geojson");
         }
 

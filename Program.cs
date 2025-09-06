@@ -7,49 +7,73 @@ if (args.Length == 0 || args.Any(arg => arg == "--help" || arg == "-h"))
     Console.WriteLine("Bike Share Location Comparison Tool");
     Console.WriteLine("===================================");
     Console.WriteLine();
-    Console.WriteLine("Usage: prepareBikeParking <city-name> <maproulette-project-id> [api-url]");
+    Console.WriteLine("Usage: prepareBikeParking <system-id>");
+    Console.WriteLine("       prepareBikeParking --list");
     Console.WriteLine();
     Console.WriteLine("Arguments:");
-    Console.WriteLine("  city-name              Name of the city (e.g., Toronto, Montreal, Vancouver)");
-    Console.WriteLine("  maproulette-project-id Numeric ID of the Maproulette project");
-    Console.WriteLine("  api-url               (Optional) Custom GBFS station_information API URL");
+    Console.WriteLine("  system-id    Numeric ID of the bike share system (from bikeshare_systems.json)");
+    Console.WriteLine("  --list       List all available bike share systems");
     Console.WriteLine();
     Console.WriteLine("Examples:");
-    Console.WriteLine("  prepareBikeParking Toronto 60735");
-    Console.WriteLine("  prepareBikeParking Montreal 12345 https://montreal.example.com/gbfs/v1/en/station_information");
+    Console.WriteLine("  prepareBikeParking 1        # Run for Bike Share Toronto");
+    Console.WriteLine("  prepareBikeParking 2        # Run for Bixi Montreal");
+    Console.WriteLine("  prepareBikeParking --list   # Show all available systems");
     Console.WriteLine();
     Console.WriteLine("Note: The tool requires the MAPROULETTE_API_KEY environment variable to be set");
     Console.WriteLine("      for creating Maproulette tasks.");
     return;
 }
 
-if (args.Length < 2)
+// Handle --list command
+if (args.Length == 1 && (args[0] == "--list" || args[0] == "-l"))
 {
-    Console.WriteLine("Error: Missing required arguments.");
-    Console.WriteLine("Use --help for usage information.");
+    await BikeShareSystemLoader.ListAvailableSystemsAsync();
     return;
 }
 
-string cityName = args[0];
-if (!int.TryParse(args[1], out int maprouletteProjectId))
+if (args.Length != 1)
 {
-    Console.WriteLine("Error: Maproulette project ID must be a valid integer.");
+    Console.WriteLine("Error: Please provide exactly one system ID.");
+    Console.WriteLine("Use --help for usage information or --list to see available systems.");
     return;
 }
 
-string? apiUrl = args.Length > 2 ? args[2] : null;
-
-Console.WriteLine($"Running bike share location comparison for {cityName}");
-Console.WriteLine($"Maproulette Project ID: {maprouletteProjectId}");
-if (!string.IsNullOrEmpty(apiUrl))
+if (!int.TryParse(args[0], out int systemId))
 {
-    Console.WriteLine($"Using custom API URL: {apiUrl}");
+    Console.WriteLine("Error: System ID must be a valid integer.");
+    Console.WriteLine("Use --list to see available system IDs.");
+    return;
+}
+
+// Load the bike share system configuration
+BikeShareSystem system;
+try
+{
+    system = await BikeShareSystemLoader.LoadSystemByIdAsync(systemId);
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"Error loading system configuration: {ex.Message}");
+    Console.WriteLine("Use --list to see available systems.");
+    return;
+}
+
+Console.WriteLine($"Running bike share location comparison for {system.Name} ({system.City})");
+Console.WriteLine($"System ID: {system.Id}");
+Console.WriteLine($"Maproulette Project ID: {system.MaprouletteProjectId}");
+Console.WriteLine($"GBFS API: {system.GbfsApi}");
+Console.WriteLine($"Station Information URL: {system.GetStationInformationUrl()}");
+
+// Validate Maproulette project ID if tasks will be created
+if (system.MaprouletteProjectId <= 0)
+{
+    Console.WriteLine("Warning: No valid Maproulette project ID configured for this system. Task creation will be skipped.");
 }
 
 // Main execution flow - comment out any step you don't want to run
-await RunBikeShareLocationComparison(cityName, maprouletteProjectId, apiUrl);
+await RunBikeShareLocationComparison(system);
 
-async Task RunBikeShareLocationComparison(string cityName, int maprouletteProjectId, string? apiUrl)
+async Task RunBikeShareLocationComparison(BikeShareSystem system)
 {
     var lastSyncDate =
         GitFunctions.GetLastCommitDateForFile("../../../bikeshare.geojson") ??
@@ -58,7 +82,7 @@ async Task RunBikeShareLocationComparison(string cityName, int maprouletteProjec
 
     // Step 1: Get bike share locations data
     // Option A: Fetch new bike share locations from API (comment out if you want to use existing data)
-    var locationsList = await BikeShareDataFetcher.FetchFromApiAsync(apiUrl);
+    var locationsList = await BikeShareDataFetcher.FetchFromApiAsync(system.GetStationInformationUrl());
 
     // Option B: Read bike share locations from existing file (uncomment to use instead of fetching)
     //var locationsList = await BikeShareDataFetcher.ReadFromFileAsync();
@@ -70,20 +94,26 @@ async Task RunBikeShareLocationComparison(string cityName, int maprouletteProjec
     await CompareAndGenerateDiffFiles(locationsList);
 
     // NEW: Step 5: Compare with OSM data (uncomment to enable OSM comparison)
-    await CompareWithOSMData(locationsList, cityName);
+    await CompareWithOSMData(locationsList, system.City);
 
     Console.WriteLine("Do you want to create Maproulette tasks for the new locations? (y/N)");
     var confirm = Console.ReadKey().KeyChar;
     if (confirm.ToString().ToLower() != "y")
     {
-
         Console.WriteLine("Skipping Maproulette task creation.");
         return;
     }
     else
     {
         // Step 4: Create Maproulette task (comment out if you don't want to create tasks)
-        await MaprouletteTaskCreator.CreateTasksAsync(maprouletteProjectId, lastSyncDate, cityName);
+        if (system.MaprouletteProjectId > 0)
+        {
+            await MaprouletteTaskCreator.CreateTasksAsync(system.MaprouletteProjectId, lastSyncDate, system.Name);
+        }
+        else
+        {
+            Console.WriteLine("Skipping Maproulette task creation: No valid project ID configured for this system.");
+        }
     }
 }
 

@@ -1,0 +1,16 @@
+{
+  "profiles": {
+    "WSL": {
+      "commandName": "WSL2",
+      "distributionName": ""
+    },
+    "toronto": {
+      "commandName": "Project",
+      "commandLineArgs": "1"
+    },
+    "montreal": {
+      "commandName": "Project",
+      "commandLineArgs": "2"
+    }
+  }
+}
