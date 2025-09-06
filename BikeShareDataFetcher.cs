@@ -10,10 +10,8 @@ namespace prepareBikeParking
         /// Fetches bike share locations from the official GBFS API
         /// </summary>
         /// <param name="apiUrl">Optional custom API URL. If not provided, defaults to Toronto's API.</param>
-        public static async Task<List<GeoPoint>> FetchFromApiAsync(string? apiUrl = null)
+        public static async Task<List<GeoPoint>> FetchFromApiAsync(string? url)
         {
-            var url = apiUrl ?? "https://tor.publicbikesystem.net/ube/gbfs/v1/en/station_information";
-
             Console.WriteLine($"Fetching bike share data from: {url}");
 
             try
