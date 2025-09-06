@@ -1,0 +1,10 @@
+bikeshare_added.geojson
+bikeshare_moved.geojson
+bikeshare_removed.geojson
+bikeshare_toreview.geojson
+bikeshare_renamed.geojson
+bikeshare_extra_in_osm.geojson
+bikeshare_missing_in_osm.geojson
+bikeshare_moved_in_osm.geojson
+bikeshare_renamed_in_osm.geojson
+bikeshare_renames.osc
