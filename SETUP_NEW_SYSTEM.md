@@ -219,6 +219,15 @@ network:wikidata=Q87654321
    ```bash
    set MAPROULETTE_API_KEY=your_api_key_here
    ```
+5. **Test Project Access**: The tool will automatically validate project access before creating tasks
+
+### Project Validation
+
+The tool automatically validates that:
+- ? The Maproulette project exists and is accessible
+- ? Your API key has the necessary permissions
+- ? The project is properly configured
+- ?? Warns if the project is disabled (tasks can still be created)
 
 ### Without Maproulette
 
@@ -228,6 +237,78 @@ Set `maproulette_project_id` to `-1` to skip task creation:
   "maproulette_project_id": -1
 }
 ```
+
+### Maproulette Troubleshooting
+
+**"Project not found" Error:**
+- Verify project ID at: `https://maproulette.org/admin/project/{ID}`
+- Ensure you have access to the project
+- Check that the project hasn't been deleted
+
+**"Unauthorized access" Error:**
+- Verify your `MAPROULETTE_API_KEY` is correct
+- Check that you have permission to access the project
+- Ensure your API key hasn't expired
+- Get API key from: [Maproulette Profile Settings](https://maproulette.org/user/profile)
+
+**"Network error" during validation:**
+- Check your internet connection
+- Verify Maproulette.org is accessible
+- Try again later if the service is temporarily unavailable
+
+**Challenge creation fails:**
+- Ensure you have permission to create challenges in the project
+- Check for duplicate challenge names
+- Verify all instruction files exist in the system's instructions directory
+
+### Test Project Access
+
+Before configuring a system, you can test your Maproulette project access:
+
+```bash
+# Test access to a specific project
+dotnet run --test-project 60735
+
+# Example output for successful validation:
+# Testing Maproulette project access for project ID: 60735
+# ============================================================
+# ? Found Maproulette project: 'Bike Share Toronto Updates' (ID: 60735)
+# ? Project validation successful!
+# You can use this project ID in your bikeshare_systems.json configuration.
+```
+
+### Validate Complete System Setup
+
+Perform comprehensive validation of a system setup with strict error checking:
+
+```bash
+# Validate a complete system setup
+dotnet run --validate 1
+
+# Example output for successful validation:
+# Validating system setup for system ID: 1
+# ============================================================
+# ? System configuration loaded: Bike Share Toronto (Toronto)
+# ? System directory and files validated
+# ? Instruction files validated for task creation
+# ? Maproulette project validated
+# 
+# ?? All validations passed! System is ready for use.
+```
+
+**The validation command checks:**
+- ? System configuration from bikeshare_systems.json
+- ? System directory structure
+- ? Required instruction files exist and have content
+- ? Maproulette project access (if configured)
+- ? API key validity
+
+**Validation will throw errors for:**
+- ? Missing or invalid system configuration
+- ? Missing system directories
+- ? Missing or empty instruction files
+- ? Invalid Maproulette project ID
+- ? Missing or invalid API key
 
 ## Troubleshooting
 
@@ -263,11 +344,34 @@ dotnet run <system-id>
 
 ### Getting Help
 
-The tool provides helpful error messages and will:
+The tool provides comprehensive error handling and will:
 - ? Auto-create missing directories
 - ? Generate missing instruction files  
 - ? Handle new system setup gracefully
-- ? Provide clear error messages for missing files
+- ? **Throw errors for critical missing components** (instead of warnings)
+
+### Error Handling
+
+The tool now uses **strict validation** and will stop execution with clear error messages for:
+
+**Critical Maproulette Issues:**
+- ? Missing `MAPROULETTE_API_KEY` when project is configured
+- ? Invalid or inaccessible Maproulette project ID
+- ? Unauthorized access to Maproulette project
+- ? Missing instruction files when creating tasks
+
+**Critical System Setup Issues:**
+- ? Missing system directories (auto-created if possible)
+- ? Missing or empty instruction files for task creation
+- ? Invalid system configuration
+
+**Example Error Messages:**
+```
+? Critical system setup error for 'MySystem': Missing required instruction files: instructions/added.md, instructions/removed.md
+? Cannot create Maproulette tasks for system 'MySystem': Missing or invalid instruction files
+? MAPROULETTE_API_KEY environment variable is required for project validation and task creation
+? Maproulette project 99999 not found. Please verify the project ID and your access permissions
+```
 
 ## Advanced Configuration
 

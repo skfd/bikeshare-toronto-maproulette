@@ -9,15 +9,21 @@ if (args.Length == 0 || args.Any(arg => arg == "--help" || arg == "-h"))
     Console.WriteLine();
     Console.WriteLine("Usage: prepareBikeParking <system-id>");
     Console.WriteLine("       prepareBikeParking --list");
+    Console.WriteLine("       prepareBikeParking --test-project <project-id>");
+    Console.WriteLine("       prepareBikeParking --validate <system-id>");
     Console.WriteLine();
     Console.WriteLine("Arguments:");
     Console.WriteLine("  system-id    Numeric ID of the bike share system (from bikeshare_systems.json)");
     Console.WriteLine("  --list       List all available bike share systems");
+    Console.WriteLine("  --test-project  Test Maproulette project access (requires MAPROULETTE_API_KEY)");
+    Console.WriteLine("  --validate   Validate system setup with strict error checking");
     Console.WriteLine();
     Console.WriteLine("Examples:");
     Console.WriteLine("  prepareBikeParking 1        # Run for Bike Share Toronto");
     Console.WriteLine("  prepareBikeParking 2        # Run for Bixi Montreal");
     Console.WriteLine("  prepareBikeParking --list   # Show all available systems");
+    Console.WriteLine("  prepareBikeParking --test-project 60735  # Test access to project 60735");
+    Console.WriteLine("  prepareBikeParking --validate 1  # Validate Bike Share Toronto setup");
     Console.WriteLine();
     Console.WriteLine("Note: The tool requires the MAPROULETTE_API_KEY environment variable to be set");
     Console.WriteLine("      for creating Maproulette tasks.");
@@ -30,6 +36,89 @@ if (args.Length == 0 || args.Any(arg => arg == "--help" || arg == "-h"))
 if (args.Length == 1 && (args[0] == "--list" || args[0] == "-l"))
 {
     await BikeShareSystemLoader.ListAvailableSystemsAsync();
+    return;
+}
+
+// Handle --test-project command
+if (args.Length == 2 && args[0] == "--test-project")
+{
+    if (!int.TryParse(args[1], out int testProjectId))
+    {
+        Console.WriteLine("Error: Project ID must be a valid integer.");
+        Console.WriteLine("Example: prepareBikeParking --test-project 60735");
+        return;
+    }
+
+    Console.WriteLine($"Testing Maproulette project access for project ID: {testProjectId}");
+    Console.WriteLine("=".PadRight(60, '='));
+    
+    try
+    {
+        var isValid = await MaprouletteTaskCreator.ValidateProjectAsync(testProjectId);
+        Console.WriteLine();
+        Console.WriteLine("✅ Project validation successful!");
+        Console.WriteLine("   You can use this project ID in your bikeshare_systems.json configuration.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine();
+        Console.WriteLine("❌ Project validation failed!");
+        Console.WriteLine($"   Error: {ex.Message}");
+        Console.WriteLine("   Please fix the issues above before using this project ID.");
+    }
+    
+    return;
+}
+
+// Handle --validate command
+if (args.Length == 2 && args[0] == "--validate")
+{
+    if (!int.TryParse(args[1], out int validateSystemId))
+    {
+        Console.WriteLine("Error: System ID must be a valid integer.");
+        Console.WriteLine("Example: prepareBikeParking --validate 1");
+        return;
+    }
+
+    Console.WriteLine($"Validating system setup for system ID: {validateSystemId}");
+    Console.WriteLine("=".PadRight(60, '='));
+    
+    try
+    {
+        // Load system configuration
+        var validateSystem = await BikeShareSystemLoader.LoadSystemByIdAsync(validateSystemId);
+        Console.WriteLine($"✅ System configuration loaded: {validateSystem.Name} ({validateSystem.City})");
+
+        // Validate system setup with strict checking
+        SystemSetupHelper.ValidateSystemSetup(validateSystem.Name, throwOnMissing: true);
+        Console.WriteLine("✅ System directory and files validated");
+
+        // Validate instruction files for task creation
+        SystemSetupHelper.ValidateInstructionFilesForTaskCreation(validateSystem.Name);
+        Console.WriteLine("✅ Instruction files validated for task creation");
+
+        // Validate Maproulette project if configured
+        if (validateSystem.MaprouletteProjectId > 0)
+        {
+            var projectValid = await MaprouletteTaskCreator.ValidateProjectAsync(validateSystem.MaprouletteProjectId);
+            Console.WriteLine("✅ Maproulette project validated");
+        }
+        else
+        {
+            Console.WriteLine("ℹ️  No Maproulette project configured (task creation will be skipped)");
+        }
+
+        Console.WriteLine();
+        Console.WriteLine("🎉 All validations passed! System is ready for use.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine();
+        Console.WriteLine("❌ Validation failed!");
+        Console.WriteLine($"   Error: {ex.Message}");
+        Console.WriteLine("   Please fix the issues above before running the system.");
+    }
+    
     return;
 }
 
@@ -77,17 +166,45 @@ Console.WriteLine($"GBFS API: {system.GbfsApi}");
 Console.WriteLine($"Station Information URL: {system.GetStationInformationUrl()}");
 
 // Validate Maproulette project ID if tasks will be created
-if (system.MaprouletteProjectId <= 0)
+if (system.MaprouletteProjectId > 0)
 {
-    Console.WriteLine("Warning: No valid Maproulette project ID configured for this system. Task creation will be skipped.");
+    Console.WriteLine($"Validating Maproulette project {system.MaprouletteProjectId}...");
+    
+    // Test project access early to catch configuration issues
+    try
+    {
+        var projectValid = await MaprouletteTaskCreator.ValidateProjectAsync(system.MaprouletteProjectId);
+        if (!projectValid)
+        {
+            throw new InvalidOperationException($"Maproulette project {system.MaprouletteProjectId} validation failed. Cannot proceed with task creation.");
+        }
+        Console.WriteLine("✅ Maproulette project validation successful.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Maproulette project validation failed: {ex.Message}");
+        throw new InvalidOperationException($"Cannot proceed: Maproulette project {system.MaprouletteProjectId} validation failed. {ex.Message}", ex);
+    }
+}
+else
+{
+    Console.WriteLine("Info: No Maproulette project ID configured for this system. Task creation will be skipped.");
 }
 
-// Validate system setup before proceeding
-var validationResult = SystemSetupHelper.ValidateSystemSetup(system.Name);
-if (!validationResult.IsValid)
+// Validate system setup before proceeding - use strict validation for critical components
+try
 {
-    Console.WriteLine($"System Setup Issue: {validationResult.ErrorMessage}");
-    Console.WriteLine("The tool will attempt to create missing files automatically...");
+    var validationResult = SystemSetupHelper.ValidateSystemSetup(system.Name, throwOnMissing: false);
+    if (!validationResult.IsValid)
+    {
+        Console.WriteLine($"System Setup Issue: {validationResult.ErrorMessage}");
+        Console.WriteLine("The tool will attempt to create missing files automatically...");
+    }
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"❌ Critical system setup error: {ex.Message}");
+    throw;
 }
 
 // Main execution flow - comment out any step you don't want to run
@@ -183,17 +300,31 @@ async Task RunBikeShareLocationComparison(BikeShareSystem system)
         {
             try
             {
+                // Validate instruction files before creating tasks
+                SystemSetupHelper.ValidateInstructionFilesForTaskCreation(system.Name);
+                
                 await MaprouletteTaskCreator.CreateTasksAsync(system.MaprouletteProjectId, lastSyncDate.Value, system.Name);
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("instruction files"))
+            {
+                Console.WriteLine($"❌ Cannot create Maproulette tasks: {ex.Message}");
+                Console.WriteLine();
+                Console.WriteLine("To fix this:");
+                Console.WriteLine("1. Run the tool again to auto-generate missing instruction files");
+                Console.WriteLine("2. Or manually create the instruction files in the system's instructions/ directory");
+                Console.WriteLine("3. See SETUP_NEW_SYSTEM.md for instruction file templates");
+                throw;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error creating Maproulette tasks: {ex.Message}");
+                Console.WriteLine($"❌ Error creating Maproulette tasks: {ex.Message}");
                 Console.WriteLine();
                 Console.WriteLine("Possible solutions:");
                 Console.WriteLine("1. Set MAPROULETTE_API_KEY environment variable");
                 Console.WriteLine("2. Verify your Maproulette project ID is correct");
                 Console.WriteLine("3. Check that you have permission to create tasks in the project");
                 Console.WriteLine("4. Ensure instruction files exist in the instructions/ directory");
+                throw;
             }
         }
         else

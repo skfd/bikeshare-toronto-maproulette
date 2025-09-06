@@ -198,11 +198,12 @@ Steps:
         }
 
         /// <summary>
-        /// Validates system configuration and provides helpful error messages for missing files
+        /// Validates system configuration and throws errors for critical missing components
         /// </summary>
         /// <param name="systemName">Name of the bike share system to validate</param>
+        /// <param name="throwOnMissing">If true, throws exceptions for missing critical components</param>
         /// <returns>Validation result with detailed error information</returns>
-        public static SystemValidationResult ValidateSystemSetup(string systemName)
+        public static SystemValidationResult ValidateSystemSetup(string systemName, bool throwOnMissing = false)
         {
             var result = new SystemValidationResult { SystemName = systemName, IsValid = true };
             var missingFiles = new List<string>();
@@ -228,6 +229,11 @@ Steps:
                 result.IsValid = false;
                 result.MissingFiles = missingFiles;
                 result.ErrorMessage = $"System '{systemName}' is missing required files: {string.Join(", ", missingFiles)}";
+                
+                if (throwOnMissing)
+                {
+                    throw new InvalidOperationException($"Critical system setup error for '{systemName}': Missing required instruction files: {string.Join(", ", missingFiles)}. These files are required for Maproulette task creation.");
+                }
             }
 
             // Check if system directory exists
@@ -236,9 +242,61 @@ Steps:
             {
                 result.IsValid = false;
                 result.ErrorMessage = $"System directory does not exist: {systemDir}";
+                
+                if (throwOnMissing)
+                {
+                    throw new DirectoryNotFoundException($"Critical system setup error for '{systemName}': System directory does not exist: {systemDir}. Run system setup first.");
+                }
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Validates that all required instruction files exist for Maproulette task creation
+        /// </summary>
+        /// <param name="systemName">Name of the bike share system</param>
+        /// <exception cref="InvalidOperationException">Thrown when critical instruction files are missing</exception>
+        public static void ValidateInstructionFilesForTaskCreation(string systemName)
+        {
+            var requiredFiles = new[]
+            {
+                Path.Combine("instructions", "added.md"),
+                Path.Combine("instructions", "removed.md"),
+                Path.Combine("instructions", "moved.md")
+            };
+
+            var missingFiles = new List<string>();
+
+            foreach (var file in requiredFiles)
+            {
+                if (!FileManager.SystemFileExists(systemName, file))
+                {
+                    missingFiles.Add(file);
+                }
+                else
+                {
+                    // Check if file has content
+                    try
+                    {
+                        var content = FileManager.ReadSystemTextFileAsync(systemName, file).Result;
+                        if (string.IsNullOrWhiteSpace(content))
+                        {
+                            missingFiles.Add($"{file} (empty)");
+                        }
+                    }
+                    catch
+                    {
+                        missingFiles.Add($"{file} (unreadable)");
+                    }
+                }
+            }
+
+            if (missingFiles.Any())
+            {
+                throw new InvalidOperationException($"Cannot create Maproulette tasks for system '{systemName}': Missing or invalid instruction files: {string.Join(", ", missingFiles)}. " +
+                    $"These files are required for task creation. Run the tool to auto-generate them or create them manually.");
+            }
         }
     }
 
