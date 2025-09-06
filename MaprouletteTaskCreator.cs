@@ -11,18 +11,18 @@ namespace prepareBikeParking
 
              //Create challenges for each type of change
             await CreateTaskForTypeAsync(projectId, "removed", $"{systemName} -- Removed stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
-                "instructions/removed.md", systemName, "bikeshare_extra_in_osm.geojson");
+                Path.Combine("instructions", "removed.md"), systemName, "bikeshare_extra_in_osm.geojson");
 
             await CreateTaskForTypeAsync(projectId, "added", $"{systemName} -- Added stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
-                "instructions/added.md", systemName, "bikeshare_missing_in_osm.geojson");
+                Path.Combine("instructions", "added.md"), systemName, "bikeshare_missing_in_osm.geojson");
 
             await CreateTaskForTypeAsync(projectId, "moved", $"{systemName} -- Moved stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
-                "instructions/moved.md", systemName, "bikeshare_moved.geojson");
+                Path.Combine("instructions", "moved.md"), systemName, "bikeshare_moved.geojson");
 
             //NOTE: Renames are handled in bulk via changeset, so no need to create individual tasks
             Console.WriteLine("Skipping 'renamed' challenge creation as renames are handled via changeset.");
             //await CreateTaskForTypeAsync(projectId, "renamed", $"{systemName} -- Renamed stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
-            //    "instructions/renamed.md", systemName, "bikeshare_renamed_in_osm.geojson");
+            //    Path.Combine("instructions", "renamed.md"), systemName, "bikeshare_renamed_in_osm.geojson");
         }
 
 
@@ -38,17 +38,17 @@ namespace prepareBikeParking
 
             client.DefaultRequestHeaders.Add("apiKey", apiKey);
 
-            // Read instruction from markdown file
-            if (!FileManager.FileExists(instructionFilePath))
+            // Read instruction from markdown file using system-specific path
+            if (!FileManager.SystemFileExists(systemName, instructionFilePath))
             {
-                Console.WriteLine($"Instruction file not found at {instructionFilePath}. Skipping {taskType} challenge creation.");
+                Console.WriteLine($"Instruction file not found at {FileManager.GetSystemFilePath(systemName, instructionFilePath)}. Skipping {taskType} challenge creation.");
                 return;
             }
 
-            string instruction = await FileManager.ReadTextFileAsync(instructionFilePath);
+            string instruction = await FileManager.ReadSystemTextFileAsync(systemName, instructionFilePath);
             if (string.IsNullOrWhiteSpace(instruction))
             {
-                Console.WriteLine($"Instruction file is empty at {instructionFilePath}. Skipping {taskType} challenge creation.");
+                Console.WriteLine($"Instruction file is empty at {FileManager.GetSystemFilePath(systemName, instructionFilePath)}. Skipping {taskType} challenge creation.");
                 return;
             }
 
