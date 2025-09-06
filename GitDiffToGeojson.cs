@@ -51,7 +51,13 @@ namespace prepareBikeParking
 
                     if (process.ExitCode != 0)
                     {
-                        throw new Exception($"Git command failed: {errorOutput}");
+                        var errorMessage = errorOutput.ToString();
+                        // Check if it's a "file not found in git" error
+                        if (errorMessage.Contains("does not exist") || errorMessage.Contains("Path") || errorMessage.Contains("fatal"))
+                        {
+                            throw new FileNotFoundException($"File '{filePath}' not found in git repository. This might be a new system.", filePath);
+                        }
+                        throw new Exception($"Git command failed: {errorMessage}");
                     }
                 }
             }

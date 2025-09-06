@@ -1,0 +1,200 @@
+using System.Text;
+
+namespace prepareBikeParking
+{
+    /// <summary>
+    /// Helper class for setting up new bike share systems
+    /// </summary>
+    public static class SystemSetupHelper
+    {
+        /// <summary>
+        /// Creates the necessary directory structure and default instruction files for a new bike share system
+        /// </summary>
+        /// <param name="systemName">Name of the bike share system</param>
+        /// <param name="operatorName">Name of the operator (for instruction templates)</param>
+        /// <param name="brandName">Brand name (for instruction templates)</param>
+        /// <param name="operatorType">Type of operator (public/private)</param>
+        /// <param name="brandWikidataId">Wikidata ID for the brand (optional)</param>
+        /// <param name="operatorWikidataId">Wikidata ID for the operator (optional)</param>
+        public static async Task SetupNewSystemAsync(
+            string systemName, 
+            string operatorName, 
+            string brandName, 
+            string operatorType = "public",
+            string? brandWikidataId = null,
+            string? operatorWikidataId = null)
+        {
+            Console.WriteLine($"Setting up new system: {systemName}");
+
+            // Create the system directory structure
+            var systemDir = FileManager.GetSystemFullPath(systemName, "");
+            var instructionsDir = FileManager.GetSystemFullPath(systemName, "instructions");
+
+            if (!Directory.Exists(systemDir))
+            {
+                Directory.CreateDirectory(systemDir);
+                Console.WriteLine($"Created system directory: {systemDir}");
+            }
+
+            if (!Directory.Exists(instructionsDir))
+            {
+                Directory.CreateDirectory(instructionsDir);
+                Console.WriteLine($"Created instructions directory: {instructionsDir}");
+            }
+
+            // Create instruction files
+            await CreateInstructionFileAsync(systemName, "added.md", GenerateAddedInstructions(operatorName, brandName, operatorType, brandWikidataId, operatorWikidataId));
+            await CreateInstructionFileAsync(systemName, "removed.md", GenerateRemovedInstructions());
+            await CreateInstructionFileAsync(systemName, "moved.md", GenerateMovedInstructions());
+            await CreateInstructionFileAsync(systemName, "renamed.md", GenerateRenamedInstructions());
+
+            Console.WriteLine($"Successfully set up new system: {systemName}");
+            Console.WriteLine($"System directory: {systemDir}");
+            Console.WriteLine("You can now run the tool with the system ID to fetch and process bike share data.");
+        }
+
+        /// <summary>
+        /// Creates an instruction file for a specific task type
+        /// </summary>
+        private static async Task CreateInstructionFileAsync(string systemName, string fileName, string content)
+        {
+            var filePath = Path.Combine("instructions", fileName);
+            
+            if (!FileManager.SystemFileExists(systemName, filePath))
+            {
+                await FileManager.WriteSystemTextFileAsync(systemName, filePath, content);
+                Console.WriteLine($"Created instruction file: {fileName}");
+            }
+            else
+            {
+                Console.WriteLine($"Instruction file already exists: {fileName}");
+            }
+        }
+
+        /// <summary>
+        /// Generates the "added" instruction template
+        /// </summary>
+        private static string GenerateAddedInstructions(string operatorName, string brandName, string operatorType, string? brandWikidataId, string? operatorWikidataId)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("Add a point with these tags, or update existing point with them:");
+            sb.AppendLine();
+            sb.AppendLine("```");
+            sb.AppendLine("ref={{address}}");
+            sb.AppendLine("name={{name}}");
+            sb.AppendLine("capacity={{capacity}}");
+            sb.AppendLine("fixme=please set exact location");
+            sb.AppendLine("amenity=bicycle_rental");
+            sb.AppendLine("bicycle_rental=docking_station");
+            sb.AppendLine($"brand={brandName}");
+            
+            if (!string.IsNullOrEmpty(brandWikidataId))
+            {
+                sb.AppendLine($"brand:wikidata={brandWikidataId}");
+            }
+            
+            if (brandName != operatorName)
+            {
+                sb.AppendLine($"network={brandName}");
+                if (!string.IsNullOrEmpty(brandWikidataId))
+                {
+                    sb.AppendLine($"network:wikidata={brandWikidataId}");
+                }
+            }
+            
+            sb.AppendLine($"operator={operatorName}");
+            sb.AppendLine($"operator:type={operatorType}");
+            
+            if (!string.IsNullOrEmpty(operatorWikidataId))
+            {
+                sb.AppendLine($"operator:wikidata={operatorWikidataId}");
+            }
+            
+            sb.AppendLine("```");
+            sb.AppendLine();
+
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Generates the "removed" instruction template
+        /// </summary>
+        private static string GenerateRemovedInstructions()
+        {
+            return @"This station has been removed from the official bike share API. Please verify if it still exists in reality and remove it from OpenStreetMap if confirmed.
+
+Steps:
+1. Check if the station still exists physically at the mapped location
+2. If the station is indeed gone, delete the point from OpenStreetMap
+3. If the station still exists but is temporarily unavailable, add a note about its status
+4. If you're unsure, add a note requesting verification from local mappers
+
+";
+        }
+
+        /// <summary>
+        /// Generates the "moved" instruction template
+        /// </summary>
+        private static string GenerateMovedInstructions()
+        {
+            return @"This station has moved to a new location according to the official bike share API. Please verify the new location and update the point accordingly.
+
+Steps:
+1. Verify the new coordinates are correct
+2. Move the existing point to the new location
+3. Update any other tags if necessary (name, capacity, etc.)
+4. If you find the station at a different location than suggested, use the actual observed location
+
+";
+        }
+
+        /// <summary>
+        /// Generates the "renamed" instruction template
+        /// </summary>
+        private static string GenerateRenamedInstructions()
+        {
+            return @"This station has been renamed according to the official bike share API. Please verify the new name and update the point accordingly.
+
+Steps:
+1. Verify the new name is correct
+2. Update the 'name' tag with the new official name
+3. Keep other tags unchanged unless they also need updating
+4. If you observe a different name on-site, prioritize the name actually displayed at the station
+
+";
+        }
+
+        /// <summary>
+        /// Checks if a system has been properly set up with required files and directories
+        /// </summary>
+        /// <param name="systemName">Name of the bike share system to check</param>
+        /// <returns>True if the system is properly set up, false otherwise</returns>
+        public static bool IsSystemSetUp(string systemName)
+        {
+            var requiredFiles = new[]
+            {
+                Path.Combine("instructions", "added.md"),
+                Path.Combine("instructions", "removed.md"),
+                Path.Combine("instructions", "moved.md"),
+                Path.Combine("instructions", "renamed.md")
+            };
+
+            return requiredFiles.All(file => FileManager.SystemFileExists(systemName, file));
+        }
+
+        /// <summary>
+        /// Ensures a system is properly set up, creating missing files with default templates if needed
+        /// </summary>
+        /// <param name="systemName">Name of the bike share system</param>
+        /// <param name="operatorName">Operator name (used for default templates)</param>
+        /// <param name="brandName">Brand name (used for default templates)</param>
+        public static async Task EnsureSystemSetUpAsync(string systemName, string operatorName, string brandName)
+        {
+            if (!IsSystemSetUp(systemName))
+            {
+                Console.WriteLine($"System {systemName} is not fully set up. Creating missing instruction files...");
+                await SetupNewSystemAsync(systemName, operatorName, brandName);
+            }
+        }
+    }
+}

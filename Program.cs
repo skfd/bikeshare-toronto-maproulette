@@ -75,10 +75,23 @@ await RunBikeShareLocationComparison(system);
 
 async Task RunBikeShareLocationComparison(BikeShareSystem system)
 {
-    var lastSyncDate =
-        GitFunctions.GetLastCommitDateForFile(FileManager.GetSystemFullPath(system.Name, "bikeshare.geojson")) ??
-        throw new Exception("Failed to retrieve last sync date. Ensure the file exists and is committed in the git repository.");
-    Console.WriteLine($"Last sync date: {lastSyncDate}");
+    // Ensure the system is properly set up with instruction files
+    await SystemSetupHelper.EnsureSystemSetUpAsync(system.Name, system.Name, system.Name);
+    
+    // Check if this is a new system by looking for existing bikeshare.geojson file
+    var geojsonFilePath = FileManager.GetSystemFullPath(system.Name, "bikeshare.geojson");
+    var lastSyncDate = GitFunctions.GetLastCommitDateForFile(geojsonFilePath);
+    
+    if (lastSyncDate == null)
+    {
+        Console.WriteLine("No previous bikeshare.geojson file found in git history. This appears to be a new system setup.");
+        Console.WriteLine("Using current date as the reference point for changes.");
+        lastSyncDate = DateTime.Now;
+    }
+    else
+    {
+        Console.WriteLine($"Last sync date: {lastSyncDate}");
+    }
 
     // Step 1: Get bike share locations data
     // Option A: Fetch new bike share locations from API (comment out if you want to use existing data)
@@ -108,7 +121,7 @@ async Task RunBikeShareLocationComparison(BikeShareSystem system)
         // Step 4: Create Maproulette task (comment out if you don't want to create tasks)
         if (system.MaprouletteProjectId > 0)
         {
-            await MaprouletteTaskCreator.CreateTasksAsync(system.MaprouletteProjectId, lastSyncDate, system.Name);
+            await MaprouletteTaskCreator.CreateTasksAsync(system.MaprouletteProjectId, lastSyncDate.Value, system.Name);
         }
         else
         {
@@ -121,24 +134,56 @@ async Task CompareAndGenerateDiffFiles(List<GeoPoint> currentPoints, BikeShareSy
 {
     Console.WriteLine("Comparing with last committed version...");
 
-    // Get the last committed version of the file
-    var geojsonFile = FileManager.GetSystemFullPath(system.Name, "bikeshare.geojson");
-    string lastCommittedVersion = GitDiffToGeojson.GetLastCommittedVersion(geojsonFile);
+    try
+    {
+        // Get the last committed version of the file
+        var geojsonFile = FileManager.GetSystemFullPath(system.Name, "bikeshare.geojson");
+        string lastCommittedVersion = GitDiffToGeojson.GetLastCommittedVersion(geojsonFile);
 
-    // Parse the last committed version into a list of GeoPoints
-    List<GeoPoint> lastCommittedPoints = lastCommittedVersion
-        .Split('\n', StringSplitOptions.RemoveEmptyEntries)
-        .Select(GeoPoint.ParseLine)
-        .ToList();
+        // Parse the last committed version into a list of GeoPoints
+        List<GeoPoint> lastCommittedPoints = lastCommittedVersion
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(GeoPoint.ParseLine)
+            .ToList();
 
-    // Compare the current points with the last committed points
-    var (addedPoints, removedPoints, movedPoints, renamedPoints) = 
-        BikeShareComparer.ComparePoints(currentPoints, lastCommittedPoints, moveThreshold: 3);
+        // Compare the current points with the last committed points
+        var (addedPoints, removedPoints, movedPoints, renamedPoints) = 
+            BikeShareComparer.ComparePoints(currentPoints, lastCommittedPoints, moveThreshold: 3);
 
-    // Generate diff files
-    await GeoJsonGenerator.GenerateDiffFilesAsync(addedPoints, removedPoints, movedPoints, renamedPoints, system.Name);
+        // Generate diff files
+        await GeoJsonGenerator.GenerateDiffFilesAsync(addedPoints, removedPoints, movedPoints, renamedPoints, system.Name);
 
-    Console.WriteLine($"Generated diff files: {addedPoints.Count} added, {removedPoints.Count} removed, {movedPoints.Count} moved, {renamedPoints.Count} renamed");
+        Console.WriteLine($"Generated diff files: {addedPoints.Count} added, {removedPoints.Count} removed, {movedPoints.Count} moved, {renamedPoints.Count} renamed");
+    }
+    catch (FileNotFoundException ex) when (ex.Message.Contains("not found in git repository"))
+    {
+        Console.WriteLine("No previous version found in git repository. This appears to be a new system.");
+        Console.WriteLine("Treating all current stations as newly added.");
+        
+        // For new systems, treat all current points as newly added
+        await GenerateNewSystemDiffFiles(currentPoints, system);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Unable to compare with previous version: {ex.Message}");
+        Console.WriteLine("This might be a new system or there might be an issue with git.");
+        Console.WriteLine("Treating all current stations as newly added.");
+        
+        // For new systems or when git comparison fails, treat all current points as newly added
+        await GenerateNewSystemDiffFiles(currentPoints, system);
+    }
+}
+
+async Task GenerateNewSystemDiffFiles(List<GeoPoint> currentPoints, BikeShareSystem system)
+{
+    // For new systems, treat all current points as newly added
+    var emptyList = new List<GeoPoint>();
+    var emptyTupleList = new List<(GeoPoint current, GeoPoint old)>();
+    
+    // Generate diff files with all stations marked as added
+    await GeoJsonGenerator.GenerateDiffFilesAsync(currentPoints, emptyList, emptyList, emptyTupleList, system.Name);
+    
+    Console.WriteLine($"Generated diff files for new system: {currentPoints.Count} stations marked as added, 0 removed, 0 moved, 0 renamed");
 }
 
 async Task CompareWithOSMData(List<GeoPoint> bikeshareApiPoints, BikeShareSystem system)
