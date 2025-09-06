@@ -11,7 +11,7 @@ namespace prepareBikeParking
                 var processStartInfo = new ProcessStartInfo
                 {
                     FileName = "git",
-                    Arguments = $"log -1 --format=%ci -- {filePath}",
+                    Arguments = $"log -1 --format=%ci -- \"{filePath.Replace('\\', '/')}\"",
                     RedirectStandardOutput = true,
                     UseShellExecute = false,
                     CreateNoWindow = true

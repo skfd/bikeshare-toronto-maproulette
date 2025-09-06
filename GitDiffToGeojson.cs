@@ -13,9 +13,9 @@ namespace prepareBikeParking
             return (addedlines, removedObjects);
         }
 
-        public static string GetLastCommittedVersion()
+        public static string GetLastCommittedVersion(string filePath)
         {
-            string command = "show HEAD:../../../bikeshare.geojson";
+            string command = $"show HEAD:\"{filePath.Replace('\\','/')}\"";
             string arguments = "";
 
             ProcessStartInfo startInfo = new ProcessStartInfo

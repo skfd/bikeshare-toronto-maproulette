@@ -11,22 +11,22 @@ namespace prepareBikeParking
 
              //Create challenges for each type of change
             await CreateTaskForTypeAsync(projectId, "removed", $"{systemName} -- Removed stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
-                "instructions/removed.md", "bikeshare_extra_in_osm.geojson");
+                "instructions/removed.md", systemName, "bikeshare_extra_in_osm.geojson");
 
             await CreateTaskForTypeAsync(projectId, "added", $"{systemName} -- Added stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
-                "instructions/added.md", "bikeshare_missing_in_osm.geojson");
+                "instructions/added.md", systemName, "bikeshare_missing_in_osm.geojson");
 
             await CreateTaskForTypeAsync(projectId, "moved", $"{systemName} -- Moved stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
-                "instructions/moved.md", "bikeshare_moved.geojson");
+                "instructions/moved.md", systemName, "bikeshare_moved.geojson");
 
             //NOTE: Renames are handled in bulk via changeset, so no need to create individual tasks
             Console.WriteLine("Skipping 'renamed' challenge creation as renames are handled via changeset.");
             //await CreateTaskForTypeAsync(projectId, "renamed", $"{systemName} -- Renamed stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
-            //    "instructions/renamed.md", "bikeshare_renamed_in_osm.geojson");
+            //    "instructions/renamed.md", systemName, "bikeshare_renamed_in_osm.geojson");
         }
 
 
-        private async static Task CreateTaskForTypeAsync(int projectId, string taskType, string challengeDescription, string instructionFilePath, string filePath)
+        private async static Task CreateTaskForTypeAsync(int projectId, string taskType, string challengeDescription, string instructionFilePath, string systemName, string fileName)
         {
             var client = new HttpClient();
             var apiKey = Environment.GetEnvironmentVariable("MAPROULETTE_API_KEY");
@@ -53,13 +53,13 @@ namespace prepareBikeParking
             }
 
             // Check if file exists and has content
-            if (!FileManager.FileExists(filePath))
+            if (!FileManager.SystemFileExists(systemName, fileName))
             {
-                Console.WriteLine($"No {taskType} stations file found at {filePath}. Skipping {taskType} challenge creation.");
+                Console.WriteLine($"No {taskType} stations file found at {fileName} for system {systemName}. Skipping {taskType} challenge creation.");
                 return;
             }
 
-            string fileContent = await FileManager.ReadTextFileAsync(filePath);
+            string fileContent = await FileManager.ReadSystemTextFileAsync(systemName, fileName);
             if (string.IsNullOrWhiteSpace(fileContent))
             {
                 Console.WriteLine($"No {taskType} stations found. Skipping {taskType} challenge creation.");

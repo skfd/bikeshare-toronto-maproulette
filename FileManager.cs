@@ -11,7 +11,27 @@ namespace prepareBikeParking
         /// <summary>
         /// Base path for file operations (relative to application directory)
         /// </summary>
-        private const string BasePath = "../../../";
+        private const string BasePath = "..\\..\\..\\";
+
+        /// <summary>
+        /// Data results directory path
+        /// </summary>
+        private const string DataResultsPath = "data_results";
+
+        #region Path Utilities
+
+        /// <summary>
+        /// Gets the full path for a file in a system-specific directory
+        /// </summary>
+        /// <param name="systemName">Name of the bike share system</param>
+        /// <param name="fileName">Name of the file</param>
+        /// <returns>Full path to the file</returns>
+        public static string GetSystemFilePath(string systemName, string fileName)
+        {
+            return Path.Combine(DataResultsPath, systemName, fileName);
+        }
+
+        #endregion
 
         #region Text File Operations
 
@@ -30,6 +50,18 @@ namespace prepareBikeParking
             }
 
             return await File.ReadAllTextAsync(fullPath, Encoding.UTF8);
+        }
+
+        /// <summary>
+        /// Reads text content from a system-specific file
+        /// </summary>
+        /// <param name="systemName">Name of the bike share system</param>
+        /// <param name="fileName">Name of the file</param>
+        /// <returns>File content as string</returns>
+        public static async Task<string> ReadSystemTextFileAsync(string systemName, string fileName)
+        {
+            var relativePath = GetSystemFilePath(systemName, fileName);
+            return await ReadTextFileAsync(relativePath);
         }
 
         /// <summary>
@@ -66,6 +98,18 @@ namespace prepareBikeParking
             }
 
             await File.WriteAllTextAsync(fullPath, content, Encoding.UTF8);
+        }
+
+        /// <summary>
+        /// Writes text content to a system-specific file
+        /// </summary>
+        /// <param name="systemName">Name of the bike share system</param>
+        /// <param name="fileName">Name of the file</param>
+        /// <param name="content">Content to write</param>
+        public static async Task WriteSystemTextFileAsync(string systemName, string fileName, string content)
+        {
+            var relativePath = GetSystemFilePath(systemName, fileName);
+            await WriteTextFileAsync(relativePath, content);
         }
 
         /// <summary>
@@ -157,6 +201,18 @@ namespace prepareBikeParking
             await WriteTextFileAsync(relativePath, content);
         }
 
+        /// <summary>
+        /// Writes an enumerable of strings as lines to a system-specific file
+        /// </summary>
+        /// <param name="systemName">Name of the bike share system</param>
+        /// <param name="fileName">Name of the file</param>
+        /// <param name="lines">Lines to write</param>
+        public static async Task WriteSystemLinesAsync(string systemName, string fileName, IEnumerable<string> lines)
+        {
+            var relativePath = GetSystemFilePath(systemName, fileName);
+            await WriteLinesAsync(relativePath, lines);
+        }
+
         #endregion
 
         #region File Existence and Utilities
@@ -173,6 +229,18 @@ namespace prepareBikeParking
         }
 
         /// <summary>
+        /// Checks if a system-specific file exists
+        /// </summary>
+        /// <param name="systemName">Name of the bike share system</param>
+        /// <param name="fileName">Name of the file</param>
+        /// <returns>True if file exists</returns>
+        public static bool SystemFileExists(string systemName, string fileName)
+        {
+            var relativePath = GetSystemFilePath(systemName, fileName);
+            return FileExists(relativePath);
+        }
+
+        /// <summary>
         /// Gets the full path for a relative path
         /// </summary>
         /// <param name="relativePath">Path relative to the base directory</param>
@@ -180,6 +248,18 @@ namespace prepareBikeParking
         public static string GetFullPath(string relativePath)
         {
             return Path.Combine(BasePath, relativePath);
+        }
+
+        /// <summary>
+        /// Gets the full path for a system-specific file
+        /// </summary>
+        /// <param name="systemName">Name of the bike share system</param>
+        /// <param name="fileName">Name of the file</param>
+        /// <returns>Full path</returns>
+        public static string GetSystemFullPath(string systemName, string fileName)
+        {
+            var relativePath = GetSystemFilePath(systemName, fileName);
+            return GetFullPath(relativePath);
         }
 
         /// <summary>
@@ -233,6 +313,18 @@ namespace prepareBikeParking
         }
 
         /// <summary>
+        /// Reads a system-specific GeoJSON file and parses it into GeoPoint objects
+        /// </summary>
+        /// <param name="systemName">Name of the bike share system</param>
+        /// <param name="fileName">Name of the file</param>
+        /// <returns>List of GeoPoint objects</returns>
+        public static async Task<List<GeoPoint>> ReadSystemGeoJsonFileAsync(string systemName, string fileName)
+        {
+            var relativePath = GetSystemFilePath(systemName, fileName);
+            return await ReadGeoJsonFileAsync(relativePath);
+        }
+
+        /// <summary>
         /// Writes GeoPoint objects to a GeoJSON file
         /// </summary>
         /// <param name="relativePath">Path relative to the base directory</param>
@@ -245,6 +337,19 @@ namespace prepareBikeParking
         }
 
         /// <summary>
+        /// Writes GeoPoint objects to a system-specific GeoJSON file
+        /// </summary>
+        /// <param name="systemName">Name of the bike share system</param>
+        /// <param name="fileName">Name of the file</param>
+        /// <param name="geoPoints">GeoPoint objects to write</param>
+        /// <param name="generateLineFunc">Function to generate GeoJSON line from GeoPoint</param>
+        public static async Task WriteSystemGeoJsonFileAsync(string systemName, string fileName, IEnumerable<GeoPoint> geoPoints, Func<GeoPoint, string> generateLineFunc)
+        {
+            var relativePath = GetSystemFilePath(systemName, fileName);
+            await WriteGeoJsonFileAsync(relativePath, geoPoints, generateLineFunc);
+        }
+
+        /// <summary>
         /// Writes GeoPoint objects with old names to a GeoJSON file
         /// </summary>
         /// <param name="relativePath">Path relative to the base directory</param>
@@ -254,6 +359,19 @@ namespace prepareBikeParking
         {
             var lines = geoPointPairs.OrderBy(x => x.current.id).Select(x => generateLineFunc(x.current, x.old.name));
             await WriteLinesAsync(relativePath, lines);
+        }
+
+        /// <summary>
+        /// Writes GeoPoint objects with old names to a system-specific GeoJSON file
+        /// </summary>
+        /// <param name="systemName">Name of the bike share system</param>
+        /// <param name="fileName">Name of the file</param>
+        /// <param name="geoPointPairs">Tuples of current and old GeoPoint objects</param>
+        /// <param name="generateLineFunc">Function to generate GeoJSON line from GeoPoint pair</param>
+        public static async Task WriteSystemGeoJsonFileWithOldNamesAsync(string systemName, string fileName, IEnumerable<(GeoPoint current, GeoPoint old)> geoPointPairs, Func<GeoPoint, string, string> generateLineFunc)
+        {
+            var relativePath = GetSystemFilePath(systemName, fileName);
+            await WriteGeoJsonFileWithOldNamesAsync(relativePath, geoPointPairs, generateLineFunc);
         }
 
         #endregion

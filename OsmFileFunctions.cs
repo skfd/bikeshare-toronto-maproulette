@@ -5,9 +5,9 @@ using prepareBikeParking;
 
 internal class OsmFileFunctions
 {
-    internal static async Task GenerateRenameOsmChangeFile(List<(GeoPoint current, GeoPoint old)> renamedInOSM)
+    internal static async Task GenerateRenameOsmChangeFile(List<(GeoPoint current, GeoPoint old)> renamedInOSM, string systemName)
     {
-        var osmChangeFilePath = "bikeshare_renames.osc";
+        var osmChangeFileName = "bikeshare_renames.osc";
 
         // Start with proper XML declaration with UTF-8 encoding and single root element
         var osmXml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<osmChange version=\"0.6\" generator=\"prepareBikeParking\">\n";
@@ -92,6 +92,6 @@ internal class OsmFileFunctions
         // Close the modify and osmChange elements
         osmXml += "</osmChange>";
 
-        await FileManager.WriteTextFileAsync(osmChangeFilePath, osmXml);
+        await FileManager.WriteSystemTextFileAsync(systemName, osmChangeFileName, osmXml);
     }
 }

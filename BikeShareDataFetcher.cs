@@ -88,14 +88,14 @@ namespace prepareBikeParking
         /// <summary>
         /// Reads bike share locations from an existing GeoJSON file
         /// </summary>
-        public static async Task<List<GeoPoint>> ReadFromFileAsync(string filePath = "bikeshare.geojson")
+        public static async Task<List<GeoPoint>> ReadFromFileAsync(string systemName, string fileName = "bikeshare.geojson")
         {
-            if (!FileManager.FileExists(filePath))
+            if (!FileManager.SystemFileExists(systemName, fileName))
             {
-                throw new FileNotFoundException($"File not found: {filePath}. Please ensure the file exists or use FetchFromApiAsync() instead.");
+                throw new FileNotFoundException($"File not found: {fileName} for system {systemName}. Please ensure the file exists or use FetchFromApiAsync() instead.");
             }
 
-            return await FileManager.ReadGeoJsonFileAsync(filePath);
+            return await FileManager.ReadSystemGeoJsonFileAsync(systemName, fileName);
         }
 
         /// <summary>
