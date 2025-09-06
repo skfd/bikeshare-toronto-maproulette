@@ -1,0 +1,261 @@
+using System.Text;
+using System.Text.Json;
+
+namespace prepareBikeParking
+{
+    /// <summary>
+    /// Centralized file handling class for reading and writing various file types used in the application
+    /// </summary>
+    public static class FileManager
+    {
+        /// <summary>
+        /// Base path for file operations (relative to application directory)
+        /// </summary>
+        private const string BasePath = "../../../";
+
+        #region Text File Operations
+
+        /// <summary>
+        /// Reads text content from a file
+        /// </summary>
+        /// <param name="relativePath">Path relative to the base directory</param>
+        /// <returns>File content as string</returns>
+        public static async Task<string> ReadTextFileAsync(string relativePath)
+        {
+            var fullPath = Path.Combine(BasePath, relativePath);
+            
+            if (!File.Exists(fullPath))
+            {
+                throw new FileNotFoundException($"File not found: {fullPath}");
+            }
+
+            return await File.ReadAllTextAsync(fullPath, Encoding.UTF8);
+        }
+
+        /// <summary>
+        /// Reads text content from a file synchronously
+        /// </summary>
+        /// <param name="relativePath">Path relative to the base directory</param>
+        /// <returns>File content as string</returns>
+        public static string ReadTextFile(string relativePath)
+        {
+            var fullPath = Path.Combine(BasePath, relativePath);
+            
+            if (!File.Exists(fullPath))
+            {
+                throw new FileNotFoundException($"File not found: {fullPath}");
+            }
+
+            return File.ReadAllText(fullPath, Encoding.UTF8);
+        }
+
+        /// <summary>
+        /// Writes text content to a file
+        /// </summary>
+        /// <param name="relativePath">Path relative to the base directory</param>
+        /// <param name="content">Content to write</param>
+        public static async Task WriteTextFileAsync(string relativePath, string content)
+        {
+            var fullPath = Path.Combine(BasePath, relativePath);
+            
+            // Ensure directory exists
+            var directory = Path.GetDirectoryName(fullPath);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            await File.WriteAllTextAsync(fullPath, content, Encoding.UTF8);
+        }
+
+        /// <summary>
+        /// Writes text content to a file synchronously
+        /// </summary>
+        /// <param name="relativePath">Path relative to the base directory</param>
+        /// <param name="content">Content to write</param>
+        public static void WriteTextFile(string relativePath, string content)
+        {
+            var fullPath = Path.Combine(BasePath, relativePath);
+            
+            // Ensure directory exists
+            var directory = Path.GetDirectoryName(fullPath);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            File.WriteAllText(fullPath, content, Encoding.UTF8);
+        }
+
+        #endregion
+
+        #region JSON File Operations
+
+        /// <summary>
+        /// Reads and deserializes JSON content from a file
+        /// </summary>
+        /// <typeparam name="T">Type to deserialize to</typeparam>
+        /// <param name="relativePath">Path relative to the base directory</param>
+        /// <returns>Deserialized object</returns>
+        public static async Task<T> ReadJsonFileAsync<T>(string relativePath) where T : class
+        {
+            var jsonContent = await ReadTextFileAsync(relativePath);
+            var result = JsonSerializer.Deserialize<T>(jsonContent);
+            
+            if (result == null)
+            {
+                throw new InvalidOperationException($"Failed to parse JSON file '{relativePath}'. The file may contain invalid JSON or result in null.");
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Serializes and writes an object to a JSON file
+        /// </summary>
+        /// <typeparam name="T">Type of object to serialize</typeparam>
+        /// <param name="relativePath">Path relative to the base directory</param>
+        /// <param name="obj">Object to serialize</param>
+        /// <param name="prettyPrint">Whether to format JSON with indentation</param>
+        public static async Task WriteJsonFileAsync<T>(string relativePath, T obj, bool prettyPrint = true)
+        {
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = prettyPrint,
+                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+            };
+
+            var jsonContent = JsonSerializer.Serialize(obj, options);
+            await WriteTextFileAsync(relativePath, jsonContent);
+        }
+
+        #endregion
+
+        #region Line-based File Operations
+
+        /// <summary>
+        /// Reads file content and splits into lines
+        /// </summary>
+        /// <param name="relativePath">Path relative to the base directory</param>
+        /// <param name="removeEmptyLines">Whether to remove empty lines</param>
+        /// <returns>Array of lines</returns>
+        public static async Task<string[]> ReadLinesAsync(string relativePath, bool removeEmptyLines = true)
+        {
+            var content = await ReadTextFileAsync(relativePath);
+            var splitOptions = removeEmptyLines ? StringSplitOptions.RemoveEmptyEntries : StringSplitOptions.None;
+            return content.Split('\n', splitOptions);
+        }
+
+        /// <summary>
+        /// Writes an enumerable of strings as lines to a file
+        /// </summary>
+        /// <param name="relativePath">Path relative to the base directory</param>
+        /// <param name="lines">Lines to write</param>
+        public static async Task WriteLinesAsync(string relativePath, IEnumerable<string> lines)
+        {
+            var content = string.Join("\n", lines);
+            await WriteTextFileAsync(relativePath, content);
+        }
+
+        #endregion
+
+        #region File Existence and Utilities
+
+        /// <summary>
+        /// Checks if a file exists
+        /// </summary>
+        /// <param name="relativePath">Path relative to the base directory</param>
+        /// <returns>True if file exists</returns>
+        public static bool FileExists(string relativePath)
+        {
+            var fullPath = Path.Combine(BasePath, relativePath);
+            return File.Exists(fullPath);
+        }
+
+        /// <summary>
+        /// Gets the full path for a relative path
+        /// </summary>
+        /// <param name="relativePath">Path relative to the base directory</param>
+        /// <returns>Full path</returns>
+        public static string GetFullPath(string relativePath)
+        {
+            return Path.Combine(BasePath, relativePath);
+        }
+
+        /// <summary>
+        /// Deletes a file if it exists
+        /// </summary>
+        /// <param name="relativePath">Path relative to the base directory</param>
+        /// <returns>True if file was deleted, false if it didn't exist</returns>
+        public static bool DeleteFile(string relativePath)
+        {
+            var fullPath = Path.Combine(BasePath, relativePath);
+            
+            if (File.Exists(fullPath))
+            {
+                File.Delete(fullPath);
+                return true;
+            }
+            
+            return false;
+        }
+
+        /// <summary>
+        /// Gets file information
+        /// </summary>
+        /// <param name="relativePath">Path relative to the base directory</param>
+        /// <returns>FileInfo object or null if file doesn't exist</returns>
+        public static FileInfo? GetFileInfo(string relativePath)
+        {
+            var fullPath = Path.Combine(BasePath, relativePath);
+            
+            if (File.Exists(fullPath))
+            {
+                return new FileInfo(fullPath);
+            }
+            
+            return null;
+        }
+
+        #endregion
+
+        #region Specialized File Operations
+
+        /// <summary>
+        /// Reads a GeoJSON file and parses it into GeoPoint objects
+        /// </summary>
+        /// <param name="relativePath">Path relative to the base directory</param>
+        /// <returns>List of GeoPoint objects</returns>
+        public static async Task<List<GeoPoint>> ReadGeoJsonFileAsync(string relativePath)
+        {
+            var lines = await ReadLinesAsync(relativePath, removeEmptyLines: true);
+            return lines.Select(GeoPoint.ParseLine).ToList();
+        }
+
+        /// <summary>
+        /// Writes GeoPoint objects to a GeoJSON file
+        /// </summary>
+        /// <param name="relativePath">Path relative to the base directory</param>
+        /// <param name="geoPoints">GeoPoint objects to write</param>
+        /// <param name="generateLineFunc">Function to generate GeoJSON line from GeoPoint</param>
+        public static async Task WriteGeoJsonFileAsync(string relativePath, IEnumerable<GeoPoint> geoPoints, Func<GeoPoint, string> generateLineFunc)
+        {
+            var lines = geoPoints.OrderBy(x => x.id).Select(generateLineFunc);
+            await WriteLinesAsync(relativePath, lines);
+        }
+
+        /// <summary>
+        /// Writes GeoPoint objects with old names to a GeoJSON file
+        /// </summary>
+        /// <param name="relativePath">Path relative to the base directory</param>
+        /// <param name="geoPointPairs">Tuples of current and old GeoPoint objects</param>
+        /// <param name="generateLineFunc">Function to generate GeoJSON line from GeoPoint pair</param>
+        public static async Task WriteGeoJsonFileWithOldNamesAsync(string relativePath, IEnumerable<(GeoPoint current, GeoPoint old)> geoPointPairs, Func<GeoPoint, string, string> generateLineFunc)
+        {
+            var lines = geoPointPairs.OrderBy(x => x.current.id).Select(x => generateLineFunc(x.current, x.old.name));
+            await WriteLinesAsync(relativePath, lines);
+        }
+
+        #endregion
+    }
+}

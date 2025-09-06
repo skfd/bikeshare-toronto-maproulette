@@ -1,13 +1,11 @@
-﻿namespace prepareBikeParking
+namespace prepareBikeParking
 {
     public static class GeoJsonGenerator
     {
         public static async Task GenerateMainFileAsync(List<GeoPoint> locationsList)
         {
             Console.WriteLine("Generating main geojson file...");
-            var items = locationsList.OrderBy(x => x.id).Select(GenerateGeojsonLine);
-            var geojson = string.Join("\n", items);
-            File.WriteAllText("../../../bikeshare.geojson", geojson);
+            await FileManager.WriteGeoJsonFileAsync("bikeshare.geojson", locationsList, GenerateGeojsonLine);
             Console.WriteLine("Main geojson file saved.");
         }
 
@@ -15,11 +13,11 @@
         {
             Console.WriteLine("Generating diff files...");
 
-            File.WriteAllText("../../../bikeshare_renamed.geojson", string.Join("\n", renamedPoints.OrderBy(x => x.current.id).Select(x => GenerateGeojsonLineWithOldName(x.current, x.old.name))));
-            File.WriteAllText("../../../bikeshare_added.geojson", string.Join("\n", addedPoints.OrderBy(x => x.id).Select(GenerateGeojsonLine)));
-            File.WriteAllText("../../../bikeshare_toreview.geojson", string.Join("\n", addedPoints.OrderBy(x => x.id).Select(GenerateGeojsonLine)));
-            File.WriteAllText("../../../bikeshare_removed.geojson", string.Join("\n", removedPoints.OrderBy(x => x.id).Select(GenerateGeojsonLine)));
-            File.WriteAllText("../../../bikeshare_moved.geojson", string.Join("\n", movedPoints.OrderBy(x => x.id).Select(GenerateGeojsonLine)));
+            await FileManager.WriteGeoJsonFileWithOldNamesAsync("bikeshare_renamed.geojson", renamedPoints, GenerateGeojsonLineWithOldName);
+            await FileManager.WriteGeoJsonFileAsync("bikeshare_added.geojson", addedPoints, GenerateGeojsonLine);
+            await FileManager.WriteGeoJsonFileAsync("bikeshare_toreview.geojson", addedPoints, GenerateGeojsonLine);
+            await FileManager.WriteGeoJsonFileAsync("bikeshare_removed.geojson", removedPoints, GenerateGeojsonLine);
+            await FileManager.WriteGeoJsonFileAsync("bikeshare_moved.geojson", movedPoints, GenerateGeojsonLine);
 
             Console.WriteLine("Diff files generated successfully.");
         }
@@ -74,10 +72,10 @@
         {
             Console.WriteLine("Generating OSM comparison files...");
 
-            File.WriteAllText("../../../bikeshare_missing_in_osm.geojson", string.Join("\n", missingInOSM.OrderBy(x => x.id).Select(GenerateGeojsonLine)));
-            File.WriteAllText("../../../bikeshare_extra_in_osm.geojson", string.Join("\n", extraInOSM.OrderBy(x => x.id).Select(GenerateGeojsonLine)));
-            File.WriteAllText("../../../bikeshare_moved_in_osm.geojson", string.Join("\n", differentInOSM.OrderBy(x => x.id).Select(GenerateGeojsonLine)));
-            File.WriteAllText("../../../bikeshare_renamed_in_osm.geojson", string.Join("\n", renamedInOSM.OrderBy(x => x.current.id).Select(x => GenerateGeojsonLineWithOldName(x.current, x.old.name))));
+            await FileManager.WriteGeoJsonFileAsync("bikeshare_missing_in_osm.geojson", missingInOSM, GenerateGeojsonLine);
+            await FileManager.WriteGeoJsonFileAsync("bikeshare_extra_in_osm.geojson", extraInOSM, GenerateGeojsonLine);
+            await FileManager.WriteGeoJsonFileAsync("bikeshare_moved_in_osm.geojson", differentInOSM, GenerateGeojsonLine);
+            await FileManager.WriteGeoJsonFileWithOldNamesAsync("bikeshare_renamed_in_osm.geojson", renamedInOSM, GenerateGeojsonLineWithOldName);
 
             Console.WriteLine("OSM comparison files generated successfully.");
         }

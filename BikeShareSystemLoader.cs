@@ -4,27 +4,26 @@ namespace prepareBikeParking
 {
     public static class BikeShareSystemLoader
     {
-        private const string ConfigFilePath = "../../../bikeshare_systems.json";
+        private const string ConfigFilePath = "bikeshare_systems.json";
 
         /// <summary>
         /// Loads all bike share systems from the configuration file
         /// </summary>
         public static async Task<List<BikeShareSystem>> LoadAllSystemsAsync()
         {
-            if (!File.Exists(ConfigFilePath))
+            if (!FileManager.FileExists(ConfigFilePath))
             {
                 throw new FileNotFoundException($"Configuration file '{ConfigFilePath}' not found. Please ensure the file exists in the application directory.");
             }
 
-            var jsonContent = await File.ReadAllTextAsync(ConfigFilePath);
-            var systems = JsonSerializer.Deserialize<List<BikeShareSystem>>(jsonContent);
-            
-            if (systems == null)
+            try
             {
-                throw new InvalidOperationException($"Failed to parse configuration file '{ConfigFilePath}'. Please ensure the file contains valid JSON.");
+                return await FileManager.ReadJsonFileAsync<List<BikeShareSystem>>(ConfigFilePath);
             }
-
-            return systems;
+            catch (Exception ex) when (ex is not FileNotFoundException)
+            {
+                throw new InvalidOperationException($"Failed to parse configuration file '{ConfigFilePath}'. Please ensure the file contains valid JSON.", ex);
+            }
         }
 
         /// <summary>

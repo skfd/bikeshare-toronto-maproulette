@@ -76,7 +76,7 @@ await RunBikeShareLocationComparison(system);
 async Task RunBikeShareLocationComparison(BikeShareSystem system)
 {
     var lastSyncDate =
-        GitFunctions.GetLastCommitDateForFile("../../../bikeshare.geojson") ??
+        GitFunctions.GetLastCommitDateForFile(FileManager.GetFullPath("bikeshare.geojson")) ??
         throw new Exception("Failed to retrieve last sync date. Ensure the file exists and is committed in the git repository.");
     Console.WriteLine($"Last sync date: {lastSyncDate}");
 

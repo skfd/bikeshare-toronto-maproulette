@@ -11,18 +11,18 @@ namespace prepareBikeParking
 
              //Create challenges for each type of change
             await CreateTaskForTypeAsync(projectId, "removed", $"{systemName} -- Removed stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
-                "../../../instructions/removed.md", "../../../bikeshare_extra_in_osm.geojson");
+                "instructions/removed.md", "bikeshare_extra_in_osm.geojson");
 
             await CreateTaskForTypeAsync(projectId, "added", $"{systemName} -- Added stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
-                "../../../instructions/added.md", "../../../bikeshare_missing_in_osm.geojson");
+                "instructions/added.md", "bikeshare_missing_in_osm.geojson");
 
             await CreateTaskForTypeAsync(projectId, "moved", $"{systemName} -- Moved stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
-                "../../../instructions/moved.md", "../../../bikeshare_moved.geojson");
+                "instructions/moved.md", "bikeshare_moved.geojson");
 
             //NOTE: Renames are handled in bulk via changeset, so no need to create individual tasks
             Console.WriteLine("Skipping 'renamed' challenge creation as renames are handled via changeset.");
             //await CreateTaskForTypeAsync(projectId, "renamed", $"{systemName} -- Renamed stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
-            //    "../../../instructions/renamed.md", "../../../bikeshare_renamed_in_osm.geojson");
+            //    "instructions/renamed.md", "bikeshare_renamed_in_osm.geojson");
         }
 
 
@@ -39,13 +39,13 @@ namespace prepareBikeParking
             client.DefaultRequestHeaders.Add("apiKey", apiKey);
 
             // Read instruction from markdown file
-            if (!File.Exists(instructionFilePath))
+            if (!FileManager.FileExists(instructionFilePath))
             {
                 Console.WriteLine($"Instruction file not found at {instructionFilePath}. Skipping {taskType} challenge creation.");
                 return;
             }
 
-            string instruction = File.ReadAllText(instructionFilePath);
+            string instruction = await FileManager.ReadTextFileAsync(instructionFilePath);
             if (string.IsNullOrWhiteSpace(instruction))
             {
                 Console.WriteLine($"Instruction file is empty at {instructionFilePath}. Skipping {taskType} challenge creation.");
@@ -53,13 +53,13 @@ namespace prepareBikeParking
             }
 
             // Check if file exists and has content
-            if (!File.Exists(filePath))
+            if (!FileManager.FileExists(filePath))
             {
                 Console.WriteLine($"No {taskType} stations file found at {filePath}. Skipping {taskType} challenge creation.");
                 return;
             }
 
-            string fileContent = File.ReadAllText(filePath);
+            string fileContent = await FileManager.ReadTextFileAsync(filePath);
             if (string.IsNullOrWhiteSpace(fileContent))
             {
                 Console.WriteLine($"No {taskType} stations found. Skipping {taskType} challenge creation.");
