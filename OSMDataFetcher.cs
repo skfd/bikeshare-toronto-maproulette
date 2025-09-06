@@ -7,16 +7,17 @@ namespace prepareBikeParking
         /// <summary>
         /// Fetches bikeshare station data from OpenStreetMap using Overpass API
         /// </summary>
-        public static async Task<List<GeoPoint>> FetchFromOverpassApiAsync()
+        /// <param name="cityName">Name of the city to search for bikeshare stations</param>
+        public static async Task<List<GeoPoint>> FetchFromOverpassApiAsync(string cityName = "Toronto")
         {
-            var overpassQuery = @"
+            var overpassQuery = $@"
                 [out:json];
 
-                area[name=""Toronto""]->.to;
+                area[name=""{cityName}""]->.city;
                 (
-                  node(area.to)[bicycle_rental=docking_station];
-                  way(area.to)[bicycle_rental=docking_station];
-                  relation(area.to)[bicycle_rental=docking_station];
+                  node(area.city)[bicycle_rental=docking_station];
+                  way(area.city)[bicycle_rental=docking_station];
+                  relation(area.city)[bicycle_rental=docking_station];
                 );
 
                 out meta;

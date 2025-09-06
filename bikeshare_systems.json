@@ -1,0 +1,16 @@
+[
+  {
+    "id": 1,
+    "name": "Bike Share Toronto",
+    "city": "Toronto",
+    "maproulette_project_id": 60735,
+    "gbfs_api": "https://tor.publicbikesystem.net/ube/gbfs/v1/en/"
+  },
+  {
+    "id": 2,
+    "name": "Bixi",
+    "city": "Montreal",
+    "maproulette_project_id": -1,
+    "gbfs_api": "https://gbfs.velobixi.com/gbfs/2-2/gbfs.json"
+  }
+]
