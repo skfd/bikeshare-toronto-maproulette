@@ -5,9 +5,9 @@ namespace prepareBikeParking
 {
     public static class GitDiffToGeojson
     {
-        public static (List<string>, List<string>) LatestVsPrevious()
+        public static (List<string>, List<string>) LatestVsPrevious(string? filePath = null)
         {
-            var diffOutput = RunGitDiffCommand("0");
+            var diffOutput = RunGitDiffCommand("0", "", filePath);
             var (addedlines, removedObjects) = ExtractDiffedLines(diffOutput);
 
             return (addedlines, removedObjects);
@@ -65,17 +65,19 @@ namespace prepareBikeParking
             return output.ToString();
         }
 
-        public static (List<string>, List<string>) Compare(string @new = "HEAD", string old = "")
+        public static (List<string>, List<string>) Compare(string @new = "HEAD", string old = "", string? filePath = null)
         {
-            var diffOutput = RunGitDiffCommand(@new, old);
+            var diffOutput = RunGitDiffCommand(@new, old, filePath);
             var (addedlines, removedObjects) = ExtractDiffedLines(diffOutput);
 
             return (addedlines, removedObjects);
         }
 
-        private static string RunGitDiffCommand(string @new = "HEAD", string old = "")
+        private static string RunGitDiffCommand(string @new = "HEAD", string old = "", string? filePath = null)
         {
-            string command = $"--no-pager diff --unified=0 {@new} {old} \"../../../bikeshare.geojson\"";
+            // Use the provided file path or fallback to the old hardcoded path for backward compatibility
+            var targetFile = filePath ?? "../../../bikeshare.geojson";
+            string command = $"--no-pager diff --unified=0 {@new} {old} \"{targetFile.Replace('\\', '/')}\"";
             string arguments = "";
 
             Console.WriteLine($"Running git {command} {arguments}");

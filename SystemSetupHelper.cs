@@ -196,5 +196,60 @@ Steps:
                 await SetupNewSystemAsync(systemName, operatorName, brandName);
             }
         }
+
+        /// <summary>
+        /// Validates system configuration and provides helpful error messages for missing files
+        /// </summary>
+        /// <param name="systemName">Name of the bike share system to validate</param>
+        /// <returns>Validation result with detailed error information</returns>
+        public static SystemValidationResult ValidateSystemSetup(string systemName)
+        {
+            var result = new SystemValidationResult { SystemName = systemName, IsValid = true };
+            var missingFiles = new List<string>();
+
+            var requiredFiles = new[]
+            {
+                Path.Combine("instructions", "added.md"),
+                Path.Combine("instructions", "removed.md"),
+                Path.Combine("instructions", "moved.md"),
+                Path.Combine("instructions", "renamed.md")
+            };
+
+            foreach (var file in requiredFiles)
+            {
+                if (!FileManager.SystemFileExists(systemName, file))
+                {
+                    missingFiles.Add(file);
+                }
+            }
+
+            if (missingFiles.Any())
+            {
+                result.IsValid = false;
+                result.MissingFiles = missingFiles;
+                result.ErrorMessage = $"System '{systemName}' is missing required files: {string.Join(", ", missingFiles)}";
+            }
+
+            // Check if system directory exists
+            var systemDir = FileManager.GetSystemFullPath(systemName, "");
+            if (!Directory.Exists(systemDir))
+            {
+                result.IsValid = false;
+                result.ErrorMessage = $"System directory does not exist: {systemDir}";
+            }
+
+            return result;
+        }
+    }
+
+    /// <summary>
+    /// Result of system validation with detailed error information
+    /// </summary>
+    public class SystemValidationResult
+    {
+        public string SystemName { get; set; } = string.Empty;
+        public bool IsValid { get; set; }
+        public string ErrorMessage { get; set; } = string.Empty;
+        public List<string> MissingFiles { get; set; } = new List<string>();
     }
 }
