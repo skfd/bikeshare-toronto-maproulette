@@ -43,6 +43,7 @@ When you add a new system to `bikeshare_systems.json`, the tool automatically:
 - ? Generates instruction templates for Maproulette
 - ? Handles first-time setup gracefully
 - ? Provides helpful error messages
+- ? **Protects existing OSM data** by skipping deletion tasks for new systems
 
 ## Generated Files
 

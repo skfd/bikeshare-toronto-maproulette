@@ -9,8 +9,8 @@
   {
     "id": 2,
     "name": "Bixi",
-    "city": "Montreal",
-    "maproulette_project_id": -1,
+    "city": "Montréal",
+    "maproulette_project_id": 60735,
     "gbfs_api": "https://gbfs.velobixi.com/gbfs/2-2/en/station_information.json"
   }
 ]

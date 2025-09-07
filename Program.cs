@@ -242,8 +242,9 @@ async Task RunBikeShareLocationComparison(BikeShareSystem system)
     // Check if this is a new system by looking for existing bikeshare.geojson file
     var geojsonFilePath = FileManager.GetSystemFullPath(system.Name, "bikeshare.geojson");
     var lastSyncDate = GitFunctions.GetLastCommitDateForFile(geojsonFilePath);
+    bool isNewSystem = lastSyncDate == null;
     
-    if (lastSyncDate == null)
+    if (isNewSystem)
     {
         Console.WriteLine("No previous bikeshare.geojson file found in git history. This appears to be a new system setup.");
         Console.WriteLine("Using current date as the reference point for changes.");
@@ -280,7 +281,7 @@ async Task RunBikeShareLocationComparison(BikeShareSystem system)
     await GeoJsonGenerator.GenerateMainFileAsync(locationsList, system.Name);
 
     // Step 3: Compare with last committed version and generate diff files
-    await CompareAndGenerateDiffFiles(locationsList, system);
+    await CompareAndGenerateDiffFiles(locationsList, system, isNewSystem);
 
     // NEW: Step 5: Compare with OSM data (uncomment to enable OSM comparison)
     await CompareWithOSMData(locationsList, system);
@@ -303,7 +304,8 @@ async Task RunBikeShareLocationComparison(BikeShareSystem system)
                 // Validate instruction files before creating tasks
                 SystemSetupHelper.ValidateInstructionFilesForTaskCreation(system.Name);
                 
-                await MaprouletteTaskCreator.CreateTasksAsync(system.MaprouletteProjectId, lastSyncDate.Value, system.Name);
+                // Pass isNewSystem flag to avoid creating deletion tasks for new systems
+                await MaprouletteTaskCreator.CreateTasksAsync(system.MaprouletteProjectId, lastSyncDate.Value, system.Name, isNewSystem);
             }
             catch (InvalidOperationException ex) when (ex.Message.Contains("instruction files"))
             {
@@ -335,7 +337,7 @@ async Task RunBikeShareLocationComparison(BikeShareSystem system)
     }
 }
 
-async Task CompareAndGenerateDiffFiles(List<GeoPoint> currentPoints, BikeShareSystem system)
+async Task CompareAndGenerateDiffFiles(List<GeoPoint> currentPoints, BikeShareSystem system, bool isNewSystem = false)
 {
     Console.WriteLine("Comparing with last committed version...");
 

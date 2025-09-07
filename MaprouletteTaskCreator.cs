@@ -5,7 +5,7 @@ namespace prepareBikeParking
 {
     public static class MaprouletteTaskCreator
     {
-        public async static Task CreateTasksAsync(int projectId, DateTime lastSyncDate, string systemName = "Toronto")
+        public async static Task CreateTasksAsync(int projectId, DateTime lastSyncDate, string systemName = "Toronto", bool isNewSystem = false)
         {
             Console.WriteLine("Creating Maproulette tasks...");
 
@@ -17,15 +17,29 @@ namespace prepareBikeParking
 
             Console.WriteLine($"✅ Maproulette project {projectId} validated successfully.");
 
-             //Create challenges for each type of change
-            await CreateTaskForTypeAsync(projectId, "removed", $"{systemName} -- Removed stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
-                Path.Combine("instructions", "removed.md"), systemName, "bikeshare_extra_in_osm.geojson");
+            if (isNewSystem)
+            {
+                Console.WriteLine("🆕 Detected new system setup - skipping 'removed' task creation to avoid deleting existing OSM data.");
+                Console.WriteLine("   Only 'added' and 'moved' tasks will be created for stations missing from or different in OSM.");
+            }
+
+            // Create challenges for each type of change
+            // Skip 'removed' tasks for new systems to avoid deleting existing OSM stations
+            if (!isNewSystem)
+            {
+                await CreateTaskForTypeAsync(projectId, "removed", $"{systemName} -- Removed stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
+                    Path.Combine("instructions", "removed.md"), systemName, "bikeshare_extra_in_osm.geojson");
+            }
+            else
+            {
+                Console.WriteLine("⏭️  Skipping 'removed' challenge creation for new system to preserve existing OSM data.");
+            }
 
             await CreateTaskForTypeAsync(projectId, "added", $"{systemName} -- Added stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
                 Path.Combine("instructions", "added.md"), systemName, "bikeshare_missing_in_osm.geojson");
 
             await CreateTaskForTypeAsync(projectId, "moved", $"{systemName} -- Moved stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
-                Path.Combine("instructions", "moved.md"), systemName, "bikeshare_moved.geojson");
+                Path.Combine("instructions", "moved.md"), systemName, "bikeshare_moved_in_osm.geojson");
 
             //NOTE: Renames are handled in bulk via changeset, so no need to create individual tasks
             Console.WriteLine("Skipping 'renamed' challenge creation as renames are handled via changeset.");
