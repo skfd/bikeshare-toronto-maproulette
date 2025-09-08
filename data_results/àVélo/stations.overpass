@@ -1,0 +1,12 @@
+﻿[out:json];
+(
+  area[name="Agglomération de Québec"];
+  area[indigenous_community="Wendake, Nation Wendat"];
+)->.city;
+(
+    node(area.city)[bicycle_rental=docking_station];
+    way(area.city)[bicycle_rental=docking_station];
+    relation(area.city)[bicycle_rental=docking_station];
+);
+
+out meta;
