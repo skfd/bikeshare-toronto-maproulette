@@ -12,5 +12,12 @@
     "city": "Montréal",
     "maproulette_project_id": 60735,
     "gbfs_api": "https://gbfs.velobixi.com/gbfs/2-2/en/station_information.json"
+  },
+  {
+    "id": 3,
+    "name": "àVélo",
+    "city": "la ville de Québec",
+    "maproulette_project_id": 60735,
+    "gbfs_api": "https://quebec.publicbikesystem.net/customer/ube/gbfs/v1/en/station_information"
   }
 ]

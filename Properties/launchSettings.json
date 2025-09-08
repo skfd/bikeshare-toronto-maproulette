@@ -11,6 +11,10 @@
     "montreal": {
       "commandName": "Project",
       "commandLineArgs": "2"
+    },
+    "quebec": {
+      "commandName": "Project",
+      "commandLineArgs": "3"
     }
   }
 }
