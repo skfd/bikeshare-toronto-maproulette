@@ -230,7 +230,7 @@ async Task RunBikeShareLocationComparison(BikeShareSystem system)
     // Ensure the system is properly set up with instruction files
     try
     {
-        await SystemSetupHelper.EnsureSystemSetUpAsync(system.Name, system.Name, system.Name);
+        await SystemSetupHelper.EnsureSystemSetUpAsync(system.Name, system.Name, system.Name, system.City);
     }
     catch (Exception ex)
     {
@@ -397,10 +397,13 @@ async Task CompareWithOSMData(List<GeoPoint> bikeshareApiPoints, BikeShareSystem
 {
     try
     {
-        Console.WriteLine($"Fetching current bikeshare stations from OpenStreetMap for {system.City}...");
+        Console.WriteLine($"Fetching current bikeshare stations from OpenStreetMap for {system.Name}...");
 
-        // Fetch current OSM data
-        var osmPoints = await OSMDataFetcher.FetchFromOverpassApiAsync(system.City);
+        // Ensure stations.overpass file exists for the system
+        await OSMDataFetcher.EnsureStationsOverpassFileAsync(system.Name, system.City);
+
+        // Fetch current OSM data using system-specific overpass query
+        var osmPoints = await OSMDataFetcher.FetchFromOverpassApiAsync(system.Name);
         Console.WriteLine($"Found {osmPoints.Count} bikeshare stations in OSM");
 
         // Compare BikeShare API data with OSM data

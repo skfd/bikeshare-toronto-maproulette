@@ -88,37 +88,113 @@ The tool automatically detects new systems by checking git history for `bikeshar
 - Handles git integration for change tracking
 - Generates OSM comparison files
 - **New System Behavior**: Treats all API stations as potentially new additions
+- ? **Custom Overpass Queries**: Creates `stations.overpass` file for precise OSM data fetching
 
-### Task Creation Behavior
+### 5. **Smart OSM Data Fetching**
+The tool now uses system-specific Overpass query files instead of generating queries inline:
 
-The tool creates different types of Maproulette tasks based on the system status:
+**File Location:** `data_results/SYSTEM_NAME/stations.overpass`
 
-#### **For Established Systems** (with git history):
-- ? **Added Tasks**: New stations since last sync
-- ? **Removed Tasks**: Stations deleted since last sync  
-- ? **Moved Tasks**: Stations relocated since last sync
-- ?? **Renamed Tasks**: Handled via bulk changeset (not individual tasks)
+**Benefits:**
+- ?? **Precise Control**: Customize exactly which areas and criteria to search
+- ?? **Complex Queries**: Support for multi-area queries (like Bixi's Montreal + Sherbrooke)
+- ?? **Version Control**: Overpass queries are tracked in git with your data
+- ? **Consistent Results**: Same query used across all runs for reproducible results
 
-#### **For New Systems** (no git history):
-- ? **Added Tasks**: Stations missing from OpenStreetMap
-- ? **Removed Tasks**: **SKIPPED** to protect existing OSM data
-- ? **Moved Tasks**: Stations with different coordinates in OSM
-- ?? **Renamed Tasks**: Handled via bulk changeset
+**Auto-Generated for New Systems:**
+```overpass
+[out:json];
 
-#### **Why Skip Deletion Tasks for New Systems?**
+area[name="Your City"]->.city;
+(
+    node(area.city)[bicycle_rental=docking_station];
+    way(area.city)[bicycle_rental=docking_station];
+    relation(area.city)[bicycle_rental=docking_station];
+);
 
-When setting up a new system, the tool compares API data with existing OSM data. Any stations in OSM but not in the API would normally create "removal" tasks. However, for new systems:
-
-- ??? **Protects Existing Work**: Preserves bike share stations already mapped by the community
-- ?? **Avoids Data Loss**: Prevents accidental deletion of valid OSM data
-- ?? **Focuses on Gaps**: Concentrates on adding missing stations rather than removing existing ones
-- ?? **Gradual Integration**: Allows manual review of what should be removed vs. what should stay
-
-**Example Output for New System:**
+out meta;
 ```
-?? Detected new system setup - skipping 'removed' task creation to avoid deleting existing OSM data.
-   Only 'added' and 'moved' tasks will be created for stations missing from or different in OSM.
 
-??  Skipping 'removed' challenge creation for new system to preserve existing OSM data.
-Creating added challenge: Capital Bikeshare -- Added stations at 2024-01-15 since 2024-01-15
-Creating moved challenge: Capital Bikeshare -- Moved stations at 2024-01-15 since 2024-01-15
+**Custom Example (Bixi Montreal):**
+```overpass
+[out:json];
+
+(
+  area[name="Montréal (Région métropolitaine de recensement)"];
+  area[name="Sherbrooke"];
+)->.city;
+(
+  node(area.city)[bicycle_rental=docking_station];
+  way(area.city)[bicycle_rental=docking_station];
+  area(area.city)[bicycle_rental=docking_station];
+);
+
+out meta;
+```
+
+### Custom File Organization
+
+The tool organizes files by system name:
+- Use descriptive, filesystem-safe names
+- Avoid special characters: `/ \ : * ? " < > |`
+- Spaces are converted to valid directory names
+
+### Customizing Overpass Queries
+
+Each system can have a custom `stations.overpass` file for precise OSM data fetching:
+
+**Location:** `data_results/SYSTEM_NAME/stations.overpass`
+
+**Common Customizations:**
+
+**Multi-City Systems:**
+```overpass
+[out:json];
+
+(
+  area[name="City 1"];
+  area[name="City 2"];
+  area[name="City 3"];
+)->.searcharea;
+(
+  node(area.searcharea)[bicycle_rental=docking_station];
+  way(area.searcharea)[bicycle_rental=docking_station];
+  relation(area.searcharea)[bicycle_rental=docking_station];
+);
+
+out meta;
+```
+
+**Specific Operators:**
+```overpass
+[out:json];
+
+area[name="Your City"]->.city;
+(
+  node(area.city)[bicycle_rental=docking_station][operator="Your Operator"];
+  way(area.city)[bicycle_rental=docking_station][operator="Your Operator"];
+);
+
+out meta;
+```
+
+**Regional Systems:**
+```overpass
+[out:json];
+
+(
+  area[name~"Greater.*Area"];
+  area[name~".*Metropolitan.*"];
+)->.region;
+(
+  node(area.region)[bicycle_rental=docking_station];
+  way(area.region)[bicycle_rental=docking_station];
+);
+
+out meta;
+```
+
+**Testing Your Query:**
+1. Edit `data_results/SYSTEM_NAME/stations.overpass`
+2. Test at [Overpass Turbo](https://overpass-turbo.eu/)
+3. Run the tool to see results: `dotnet run <system-id>`

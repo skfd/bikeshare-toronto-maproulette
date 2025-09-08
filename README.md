@@ -27,9 +27,15 @@ See **[SETUP_NEW_SYSTEM.md](SETUP_NEW_SYSTEM.md)** for complete instructions on 
 
 ### OSM Data Download and Comparison
 
-The tool supports downloading current bikeshare station data from OpenStreetMap using the Overpass API. This enables comparison between official bike share API data and what's currently mapped in OpenStreetMap.
+The tool supports downloading current bikeshare station data from OpenStreetMap using system-specific Overpass queries. Each system can have a customized `stations.overpass` file for precise control over OSM data fetching.
 
-To enable OSM comparison, the comparison runs automatically and generates:
+**Features:**
+- ?? **Custom Overpass Queries**: Each system uses its own `data_results/SYSTEM_NAME/stations.overpass` file
+- ?? **Multi-Area Support**: Complex queries for systems spanning multiple cities or regions  
+- ?? **Version Controlled**: Overpass queries are tracked with your data for reproducible results
+- ? **Auto-Generated**: Default queries created automatically for new systems
+
+This enables comparison between official bike share API data and what's currently mapped in OpenStreetMap and generates:
 * `bikeshare_missing_in_osm.geojson`: Stations that exist in the API but are missing from OSM
 * `bikeshare_extra_in_osm.geojson`: Stations that exist in OSM but not in the current API
 * `bikeshare_moved_in_osm.geojson`: Stations that have different coordinates between API and OSM
@@ -49,11 +55,23 @@ When you add a new system to `bikeshare_systems.json`, the tool automatically:
 
 The tool generates files organized by system in `data_results/SYSTEM_NAME/`:
 
+**Station Data:**
 * `bikeshare.geojson`: Contains all current bike share stations
 * `bikeshare_added.geojson`: New stations added since the last update
 * `bikeshare_removed.geojson`: Stations removed since the last update
 * `bikeshare_moved.geojson`: Stations that have changed location, and maybe name too
 * `bikeshare_renamed.geojson`: Stations that have been renamed, but not moved
+
+**OSM Comparison:**
+* `bikeshare_missing_in_osm.geojson`: Stations missing from OpenStreetMap
+* `bikeshare_extra_in_osm.geojson`: Extra stations in OpenStreetMap
+* `bikeshare_moved_in_osm.geojson`: Stations with different coordinates in OSM
+* `bikeshare_renamed_in_osm.geojson`: Stations with different names in OSM
+* `bikeshare_renames.osc`: Changeset file for bulk name updates
+
+**Configuration:**
+* `stations.overpass`: Custom Overpass query for fetching OSM data
+* `instructions/`: Maproulette instruction templates (added.md, removed.md, moved.md, renamed.md)
 
 ## Configuration
 

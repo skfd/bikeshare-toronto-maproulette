@@ -1,0 +1,13 @@
+﻿[out:json];
+
+(
+  area[name="Montréal (Région métropolitaine de recensement)"];
+  area[name="Sherbrooke"];
+)->.city;
+(
+  node(area.city)[bicycle_rental=docking_station];
+  way(area.city)[bicycle_rental=docking_station];
+  area(area.city)[bicycle_rental=docking_station];
+);
+
+out meta;

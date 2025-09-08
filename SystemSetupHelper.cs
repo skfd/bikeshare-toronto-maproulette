@@ -16,13 +16,15 @@ namespace prepareBikeParking
         /// <param name="operatorType">Type of operator (public/private)</param>
         /// <param name="brandWikidataId">Wikidata ID for the brand (optional)</param>
         /// <param name="operatorWikidataId">Wikidata ID for the operator (optional)</param>
+        /// <param name="cityName">City name for Overpass query (optional, defaults to system name)</param>
         public static async Task SetupNewSystemAsync(
             string systemName, 
             string operatorName, 
             string brandName, 
             string operatorType = "public",
             string? brandWikidataId = null,
-            string? operatorWikidataId = null)
+            string? operatorWikidataId = null,
+            string? cityName = null)
         {
             Console.WriteLine($"Setting up new system: {systemName}");
 
@@ -47,6 +49,9 @@ namespace prepareBikeParking
             await CreateInstructionFileAsync(systemName, "removed.md", GenerateRemovedInstructions());
             await CreateInstructionFileAsync(systemName, "moved.md", GenerateMovedInstructions());
             await CreateInstructionFileAsync(systemName, "renamed.md", GenerateRenamedInstructions());
+
+            // Create stations.overpass file for OSM data fetching
+            await OSMDataFetcher.EnsureStationsOverpassFileAsync(systemName, cityName ?? systemName);
 
             Console.WriteLine($"Successfully set up new system: {systemName}");
             Console.WriteLine($"System directory: {systemDir}");
@@ -188,12 +193,18 @@ Steps:
         /// <param name="systemName">Name of the bike share system</param>
         /// <param name="operatorName">Operator name (used for default templates)</param>
         /// <param name="brandName">Brand name (used for default templates)</param>
-        public static async Task EnsureSystemSetUpAsync(string systemName, string operatorName, string brandName)
+        /// <param name="cityName">City name for Overpass query (optional)</param>
+        public static async Task EnsureSystemSetUpAsync(string systemName, string operatorName, string brandName, string? cityName = null)
         {
             if (!IsSystemSetUp(systemName))
             {
                 Console.WriteLine($"System {systemName} is not fully set up. Creating missing instruction files...");
-                await SetupNewSystemAsync(systemName, operatorName, brandName);
+                await SetupNewSystemAsync(systemName, operatorName, brandName, "public", null, null, cityName);
+            }
+            else
+            {
+                // Even if system is set up, ensure stations.overpass file exists
+                await OSMDataFetcher.EnsureStationsOverpassFileAsync(systemName, cityName ?? systemName);
             }
         }
 

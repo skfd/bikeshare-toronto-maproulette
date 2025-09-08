@@ -1,27 +1,29 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 
 namespace prepareBikeParking
 {
     public static class OSMDataFetcher
     {
         /// <summary>
-        /// Fetches bikeshare station data from OpenStreetMap using Overpass API
+        /// Fetches bikeshare station data from OpenStreetMap using system-specific Overpass query file
         /// </summary>
-        /// <param name="cityName">Name of the city to search for bikeshare stations</param>
-        public static async Task<List<GeoPoint>> FetchFromOverpassApiAsync(string cityName = "Toronto")
+        /// <param name="systemName">Name of the bike share system</param>
+        public static async Task<List<GeoPoint>> FetchFromOverpassApiAsync(string systemName)
         {
-            var overpassQuery = $@"
-                [out:json];
-
-                area[name=""{cityName}""]->.city;
-                (
-                  node(area.city)[bicycle_rental=docking_station];
-                  way(area.city)[bicycle_rental=docking_station];
-                  relation(area.city)[bicycle_rental=docking_station];
-                );
-
-                out meta;
-                ";
+            // Try to load system-specific overpass query first
+            string overpassQuery;
+            try
+            {
+                overpassQuery = await FileManager.ReadSystemTextFileAsync(systemName, "stations.overpass");
+                Console.WriteLine($"✅ Using system-specific Overpass query from data_results/{systemName}/stations.overpass");
+            }
+            catch (FileNotFoundException)
+            {
+                // Fallback to default query generation for backward compatibility
+                Console.WriteLine($"⚠️  System-specific stations.overpass file not found for {systemName}");
+                Console.WriteLine("   Using fallback query generation. Consider creating a stations.overpass file for better control.");
+                overpassQuery = GenerateDefaultOverpassQuery(systemName);
+            }
 
             var url = "https://overpass-api.de/api/interpreter";
             var client = new HttpClient();
@@ -42,6 +44,62 @@ namespace prepareBikeParking
             }
 
             return await ParseOverpassResponseAsync(responseText);
+        }
+
+        /// <summary>
+        /// Generates a default Overpass query for systems without a stations.overpass file
+        /// </summary>
+        /// <param name="systemName">Name of the bike share system</param>
+        /// <returns>Default Overpass query string</returns>
+        private static string GenerateDefaultOverpassQuery(string systemName)
+        {
+            // Map system names to cities for fallback
+            var cityName = systemName switch
+            {
+                "Bike Share Toronto" => "Toronto",
+                "Bixi" => "Montreal", // Note: This won't work perfectly for Bixi's complex area query
+                _ => systemName // Fallback to system name as city name
+            };
+
+            return $@"
+                [out:json];
+
+                area[name=""{cityName}""]->.city;
+                (
+                  node(area.city)[bicycle_rental=docking_station];
+                  way(area.city)[bicycle_rental=docking_station];
+                  relation(area.city)[bicycle_rental=docking_station];
+                );
+
+                out meta;
+                ";
+        }
+
+        /// <summary>
+        /// Creates a default stations.overpass file for a system if it doesn't exist
+        /// </summary>
+        /// <param name="systemName">Name of the bike share system</param>
+        /// <param name="cityName">Name of the city for the query</param>
+        public static async Task EnsureStationsOverpassFileAsync(string systemName, string cityName)
+        {
+            if (!FileManager.SystemFileExists(systemName, "stations.overpass"))
+            {
+                var defaultQuery = $@"[out:json];
+
+area[name=""{cityName}""]->.city;
+(
+    node(area.city)[bicycle_rental=docking_station];
+    way(area.city)[bicycle_rental=docking_station];
+    relation(area.city)[bicycle_rental=docking_station];
+);
+
+out meta;
+";
+
+                await FileManager.WriteSystemTextFileAsync(systemName, "stations.overpass", defaultQuery);
+                Console.WriteLine($"✅ Created default stations.overpass file for {systemName}");
+                Console.WriteLine($"   Edit data_results/{systemName}/stations.overpass to customize the Overpass query");
+            }
         }
 
         /// <summary>
