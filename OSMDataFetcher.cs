@@ -178,7 +178,8 @@ out meta;
                         // Only add if we have valid coordinates and ID
                         if (!string.IsNullOrEmpty(geoPoint.lat) &&
                             !string.IsNullOrEmpty(geoPoint.lon) &&
-                            !string.IsNullOrEmpty(geoPoint.id))
+                            !string.IsNullOrEmpty(geoPoint.id) &&
+                            !(geoPoint.lat == "0" && geoPoint.lon == "0"))
                         {
                             geoPoints.Add(geoPoint);
                         }
@@ -294,7 +295,8 @@ out meta;
             // Only add if we have valid coordinates and ID
             if (!string.IsNullOrEmpty(geoPoint.lat) &&
                 !string.IsNullOrEmpty(geoPoint.lon) &&
-                !string.IsNullOrEmpty(geoPoint.id))
+                !string.IsNullOrEmpty(geoPoint.id) &&
+                !(geoPoint.lat == "0" && geoPoint.lon == "0"))
             {
                 geoPoints.Add(geoPoint);
             }
