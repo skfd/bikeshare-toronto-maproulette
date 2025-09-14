@@ -37,9 +37,10 @@ namespace prepareBikeParking
 
             await CreateTaskForTypeAsync(projectId, "added", $"{systemName} -- Added stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
                 Path.Combine("instructions", "added.md"), systemName, "bikeshare_missing_in_osm.geojson");
-
-            await CreateTaskForTypeAsync(projectId, "moved", $"{systemName} -- Moved stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
-                Path.Combine("instructions", "moved.md"), systemName, "bikeshare_moved_in_osm.geojson");
+            
+            Console.WriteLine("Note: 'moved' tasks are currently disabled due to complexity in handling moved stations.");
+            //await CreateTaskForTypeAsync(projectId, "moved", $"{systemName} -- Moved stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
+            //    Path.Combine("instructions", "moved.md"), systemName, "bikeshare_moved_in_osm.geojson");
 
             //NOTE: Renames are handled in bulk via changeset, so no need to create individual tasks
             Console.WriteLine("Skipping 'renamed' challenge creation as renames are handled via changeset.");
