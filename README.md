@@ -6,6 +6,7 @@ Automate synchronization between official bike share (GBFS) station data and wha
 * Compares against the last committed snapshot and OSM data (via custom Overpass queries)
 * Produces rich GeoJSON diff + review files
 * (Optionally) creates Maproulette challenges for community mapping
+* Creates OSM changeset file for renamed stations (use JOSM to apply)
 
 > Goal: Keep bike share station networks accurately mapped, highlight missing/moved/renamed infrastructure, and streamline community contribution workflows.
 
