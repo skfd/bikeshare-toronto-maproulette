@@ -5,25 +5,43 @@ namespace prepareBikeParking
 {
     public static class BikeShareSystemLoader
     {
-        private const string ConfigFilePath = "../../../bikeshare_systems.json";
+        private static readonly string[] ConfigFilePaths = {
+            "../../../bikeshare_systems.json",  // From build output directory (VS debugging)
+            "bikeshare_systems.json",           // From src directory (dotnet run from src)
+            "src/bikeshare_systems.json"        // From project root (dotnet run from root)
+        };
+
+        /// <summary>
+        /// Finds the configuration file by trying multiple possible locations
+        /// </summary>
+        private static string FindConfigFile()
+        {
+            foreach (var path in ConfigFilePaths)
+            {
+                if (File.Exists(path))
+                {
+                    return path;
+                }
+            }
+
+            var searchedPaths = string.Join("\n", ConfigFilePaths.Select(p => $"  - {Path.GetFullPath(p)}"));
+            throw new FileNotFoundException($"Configuration file 'bikeshare_systems.json' not found. Searched locations:\n{searchedPaths}\n\n" +
+                "To fix this:\n" +
+                "1. Ensure 'bikeshare_systems.json' exists in the src directory\n" +
+                "2. Use the example configuration from SETUP_NEW_SYSTEM.md\n" +
+                "3. Verify the file has proper JSON formatting");
+        }
 
         /// <summary>
         /// Loads all bike share systems from the configuration file
         /// </summary>
         public static async Task<List<BikeShareSystem>> LoadAllSystemsAsync()
         {
-            if (!File.Exists(ConfigFilePath))
-            {
-                throw new FileNotFoundException($"Configuration file 'bikeshare_systems.json' not found at path: {Path.GetFullPath(ConfigFilePath)}\n\n" +
-                    "To fix this:\n" +
-                    "1. Ensure 'bikeshare_systems.json' exists in the project root directory\n" +
-                    "2. Use the example configuration from SETUP_NEW_SYSTEM.md\n" +
-                    "3. Verify the file has proper JSON formatting");
-            }
+            var configFilePath = FindConfigFile();
 
             try
             {
-                var jsonContent = await File.ReadAllTextAsync(ConfigFilePath);
+                var jsonContent = await File.ReadAllTextAsync(configFilePath);
 
                 if (string.IsNullOrWhiteSpace(jsonContent))
                 {

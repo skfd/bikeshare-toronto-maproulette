@@ -8,89 +8,127 @@ All todos should be saved to `todo.md` in the project root. Completed items must
 ## Purpose
 Automate comparison between GBFS bike share station data and OpenStreetMap (OSM); emit structured diff GeoJSON + optional Maproulette challenges + OSM rename changeset.
 
+## Architecture & DI Pattern
+- Main orchestration in `BikeShareFlows` class (injected dependencies)
+- Services abstracted via interfaces in `Services/Interfaces.cs`
+- Implementations in `Services/ServiceImplementations.cs`
+- DI container configured in `Program.cs` with `Microsoft.Extensions.DependencyInjection`
+- Always inject interfaces, never concrete classes when adding new services
+
 ## Core Flow (orchestrated in `BikeShareFlows`)
-1. Load system (`BikeShareSystemLoader`) from `bikeshare_systems.json` (root file; validate IDs & URLs)
-2. Ensure per‑system scaffolding (`SystemSetupHelper.EnsureSystemSetUpAsync`) – creates `data_results/<SYSTEM>/instructions/*.md` + `stations.overpass` if missing
-3. Fetch current GBFS stations (`BikeShareDataFetcher.FetchFromApiAsync`)
-4. Write baseline `bikeshare.geojson` (record‑separated FeatureCollections; each line starts with RS `\u001e`) via `GeoJsonGenerator`
-5. Git diff previous committed version (`GitDiffToGeojson.GetLastCommittedVersion`) → classify added/removed/moved/renamed (`BikeShareComparer`) threshold: 3m internal diff, 30m vs OSM
-6. Generate diff files + OSM comparison (`OSMDataFetcher.FetchFromOverpassApiAsync` + `GeoJsonGenerator.GenerateOSMComparisonFilesAsync`)
-7. Optional Maproulette tasks (`MaprouletteTaskCreator.CreateTasksAsync`) after interactive prompt; skips removed if new system; renames handled via changeset `.osc` file.
+1. Load system from `src/bikeshare_systems.json` via `IBikeShareSystemLoader`
+2. Ensure system scaffolding via `ISystemSetupService` – creates `data_results/<SYSTEM>/instructions/*.md` + `stations.overpass` if missing
+3. Fetch GBFS stations via `IBikeShareDataFetcher.FetchStationsAsync()`
+4. Write baseline `bikeshare.geojson` (record‑separated FeatureCollections; each line starts with RS `\u001e`) via `IGeoJsonWriter`
+5. Git diff previous committed version via `IGitReader` → classify added/removed/moved/renamed via `IComparerService` (threshold: 3m internal diff, 30m vs OSM)
+6. Generate diff files + OSM comparison via `IOSMDataFetcher` + `IGeoJsonWriter`
+7. Optional Maproulette tasks via `IMaprouletteService` after `IPromptService` confirmation
 
-## Generated Files (all under `data_results/<SYSTEM>/`)
-- Core: `bikeshare.geojson`
-- Diff: `bikeshare_added.geojson`, `bikeshare_removed.geojson`, `bikeshare_moved.geojson`, `bikeshare_renamed.geojson`, `bikeshare_toreview.geojson`
-- OSM compare: `bikeshare_missing_in_osm.geojson`, `bikeshare_extra_in_osm.geojson`, `bikeshare_moved_in_osm.geojson`, `bikeshare_renamed_in_osm.geojson`, `bikeshare_osm.geojson`
-- Overpass query: `stations.overpass` (customizable; auto-created)
-- OSM rename changes: `bikeshare_renames.osc`
-- Task templates: `instructions/{added,removed,moved,renamed}.md`
-- Brand tags: `brand_tags.osm` (OSM XML template with tagging suggestions from Name Suggestion Index)
+## Critical File Format: Record-Separated GeoJSON
+**NEVER modify this format without coordinated migration:**
+```csharp
+// Each line = \u001e + complete FeatureCollection JSON
+var template = "\u001e{{\"type\":\"FeatureCollection\"" +
+    ",\"features\":[{{\"type\":\"Feature\",\"geometry\":{{\"type\":\"Point\"," +
+    "\"coordinates\":[{lat},{lon}]}},\"properties\":{{" +
+    "\"address\":\"{id}\",\"name\":\"{name}\"...
+```
+- Parsing: `GeoPoint.ParseLine()` strips `\u001e` prefix
+- Generation: `GeoJsonGenerator.GenerateGeojsonLine()` adds `\u001e` prefix
+- Git-friendly: enables clean line-by-line diffs
 
-## GeoJSON Line Format
-Each line = whole FeatureCollection (single Feature) prefixed with `\u001e` for git-friendly diffs. Parsing uses `GeoPoint.ParseLine`. Maintain this exact structure when creating new generators.
+## File Paths & IO Patterns
+- All file operations through `FileManager` static class
+- **Dynamic base path resolution**: `GetBasePath()` handles different working directories automatically
+- System files under `data_results/<SYSTEM>/`
+- Helper methods: `FileManager.GetSystemFilePath()`, `FileManager.WriteSystemGeoJsonFileAsync()`
+- **Always use relative paths via FileManager helpers**
+- Works from any directory: project root, `src/`, or build output directory
 
-## Key Conventions
-- File IO centralized in `FileManager` (always use relative paths via helpers; base path is `..\\..\\..\\`).
-- Do NOT change record‑separated format or RS prefix without coordinated migration.
-- Comparisons rely on stable `id` (GBFS `station_id` or OSM `ref`; fallback prefixed with `osm_`).
-- Distances (Haversine) in `BikeShareComparer.GetDistanceInMeters`; keep thresholds parametric if extending.
-- Logging: Serilog configured in `Program.cs` (console + rolling file). Prefer structured logs (`Log.Information("Msg {Prop}", value)`).
-- Overpass: Always read system-specific `stations.overpass` first; only generate default if missing.
-- Maproulette task creation: one challenge per change type; tasks are individual RS-separated JSON station payloads. Renames intentionally excluded (bulk changeset instead).
-- Interactive confirmation for task creation currently uses `Console.ReadKey()`; automated flows may need an injectable prompt layer (note before refactor).
+## Coordinate & Culture Handling
+- **CRITICAL**: Always format lat/lon with `InvariantCulture` (prevents locale decimal separator issues)
+- Coordinates rounded to 5 decimals in `GeoPoint.ParseCoords()`
+- Distance calculations use Haversine formula in `BikeShareComparer.GetDistanceInMeters()`
 
-## External Dependencies
-- GBFS station_information endpoint per system (`gbfs_api` field).
-- Overpass API (`https://overpass-api.de/api/interpreter`).
-- Maproulette API (`https://maproulette.org/api/v2/*`) requires `MAPROULETTE_API_KEY` env var.
-- Name Suggestion Index (`https://github.com/osmlab/name-suggestion-index/raw/main/data/brands/amenity/bicycle_rental.json`) for OSM brand tagging.
-- AngleSharp only used by legacy HTML scraper (`FetchFromWebsiteAsync`) – avoid extending unless reviving that path.
+## Comparison Logic & Thresholds
+- Internal diff (GBFS vs previous): 3m threshold for "moved"
+- OSM comparison: 30m threshold for "moved"
+- Classification priority: moved > renamed (station can't be both)
+- Station matching by stable `id` (GBFS `station_id` or OSM `ref`; fallback `osm_` prefix)
 
-## Adding / Modifying Systems
-- Edit `bikeshare_systems.json`; keep unique integer `id`; validate URL.
-- Each system entry supports these fields:
-  - `id` (required): Unique integer identifier
-  - `name` (required): Display name of the bike share system
-  - `city` (required): City or region name
-  - `gbfs_api` (required): GBFS station_information endpoint URL
-  - `maproulette_project_id` (required): Numeric Maproulette project ID for task creation
-  - `brand:wikidata` (optional): Wikidata Q-identifier for the bike share brand (e.g., "Q17018523" for Bike Share Toronto)
-- First run auto-creates directory + instruction templates + `stations.overpass`.
-- Use `fetch-brand-tags` command to download OSM tagging suggestions based on `brand:wikidata` values.
-- Commit generated baseline GeoJSON so future diffs work (git history essential for `GetLastCommittedVersion`).
+## Logging Patterns (Serilog)
+- Structured logging: `Log.Information("Message {Property}", value)`
+- Console + rolling file (7 days retention)
+- Include context in service methods: system name, counts, file paths
+- Error handling: log & continue for non-fatal operations (e.g., Overpass failures)
 
-## Safe Change Guidelines
-- When adding new diff categories, mirror existing pattern: compute in `BikeShareComparer` (extend return tuple cautiously) → add generate method in `GeoJsonGenerator` → integrate call site in `BikeShareFlows`.
-- Preserve existing file names unless consumer tooling updated.
-- For performance-sensitive batch additions (e.g., Maproulette tasks), consider future bulk upload but keep current per-task loop semantics until tested.
-
-## Common Pitfalls
-- Missing `bikeshare_systems.json` → loader throws detailed guidance.
-- New system with no git history: treat all stations as added (handled; don't special-case unless changing baseline logic).
-- Empty or absent instruction markdown blocks Maproulette creation (validation throws).
-- Overpass rate limits: failures are logged & non-fatal; do not abort main GBFS diff generation.
-- Locale issues: always format lat/lon with `InvariantCulture` (follow existing code).
-
-## Extension Ideas (Only if Requested)
-Caching Overpass responses, bulk Maproulette adds, status feed integration, CLI options instead of interactive prompt. Do not implement proactively.
-
-## Quick Dev Commands
+## CLI Commands & Development
 ```powershell
-# Build
- dotnet build
-# List systems
- dotnet run -- list
-# Run system id 1
- dotnet run -- 1
-# Validate system 1
- dotnet run -- validate 1
-# Fetch brand tags for all systems
- dotnet run -- fetch-brand-tags
-# Fetch brand tags for specific system
- dotnet run -- fetch-brand-tags 1
-# Download global GBFS service list
- dotnet run -- save-global-service
+# Build & test
+dotnet build
+dotnet test
+
+# Primary operations (works from any directory)
+dotnet run -- 1                    # Run system ID 1 (from src/)
+dotnet run --project src -- 1      # Run system ID 1 (from root)
+dotnet run -- list                 # List systems
+dotnet run -- validate 1           # Validate system setup
+dotnet run -- fetch-brand-tags     # NSI brand tagging
+
+# Project structure
+src/                               # Main application
+├── bikeshare_systems.json        # System configurations
+├── BikeShareFlows.cs             # Main orchestration
+├── Services/Interfaces.cs        # Service contracts
+└── data_results/<SYSTEM>/        # Generated outputs
+
+tests/                            # Unit tests (xUnit)
+├── *Tests.cs                    # Test classes
+└── data_results/                # Test fixtures
 ```
 
+## Testing Patterns
+- xUnit framework with `dotnet test`
+- Test categories: Core logic → IO boundaries with mocks → Integration
+- Mock external dependencies (HTTP, file system) using service interfaces
+- Test data in `tests/data_results/` subdirectories
+- Focus on deterministic logic first: `BikeShareComparer`, `GeoPoint.ParseLine()`, coordinate rounding
+
+## External Dependencies & Environment
+- **GBFS APIs**: `station_information.json` endpoints per system
+- **Overpass API**: `https://overpass-api.de/api/interpreter` (system-specific queries in `stations.overpass`)
+- **Maproulette API**: Requires `$env:MAPROULETTE_API_KEY` environment variable
+- **Name Suggestion Index**: OSM brand tagging via GitHub raw URLs
+- Git repository: Required for diff generation (`IGitReader.GetLastCommittedVersion()`)
+
+## System Configuration (`bikeshare_systems.json`)
+```json
+{
+  "id": 1,                              // Unique integer
+  "name": "System Name",                // Display name
+  "city": "City Name",                  // Location
+  "gbfs_api": "https://...",           // GBFS endpoint (required)
+  "maproulette_project_id": 12345,     // Numeric project ID
+  "brand:wikidata": "Q123456"          // Optional: for NSI tagging
+}
+```
+
+## Safe Extension Patterns
+- New diff categories: Extend `IComparerService.Compare()` return tuple → add `IGeoJsonWriter` method → integrate in `BikeShareFlows`
+- New file outputs: Add methods to `IGeoJsonWriter` interface, implement in service
+- New external integrations: Create interface, implement service, register in DI container
+- **Preserve existing file names/formats** unless coordinating consumer updates
+
+## Common Pitfalls
+- Missing `bikeshare_systems.json` → detailed loader guidance
+- Locale decimal separators → always use `InvariantCulture`
+- Record separator format changes → breaks git diff & parsing
+- New system without git history → all stations treated as "added" (expected)
+- Missing instruction templates → Maproulette validation fails
+- Overpass rate limits → logged but non-fatal (don't abort main flow)
+
 ## When Unsure
-Prefer reading existing generator/comparer patterns before introducing new serialization or diff logic. Ask for clarification if a change impacts file formats, diff semantics, or Maproulette workflow.
+- Follow existing service interface patterns for new functionality
+- Check test coverage before modifying core comparison logic
+- Preserve record-separated GeoJSON format unless explicitly changing it
+- Ask for clarification on file format changes or new external integrations

@@ -9,14 +9,34 @@ namespace prepareBikeParking
     public static class FileManager
     {
         /// <summary>
-        /// Base path for file operations (relative to application directory)
-        /// </summary>
-        private const string BasePath = "..\\..\\..\\";
-
-        /// <summary>
         /// Data results directory path
         /// </summary>
         private const string DataResultsPath = "data_results";
+
+        /// <summary>
+        /// Gets the base path for file operations, handling different working directories
+        /// </summary>
+        private static string GetBasePath()
+        {
+            // Try different possible base paths depending on working directory
+            var possibleBasePaths = new[] {
+                "..\\..\\..\\",     // From build output directory (VS debugging)
+                "",                 // From src directory (dotnet run from src)
+                "src\\"            // From project root (dotnet run from root)
+            };
+
+            foreach (var basePath in possibleBasePaths)
+            {
+                var testPath = Path.Combine(basePath, DataResultsPath);
+                if (Directory.Exists(testPath))
+                {
+                    return basePath;
+                }
+            }
+
+            // If none found, default to current directory and create data_results if needed
+            return "";
+        }
 
         #region Path Utilities
 
@@ -42,17 +62,15 @@ namespace prepareBikeParking
         /// <returns>File content as string</returns>
         public static async Task<string> ReadTextFileAsync(string relativePath)
         {
-            var fullPath = Path.Combine(BasePath, relativePath);
-            
+            var fullPath = Path.Combine(GetBasePath(), relativePath);
+
             if (!File.Exists(fullPath))
             {
                 throw new FileNotFoundException($"File not found: {fullPath}");
             }
 
             return await File.ReadAllTextAsync(fullPath, Encoding.UTF8);
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Reads text content from a system-specific file
         /// </summary>
         /// <param name="systemName">Name of the bike share system</param>
@@ -71,8 +89,8 @@ namespace prepareBikeParking
         /// <returns>File content as string</returns>
         public static string ReadTextFile(string relativePath)
         {
-            var fullPath = Path.Combine(BasePath, relativePath);
-            
+            var fullPath = Path.Combine(GetBasePath(), relativePath);
+
             if (!File.Exists(fullPath))
             {
                 throw new FileNotFoundException($"File not found: {fullPath}");
@@ -88,8 +106,8 @@ namespace prepareBikeParking
         /// <param name="content">Content to write</param>
         public static async Task WriteTextFileAsync(string relativePath, string content)
         {
-            var fullPath = Path.Combine(BasePath, relativePath);
-            
+            var fullPath = Path.Combine(GetBasePath(), relativePath);
+
             // Ensure directory exists
             var directory = Path.GetDirectoryName(fullPath);
             if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
@@ -119,8 +137,8 @@ namespace prepareBikeParking
         /// <param name="content">Content to write</param>
         public static void WriteTextFile(string relativePath, string content)
         {
-            var fullPath = Path.Combine(BasePath, relativePath);
-            
+            var fullPath = Path.Combine(GetBasePath(), relativePath);
+
             // Ensure directory exists
             var directory = Path.GetDirectoryName(fullPath);
             if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
@@ -145,7 +163,7 @@ namespace prepareBikeParking
         {
             var jsonContent = await ReadTextFileAsync(relativePath);
             var result = JsonSerializer.Deserialize<T>(jsonContent);
-            
+
             if (result == null)
             {
                 throw new InvalidOperationException($"Failed to parse JSON file '{relativePath}'. The file may contain invalid JSON or result in null.");
@@ -224,7 +242,7 @@ namespace prepareBikeParking
         /// <returns>True if file exists</returns>
         public static bool FileExists(string relativePath)
         {
-            var fullPath = Path.Combine(BasePath, relativePath);
+            var fullPath = Path.Combine(GetBasePath(), relativePath);
             return File.Exists(fullPath);
         }
 
@@ -247,7 +265,7 @@ namespace prepareBikeParking
         /// <returns>Full path</returns>
         public static string GetFullPath(string relativePath)
         {
-            return Path.Combine(BasePath, relativePath);
+            return Path.Combine(GetBasePath(), relativePath);
         }
 
         /// <summary>
@@ -269,14 +287,14 @@ namespace prepareBikeParking
         /// <returns>True if file was deleted, false if it didn't exist</returns>
         public static bool DeleteFile(string relativePath)
         {
-            var fullPath = Path.Combine(BasePath, relativePath);
-            
+            var fullPath = Path.Combine(GetBasePath(), relativePath);
+
             if (File.Exists(fullPath))
             {
                 File.Delete(fullPath);
                 return true;
             }
-            
+
             return false;
         }
 
@@ -287,13 +305,13 @@ namespace prepareBikeParking
         /// <returns>FileInfo object or null if file doesn't exist</returns>
         public static FileInfo? GetFileInfo(string relativePath)
         {
-            var fullPath = Path.Combine(BasePath, relativePath);
-            
+            var fullPath = Path.Combine(GetBasePath(), relativePath);
+
             if (File.Exists(fullPath))
             {
                 return new FileInfo(fullPath);
             }
-            
+
             return null;
         }
 
