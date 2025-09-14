@@ -43,7 +43,37 @@ namespace prepareBikeParking
                 throw new Exception($"Overpass API request failed: {response.StatusCode} - {responseText}");
             }
 
-            return await ParseOverpassResponseAsync(responseText);
+            var osmData = await ParseOverpassResponseAsync(responseText);
+            
+            // Save the OSM data to bikeshare_osm.geojson file
+            await SaveOsmDataAsync(osmData, systemName);
+            
+            return osmData;
+        }
+
+        /// <summary>
+        /// Saves OSM data to bikeshare_osm.geojson file next to other geojson files
+        /// </summary>
+        /// <param name="osmData">List of GeoPoint objects from OSM</param>
+        /// <param name="systemName">Name of the bike share system</param>
+        private static async Task SaveOsmDataAsync(List<GeoPoint> osmData, string systemName)
+        {
+            try
+            {
+                await FileManager.WriteSystemGeoJsonFileAsync(
+                    systemName, 
+                    "bikeshare_osm.geojson", 
+                    osmData, 
+                    point => GeoJsonGenerator.GenerateGeojsonLine(point, systemName)
+                );
+                
+                Console.WriteLine($"💾 Saved {osmData.Count} OSM stations to data_results/{systemName}/bikeshare_osm.geojson");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️  Warning: Could not save OSM data to file: {ex.Message}");
+                // Don't throw - this is a nice-to-have feature, shouldn't break the main flow
+            }
         }
 
         /// <summary>
