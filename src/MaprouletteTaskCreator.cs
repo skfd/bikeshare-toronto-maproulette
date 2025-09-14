@@ -1,6 +1,9 @@
-﻿using System.Text;
+﻿using System.Runtime.CompilerServices;
+using System.Text;
 using System.Text.Json;
 using Serilog;
+
+[assembly: InternalsVisibleTo("prepareBikeParking.Tests")]
 
 namespace prepareBikeParking
 {
@@ -90,7 +93,7 @@ namespace prepareBikeParking
 
             try
             {
-                // Try to fetch the project details from Maproulette API
+                // Attempt to fetch the project details from Maproulette API
                 var response = await client.GetAsync($"https://maproulette.org/api/v2/project/{projectId}");
 
                 if (response.IsSuccessStatusCode)
@@ -219,7 +222,7 @@ namespace prepareBikeParking
 
             var challengeResponse = await client.PostAsync(
                 "https://maproulette.org/api/v2/challenge",
-                new StringContent(JsonSerializer.Serialize(challengeData), Encoding.UTF8, "application/json")
+                new StringContent(JsonSerializer.Serialize(challengeData), Encoding.UTF8, new System.Net.Http.Headers.MediaTypeHeaderValue("application/json"))
             );
 
             if (!challengeResponse.IsSuccessStatusCode)
@@ -257,7 +260,7 @@ namespace prepareBikeParking
 
                 var taskResponse = await client.PutAsync(
                     $"https://maproulette.org/api/v2/challenge/{challengeId}/addTasks",
-                    new StringContent(station, Encoding.UTF8, "application/json")
+                    new StringContent(station, Encoding.UTF8, new System.Net.Http.Headers.MediaTypeHeaderValue("application/json"))
                 );
 
                 if (taskResponse.IsSuccessStatusCode)

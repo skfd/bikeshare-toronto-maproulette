@@ -60,10 +60,21 @@ try
     var testProjectCommand = new Command("test-project", "Validate Maproulette project accessibility") { projectIdArg };
     testProjectCommand.SetHandler(async (int pid) => await provider.GetRequiredService<BikeShareFlows>().TestProjectAsync(pid), projectIdArg);
 
+
+    // save-global-service command
+    var saveGlobalServiceCommand = new Command("save-global-service", "Download and save the global GBFS service provider list");
+    saveGlobalServiceCommand.SetHandler(async () =>
+    {
+        var filePath = Path.Combine("data_results", "global_gbfs_services.json");
+        await GlobalGbfsServiceFetcher.SaveGlobalServiceListAsync(filePath);
+        Log.Information("Global GBFS service provider list saved to {Path}", filePath);
+    });
+
     root.AddCommand(runCommand);
     root.AddCommand(listCommand);
     root.AddCommand(validateCommand);
     root.AddCommand(testProjectCommand);
+    root.AddCommand(saveGlobalServiceCommand);
 
     var exitCode = await root.InvokeAsync(args);
     Log.Information("Exiting with code {Code}", exitCode);

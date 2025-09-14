@@ -184,7 +184,7 @@ public class BikeShareFlowsTests
         var setupSvc = new Mock<ISystemSetupService>();
         setupSvc.Setup(s => s.ValidateSystem(system.Name, false)).Returns(new SystemValidationResult{ SystemName=system.Name, IsValid=true });
         setupSvc.Setup(s => s.EnsureAsync(system.Name, system.Name, system.Name, system.City)).Returns(Task.CompletedTask);
-        setupSvc.Setup(s => s.ValidateInstructionFiles(system.Name)).Returns(true);
+        setupSvc.Setup(s => s.ValidateInstructionFiles(system.Name)).Verifiable();
 
         var paths = new Mock<IFilePathProvider>();
         paths.Setup(p => p.GetSystemFullPath(system.Name, "bikeshare.geojson")).Returns("dummy-valfail.geojson");

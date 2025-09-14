@@ -1,0 +1,1 @@
+﻿{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[-79.2,43.1]},"properties":{"address":"S1","latitude":"43.1","longitude":"-79.2","name":"Station A","capacity":"15","operator":"TestSystemNode"}}]}

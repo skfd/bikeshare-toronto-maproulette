@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Linq;
+using System;
 
 namespace prepareBikeParking.Tests;
 
@@ -19,10 +20,10 @@ public class OSMDataFetcherTests
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var item = _responses.Count>0 ? _responses.Dequeue() : (HttpStatusCode.OK,"{\"elements\":[]}");
-            return Task.FromResult(new HttpResponseMessage(item.code){ Content = new StringContent(item.body) });
+            return Task.FromResult(new HttpResponseMessage(item.Item1){ Content = new StringContent(item.Item2) });
         }
     }
-    private class Factory : IOverpassHttpClientFactory
+    public class Factory : IOverpassHttpClientFactory
     {
         private readonly HttpClient _client;
         public Factory(HttpMessageHandler handler){ _client = new HttpClient(handler); }

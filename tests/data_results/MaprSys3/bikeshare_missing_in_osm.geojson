@@ -1,0 +1,2 @@
+﻿{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[1,1]},"properties":{"address":"1","latitude":"1","longitude":"1","name":"A","capacity":"0","operator":"MaprSys3"}}]}
+{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[2,2]},"properties":{"address":"2","latitude":"2","longitude":"2","name":"B","capacity":"0","operator":"MaprSys3"}}]}

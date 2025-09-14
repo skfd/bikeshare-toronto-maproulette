@@ -275,7 +275,9 @@ out meta;
             if (missingNodeIds.Count > 0)
             {
                 Log.Debug("Fetching {Count} missing nodes in batch for way centroids", missingNodeIds.Count);
-                fetchedNodes = await FetchNodesBatchAsync(missingNodeIds.ToList());
+                // Use an instance to call FetchNodesBatchAsync
+                var fetcher = new OSMDataFetcher();
+                fetchedNodes = await fetcher.FetchNodesBatchAsync(missingNodeIds.ToList());
             }
 
             // Second pass: process way elements with fetched nodes

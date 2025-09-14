@@ -1,0 +1,1 @@
+﻿{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[-79.3,43.2]},"properties":{"address":"osm_2002","latitude":"43.2","longitude":"-79.3","name":"NoRef","capacity":"0","operator":"TestSystemNoRef"}}]}

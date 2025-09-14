@@ -1,0 +1,2 @@
+﻿{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[-79.4,43.3]},"properties":{"address":"osm_4004","latitude":"43.3","longitude":"-79.4","name":"Unnamed Station","capacity":"0","operator":"TestWayInline"}}]}
+{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[-79.4,43.3]},"properties":{"address":"W1","latitude":"43.3","longitude":"-79.4","name":"WayStation","capacity":"0","operator":"TestWayInline"}}]}
