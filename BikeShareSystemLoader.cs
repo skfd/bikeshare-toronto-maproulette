@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Serilog;
 
 namespace prepareBikeParking
 {
@@ -23,14 +24,14 @@ namespace prepareBikeParking
             try
             {
                 var jsonContent = await File.ReadAllTextAsync(ConfigFilePath);
-                
+
                 if (string.IsNullOrWhiteSpace(jsonContent))
                 {
                     throw new InvalidOperationException($"Configuration file 'bikeshare_systems.json' is empty. Please add at least one bike share system configuration.");
                 }
 
                 var result = JsonSerializer.Deserialize<List<BikeShareSystem>>(jsonContent);
-                
+
                 if (result == null)
                 {
                     throw new InvalidOperationException($"Failed to parse configuration file 'bikeshare_systems.json'. The file may contain invalid JSON.\n\n" +
@@ -91,7 +92,7 @@ namespace prepareBikeParking
 
                 if (string.IsNullOrWhiteSpace(system.GbfsApi))
                     systemErrors.Add("GBFS API URL is required");
-                else if (!Uri.TryCreate(system.GbfsApi, UriKind.Absolute, out var uri) || 
+                else if (!Uri.TryCreate(system.GbfsApi, UriKind.Absolute, out var uri) ||
                          (uri.Scheme != "http" && uri.Scheme != "https"))
                     systemErrors.Add("GBFS API must be a valid HTTP/HTTPS URL");
 
@@ -115,12 +116,12 @@ namespace prepareBikeParking
         {
             var systems = await LoadAllSystemsAsync();
             var system = systems.FirstOrDefault(s => s.Id == systemId);
-            
+
             if (system == null)
             {
                 var availableIds = string.Join(", ", systems.Select(s => s.Id));
                 var availableSystems = string.Join("\n", systems.Select(s => $"  ID {s.Id}: {s.Name} ({s.City})"));
-                
+
                 throw new ArgumentException($"System with ID {systemId} not found.\n\n" +
                     $"Available systems:\n{availableSystems}\n\n" +
                     $"Use one of these IDs: {availableIds}\n" +
@@ -138,42 +139,28 @@ namespace prepareBikeParking
             try
             {
                 var systems = await LoadAllSystemsAsync();
-                Console.WriteLine("Available Bike Share Systems:");
-                Console.WriteLine("============================");
-                
+                Log.Information("Available Bike Share Systems (Count={Count})", systems.Count);
+
                 if (systems.Count == 0)
                 {
-                    Console.WriteLine("No bike share systems configured.");
-                    Console.WriteLine("Add systems to bikeshare_systems.json to get started.");
-                    Console.WriteLine("See SETUP_NEW_SYSTEM.md for instructions.");
+                    Log.Warning("No bike share systems configured. Add entries to bikeshare_systems.json. See SETUP_NEW_SYSTEM.md");
                     return;
                 }
 
                 foreach (var system in systems)
                 {
-                    var projectStatus = system.MaprouletteProjectId > 0 ? $"Project ID: {system.MaprouletteProjectId}" : "No Maproulette project";
-                    var apiStatus = Uri.TryCreate(system.GbfsApi, UriKind.Absolute, out _) ? "? Valid URL" : "? Invalid URL";
-                    
-                    Console.WriteLine($"ID: {system.Id} | {system.Name} ({system.City})");
-                    Console.WriteLine($"    Maproulette: {projectStatus}");
-                    Console.WriteLine($"    GBFS API: {apiStatus}");
-                    Console.WriteLine($"    URL: {system.GbfsApi}");
-                    Console.WriteLine();
+                    var projectStatus = system.MaprouletteProjectId > 0 ? system.MaprouletteProjectId.ToString() : "None";
+                    var apiValid = Uri.TryCreate(system.GbfsApi, UriKind.Absolute, out _);
+                    Log.Information("System {Id}: {Name} ({City}) | Project={ProjectStatus} | ApiValid={ApiValid} | Url={Url}",
+                        system.Id, system.Name, system.City, projectStatus, apiValid, system.GbfsApi);
                 }
-                
-                Console.WriteLine($"Total: {systems.Count} system(s) configured");
-                Console.WriteLine();
-                Console.WriteLine("Usage: dotnet run <system-id>");
-                Console.WriteLine("Example: dotnet run 1");
+                Log.Information("Total systems configured: {Count}", systems.Count);
+                Log.Information("Usage: dotnet run -- run --system-id <id>");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error loading systems: {ex.Message}");
-                Console.WriteLine();
-                Console.WriteLine("To fix this issue:");
-                Console.WriteLine("1. Check that bikeshare_systems.json exists and is readable");
-                Console.WriteLine("2. Verify the JSON syntax is correct");
-                Console.WriteLine("3. See SETUP_NEW_SYSTEM.md for configuration help");
+                Log.Error(ex, "Error loading bike share systems configuration");
+                Log.Information("To fix: ensure bikeshare_systems.json exists, JSON is valid, and matches SETUP_NEW_SYSTEM.md");
             }
         }
     }

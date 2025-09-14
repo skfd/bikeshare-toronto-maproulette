@@ -1,4 +1,5 @@
 using AngleSharp.Html.Parser;
+using Serilog;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -12,7 +13,7 @@ namespace prepareBikeParking
         /// <param name="apiUrl">Optional custom API URL. If not provided, defaults to Toronto's API.</param>
         public static async Task<List<GeoPoint>> FetchFromApiAsync(string? url)
         {
-            Console.WriteLine($"Fetching bike share data from: {url}");
+            Log.Information("Fetching bike share data from {Url}", url);
 
             try
             {
@@ -32,11 +33,12 @@ namespace prepareBikeParking
                     });
 
                 var result = locationList.ToList();
-                Console.WriteLine($"Successfully fetched {result.Count} bike share stations");
+                Log.Information("Fetched {Count} bike share stations from {Url}", result.Count, url);
                 return result;
             }
             catch (Exception ex)
             {
+                Log.Error(ex, "Failed to fetch bike share data from {Url}", url);
                 throw new Exception($"Failed to fetch bike share data from {url}: {ex.Message}", ex);
             }
         }

@@ -18,15 +18,15 @@ namespace prepareBikeParking
         /// <param name="operatorWikidataId">Wikidata ID for the operator (optional)</param>
         /// <param name="cityName">City name for Overpass query (optional, defaults to system name)</param>
         public static async Task SetupNewSystemAsync(
-            string systemName, 
-            string operatorName, 
-            string brandName, 
+            string systemName,
+            string operatorName,
+            string brandName,
             string operatorType = "public",
             string? brandWikidataId = null,
             string? operatorWikidataId = null,
             string? cityName = null)
         {
-            Console.WriteLine($"Setting up new system: {systemName}");
+            Serilog.Log.Information("Setting up new system: {System}", systemName);
 
             // Create the system directory structure
             var systemDir = FileManager.GetSystemFullPath(systemName, "");
@@ -35,13 +35,13 @@ namespace prepareBikeParking
             if (!Directory.Exists(systemDir))
             {
                 Directory.CreateDirectory(systemDir);
-                Console.WriteLine($"Created system directory: {systemDir}");
+                Serilog.Log.Information("Created system directory {Dir}", systemDir);
             }
 
             if (!Directory.Exists(instructionsDir))
             {
                 Directory.CreateDirectory(instructionsDir);
-                Console.WriteLine($"Created instructions directory: {instructionsDir}");
+                Serilog.Log.Information("Created instructions directory {Dir}", instructionsDir);
             }
 
             // Create instruction files
@@ -53,9 +53,8 @@ namespace prepareBikeParking
             // Create stations.overpass file for OSM data fetching
             await OSMDataFetcher.EnsureStationsOverpassFileAsync(systemName, cityName ?? systemName);
 
-            Console.WriteLine($"Successfully set up new system: {systemName}");
-            Console.WriteLine($"System directory: {systemDir}");
-            Console.WriteLine("You can now run the tool with the system ID to fetch and process bike share data.");
+            Serilog.Log.Information("Successfully set up new system {System}. Directory: {Dir}", systemName, systemDir);
+            Serilog.Log.Information("Run tool with system ID to fetch and process data.");
         }
 
         /// <summary>
@@ -64,15 +63,15 @@ namespace prepareBikeParking
         private static async Task CreateInstructionFileAsync(string systemName, string fileName, string content)
         {
             var filePath = Path.Combine("instructions", fileName);
-            
+
             if (!FileManager.SystemFileExists(systemName, filePath))
             {
                 await FileManager.WriteSystemTextFileAsync(systemName, filePath, content);
-                Console.WriteLine($"Created instruction file: {fileName}");
+                Serilog.Log.Debug("Created instruction file {File}", fileName);
             }
             else
             {
-                Console.WriteLine($"Instruction file already exists: {fileName}");
+                Serilog.Log.Debug("Instruction file already exists {File}", fileName);
             }
         }
 
@@ -92,12 +91,12 @@ namespace prepareBikeParking
             sb.AppendLine("amenity=bicycle_rental");
             sb.AppendLine("bicycle_rental=docking_station");
             sb.AppendLine($"brand={brandName}");
-            
+
             if (!string.IsNullOrEmpty(brandWikidataId))
             {
                 sb.AppendLine($"brand:wikidata={brandWikidataId}");
             }
-            
+
             if (brandName != operatorName)
             {
                 sb.AppendLine($"network={brandName}");
@@ -106,15 +105,15 @@ namespace prepareBikeParking
                     sb.AppendLine($"network:wikidata={brandWikidataId}");
                 }
             }
-            
+
             sb.AppendLine($"operator={operatorName}");
             sb.AppendLine($"operator:type={operatorType}");
-            
+
             if (!string.IsNullOrEmpty(operatorWikidataId))
             {
                 sb.AppendLine($"operator:wikidata={operatorWikidataId}");
             }
-            
+
             sb.AppendLine("```");
             sb.AppendLine();
 
@@ -198,7 +197,7 @@ Steps:
         {
             if (!IsSystemSetUp(systemName))
             {
-                Console.WriteLine($"System {systemName} is not fully set up. Creating missing instruction files...");
+                Serilog.Log.Warning("System {System} not fully set up. Creating missing instruction files...", systemName);
                 await SetupNewSystemAsync(systemName, operatorName, brandName, "public", null, null, cityName);
             }
             else
@@ -240,7 +239,7 @@ Steps:
                 result.IsValid = false;
                 result.MissingFiles = missingFiles;
                 result.ErrorMessage = $"System '{systemName}' is missing required files: {string.Join(", ", missingFiles)}";
-                
+
                 if (throwOnMissing)
                 {
                     throw new InvalidOperationException($"Critical system setup error for '{systemName}': Missing required instruction files: {string.Join(", ", missingFiles)}. These files are required for Maproulette task creation.");
@@ -253,7 +252,7 @@ Steps:
             {
                 result.IsValid = false;
                 result.ErrorMessage = $"System directory does not exist: {systemDir}";
-                
+
                 if (throwOnMissing)
                 {
                     throw new DirectoryNotFoundException($"Critical system setup error for '{systemName}': System directory does not exist: {systemDir}. Run system setup first.");

@@ -158,9 +158,9 @@ public static class BikeShareFlows
         await CompareWithOSMData(locationsList, system);
 
         Log.Information("Prompting user for Maproulette task creation (y/N)");
-        Console.WriteLine("Do you want to create Maproulette tasks for the new locations? (y/N)");
-        var confirm = Console.ReadKey().KeyChar;
-        Console.WriteLine();
+        Log.Information("Do you want to create Maproulette tasks for the new locations? (y/N)");
+        var confirm = Console.ReadKey().KeyChar; // Input kept; logging replaces output
+        Log.Debug("User response to task creation prompt: {Key}", confirm);
         if (confirm.ToString().ToLower() != "y")
         {
             Log.Information("User declined task creation.");

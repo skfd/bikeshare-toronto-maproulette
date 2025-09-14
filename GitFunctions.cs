@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using Serilog;
 
 namespace prepareBikeParking
 {
@@ -20,7 +21,7 @@ namespace prepareBikeParking
                 using var process = Process.Start(processStartInfo);
                 if (process == null)
                 {
-                    Console.WriteLine("Failed to start git process.");
+                    Log.Error("Failed to start git process for file {FilePath}", filePath);
                     return null;
                 }
 
@@ -33,13 +34,13 @@ namespace prepareBikeParking
                 }
                 else
                 {
-                    Console.WriteLine("Failed to parse commit date.");
+                    Log.Warning("Failed to parse commit date for file {FilePath}. Raw output: {Output}", filePath, output.Trim());
                     return null;
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error while getting last commit date: {ex.Message}");
+                Log.Error(ex, "Error while getting last commit date for file {FilePath}", filePath);
                 return null;
             }
         }

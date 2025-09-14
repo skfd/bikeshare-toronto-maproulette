@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using Serilog;
 
 namespace prepareBikeParking
 {
@@ -80,7 +81,7 @@ namespace prepareBikeParking
             string command = $"--no-pager diff --unified=0 {@new} {old} \"{targetFile.Replace('\\', '/')}\"";
             string arguments = "";
 
-            Console.WriteLine($"Running git {command} {arguments}");
+            Log.Debug("Running git diff command: git {Command} {Args}", command, arguments);
 
             ProcessStartInfo startInfo = new ProcessStartInfo
             {
@@ -114,11 +115,16 @@ namespace prepareBikeParking
                 // Wait for the process to finish
                 process.WaitForExit();
 
-                // Output the result
-                Console.WriteLine(output.ToString());
-
-                // Output the error result
-                Console.WriteLine(errorOutput.ToString());
+                var stdOut = output.ToString();
+                var stdErr = errorOutput.ToString();
+                if (!string.IsNullOrWhiteSpace(stdOut))
+                {
+                    Log.Debug("git diff stdout for {File}: {StdOut}", targetFile, stdOut);
+                }
+                if (!string.IsNullOrWhiteSpace(stdErr))
+                {
+                    Log.Debug("git diff stderr for {File}: {StdErr}", targetFile, stdErr);
+                }
             }
 
             var result = output.ToString();

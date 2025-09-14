@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using Serilog;
 
 namespace prepareBikeParking
 {
@@ -15,13 +16,13 @@ namespace prepareBikeParking
             try
             {
                 overpassQuery = await FileManager.ReadSystemTextFileAsync(systemName, "stations.overpass");
-                Console.WriteLine($"✅ Using system-specific Overpass query from data_results/{systemName}/stations.overpass");
+                Log.Information("Using system-specific Overpass query {File}", $"data_results/{systemName}/stations.overpass");
             }
             catch (FileNotFoundException)
             {
                 // Fallback to default query generation for backward compatibility
-                Console.WriteLine($"⚠️  System-specific stations.overpass file not found for {systemName}");
-                Console.WriteLine("   Using fallback query generation. Consider creating a stations.overpass file for better control.");
+                Log.Warning("System-specific stations.overpass file not found for {System}. Using fallback query generation.", systemName);
+                Log.Information("Consider creating data_results/{System}/stations.overpass for customization.", systemName);
                 overpassQuery = GenerateDefaultOverpassQuery(systemName);
             }
 
@@ -44,10 +45,10 @@ namespace prepareBikeParking
             }
 
             var osmData = await ParseOverpassResponseAsync(responseText);
-            
+
             // Save the OSM data to bikeshare_osm.geojson file
             await SaveOsmDataAsync(osmData, systemName);
-            
+
             return osmData;
         }
 
@@ -61,17 +62,17 @@ namespace prepareBikeParking
             try
             {
                 await FileManager.WriteSystemGeoJsonFileAsync(
-                    systemName, 
-                    "bikeshare_osm.geojson", 
-                    osmData, 
+                    systemName,
+                    "bikeshare_osm.geojson",
+                    osmData,
                     point => GeoJsonGenerator.GenerateGeojsonLine(point, systemName)
                 );
-                
-                Console.WriteLine($"💾 Saved {osmData.Count} OSM stations to data_results/{systemName}/bikeshare_osm.geojson");
+
+                Log.Information("Saved {Count} OSM stations to {Path}", osmData.Count, $"data_results/{systemName}/bikeshare_osm.geojson");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"⚠️  Warning: Could not save OSM data to file: {ex.Message}");
+                Log.Warning(ex, "Could not save OSM data to file for {System}", systemName);
                 // Don't throw - this is a nice-to-have feature, shouldn't break the main flow
             }
         }
@@ -127,8 +128,8 @@ out meta;
 ";
 
                 await FileManager.WriteSystemTextFileAsync(systemName, "stations.overpass", defaultQuery);
-                Console.WriteLine($"✅ Created default stations.overpass file for {systemName}");
-                Console.WriteLine($"   Edit data_results/{systemName}/stations.overpass to customize the Overpass query");
+                Log.Information("Created default stations.overpass file for {System}", systemName);
+                Log.Information("Edit data_results/{System}/stations.overpass to customize the Overpass query", systemName);
             }
         }
 
@@ -150,13 +151,13 @@ out meta;
             {
                 element.TryGetProperty("type", out var typeProperty);
                 var type = typeProperty.GetString();
-                
+
                 // Check if tags property exists before using it
                 if (!element.TryGetProperty("tags", out var tags) || tags.ValueKind != JsonValueKind.Object)
                 {
                     continue; // Skip elements without tags or with invalid tags
                 }
-                
+
                 if (type == "node")
                 {
                     // Check if it's a bikeshare station
@@ -222,7 +223,7 @@ out meta;
                         rentalProp.GetString() == "docking_station")
                     {
                         // Get the nodes array from the way
-                        if (element.TryGetProperty("nodes", out var nodesProperty) && 
+                        if (element.TryGetProperty("nodes", out var nodesProperty) &&
                             nodesProperty.ValueKind == JsonValueKind.Array)
                         {
                             var nodesArray = nodesProperty.EnumerateArray().ToArray();
@@ -230,7 +231,7 @@ out meta;
                             {
                                 // Get the first node ID
                                 var firstNodeId = nodesArray[0].GetInt64();
-                                
+
                                 // Check if node exists in current elements
                                 var nodeElement = FindNodeInElements(elements, firstNodeId);
                                 if (nodeElement.HasValue)
@@ -254,7 +255,7 @@ out meta;
             Dictionary<long, JsonElement> fetchedNodes = new();
             if (missingNodeIds.Count > 0)
             {
-                Console.WriteLine($"Fetching {missingNodeIds.Count} missing nodes in batch...");
+                Log.Debug("Fetching {Count} missing nodes in batch for way centroids", missingNodeIds.Count);
                 fetchedNodes = await FetchNodesBatchAsync(missingNodeIds.ToList());
             }
 
@@ -267,7 +268,7 @@ out meta;
                 }
                 else
                 {
-                    Console.WriteLine($"Warning: Could not fetch coordinates for node {firstNodeId}");
+                    Log.Warning("Could not fetch coordinates for node {NodeId}", firstNodeId);
                 }
             }
 
@@ -356,7 +357,7 @@ out meta;
         private static async Task<Dictionary<long, JsonElement>> FetchNodesBatchAsync(List<long> nodeIds)
         {
             var result = new Dictionary<long, JsonElement>();
-            
+
             if (nodeIds.Count == 0)
                 return result;
 
@@ -374,7 +375,7 @@ out meta;
 
                 using var client = new HttpClient();
                 var url = "https://overpass-api.de/api/interpreter";
-                
+
                 var formData = new List<KeyValuePair<string, string>>
                 {
                     new KeyValuePair<string, string>("data", overpassQuery)
@@ -382,16 +383,16 @@ out meta;
 
                 var formContent = new FormUrlEncodedContent(formData);
                 var response = await client.PostAsync(url, formContent);
-                
+
                 if (!response.IsSuccessStatusCode)
                 {
-                    Console.WriteLine($"Batch node fetch failed: {response.StatusCode}");
+                    Log.Warning("Batch node fetch failed with status {Status}", response.StatusCode);
                     return result;
                 }
-                
+
                 var responseText = await response.Content.ReadAsStringAsync();
                 var jsonDoc = JsonSerializer.Deserialize<JsonElement>(responseText);
-                
+
                 if (jsonDoc.TryGetProperty("elements", out var elements))
                 {
                     foreach (var element in elements.EnumerateArray())
@@ -405,14 +406,14 @@ out meta;
                         }
                     }
                 }
-                
-                Console.WriteLine($"Successfully fetched {result.Count}/{nodeIds.Count} nodes in batch");
+
+                Log.Debug("Fetched {Fetched}/{Requested} nodes in batch", result.Count, nodeIds.Count);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error in batch node fetch: {ex.Message}");
+                Log.Error(ex, "Error in batch node fetch");
             }
-            
+
             return result;
         }
 

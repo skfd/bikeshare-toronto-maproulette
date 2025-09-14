@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using System.Text.Json;
+using Serilog;
 
 namespace prepareBikeParking
 {
@@ -7,7 +8,7 @@ namespace prepareBikeParking
     {
         public async static Task CreateTasksAsync(int projectId, DateTime lastSyncDate, string systemName = "Toronto", bool isNewSystem = false)
         {
-            Console.WriteLine("Creating Maproulette tasks...");
+            Serilog.Log.Information("Creating Maproulette tasks...");
 
             // First, validate that the project exists and is accessible
             if (!await ValidateProjectExistsAsync(projectId))
@@ -15,12 +16,12 @@ namespace prepareBikeParking
                 throw new InvalidOperationException($"Maproulette project validation failed for project ID {projectId}. Cannot proceed with task creation.");
             }
 
-            Console.WriteLine($"✅ Maproulette project {projectId} validated successfully.");
+            Serilog.Log.Information("Maproulette project {ProjectId} validated successfully", projectId);
 
             if (isNewSystem)
             {
-                Console.WriteLine("🆕 Detected new system setup - skipping 'removed' task creation to avoid deleting existing OSM data.");
-                Console.WriteLine("   Only 'added' and 'moved' tasks will be created for stations missing from or different in OSM.");
+                Serilog.Log.Information("New system setup detected; skipping 'removed' task creation to preserve existing OSM data.");
+                Serilog.Log.Information("Only 'added' (and future 'moved') tasks will be created in this run.");
             }
 
             // Create challenges for each type of change
@@ -32,18 +33,18 @@ namespace prepareBikeParking
             }
             else
             {
-                Console.WriteLine("⏭️  Skipping 'removed' challenge creation for new system to preserve existing OSM data.");
+                Serilog.Log.Information("Skipping 'removed' challenge creation for new system.");
             }
 
             await CreateTaskForTypeAsync(projectId, "added", $"{systemName} -- Added stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
                 Path.Combine("instructions", "added.md"), systemName, "bikeshare_missing_in_osm.geojson");
-            
-            Console.WriteLine("Note: 'moved' tasks are currently disabled due to complexity in handling moved stations.");
+
+            Serilog.Log.Information("'moved' tasks currently disabled (logic pending refinement)");
             //await CreateTaskForTypeAsync(projectId, "moved", $"{systemName} -- Moved stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
             //    Path.Combine("instructions", "moved.md"), systemName, "bikeshare_moved_in_osm.geojson");
 
             //NOTE: Renames are handled in bulk via changeset, so no need to create individual tasks
-            Console.WriteLine("Skipping 'renamed' challenge creation as renames are handled via changeset.");
+            Serilog.Log.Information("Skipping 'renamed' challenge creation (handled via changeset)");
             //await CreateTaskForTypeAsync(projectId, "renamed", $"{systemName} -- Renamed stations at {DateTime.Now:yyyy-MM-dd} since {lastSyncDate:yyyy-MM-dd}",
             //    Path.Combine("instructions", "renamed.md"), systemName, "bikeshare_renamed_in_osm.geojson");
         }
@@ -67,11 +68,10 @@ namespace prepareBikeParking
         {
             var client = new HttpClient();
             var apiKey = Environment.GetEnvironmentVariable("MAPROULETTE_API_KEY");
-            
+
             if (string.IsNullOrEmpty(apiKey))
             {
-                Console.WriteLine("❌ MAPROULETTE_API_KEY environment variable is not set.");
-                Console.WriteLine("   Project validation requires API authentication.");
+                Serilog.Log.Error("MAPROULETTE_API_KEY environment variable is not set. Project validation requires API authentication.");
                 throw new InvalidOperationException("MAPROULETTE_API_KEY environment variable is required for project validation and task creation.");
             }
 
@@ -86,20 +86,19 @@ namespace prepareBikeParking
                 {
                     var projectJson = await response.Content.ReadAsStringAsync();
                     var project = JsonSerializer.Deserialize<JsonElement>(projectJson);
-                    
+
                     if (project.TryGetProperty("name", out var nameProperty))
                     {
                         var projectName = nameProperty.GetString();
-                        Console.WriteLine($"✅ Found Maproulette project: '{projectName}' (ID: {projectId})");
-                        
+                        Serilog.Log.Information("Found Maproulette project {Name} (ID: {Id})", projectName, projectId);
+
                         // Check if project is enabled
                         if (project.TryGetProperty("enabled", out var enabledProperty))
                         {
                             var isEnabled = enabledProperty.GetBoolean();
                             if (!isEnabled)
                             {
-                                Console.WriteLine($"⚠️  Warning: Project '{projectName}' is disabled.");
-                                Console.WriteLine("   Tasks can still be created but may not be visible to mappers.");
+                                Serilog.Log.Warning("Project {Name} (ID: {Id}) is disabled; tasks may not be visible", projectName, projectId);
                             }
                         }
 
@@ -108,42 +107,32 @@ namespace prepareBikeParking
                 }
                 else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
                 {
-                    Console.WriteLine($"❌ Maproulette project with ID {projectId} not found.");
-                    Console.WriteLine("   Possible solutions:");
-                    Console.WriteLine($"   1. Verify the project ID is correct: https://maproulette.org/admin/project/{projectId}");
-                    Console.WriteLine("   2. Ensure you have access to the project");
-                    Console.WriteLine("   3. Check that the project hasn't been deleted");
+                    Serilog.Log.Error("Maproulette project {ProjectId} not found", projectId);
+                    Serilog.Log.Information("Check: ID correctness, access permissions, project existence");
                     throw new ArgumentException($"Maproulette project {projectId} not found. Please verify the project ID and your access permissions.");
                 }
                 else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                 {
-                    Console.WriteLine($"❌ Unauthorized access to Maproulette project {projectId}.");
-                    Console.WriteLine("   Possible solutions:");
-                    Console.WriteLine("   1. Verify your MAPROULETTE_API_KEY is correct");
-                    Console.WriteLine("   2. Check that you have permission to access this project");
-                    Console.WriteLine("   3. Ensure your API key hasn't expired");
+                    Serilog.Log.Error("Unauthorized access to Maproulette project {ProjectId}", projectId);
+                    Serilog.Log.Information("Ensure API key validity and project permissions");
                     throw new UnauthorizedAccessException($"Unauthorized access to Maproulette project {projectId}. Please check your API key and permissions.");
                 }
                 else
                 {
-                    Console.WriteLine($"❌ Failed to validate Maproulette project {projectId}.");
-                    Console.WriteLine($"   HTTP Status: {response.StatusCode}");
-                    Console.WriteLine($"   Response: {await response.Content.ReadAsStringAsync()}");
+                    Serilog.Log.Error("Failed to validate Maproulette project {ProjectId} - Status {Status}", projectId, response.StatusCode);
+                    Serilog.Log.Debug("Validation response: {Body}", await response.Content.ReadAsStringAsync());
                     throw new InvalidOperationException($"Failed to validate Maproulette project {projectId}. HTTP Status: {response.StatusCode}");
                 }
             }
             catch (HttpRequestException ex)
             {
-                Console.WriteLine($"❌ Network error while validating Maproulette project {projectId}: {ex.Message}");
-                Console.WriteLine("   Possible solutions:");
-                Console.WriteLine("   1. Check your internet connection");
-                Console.WriteLine("   2. Verify Maproulette.org is accessible");
-                Console.WriteLine("   3. Try again later if the service is temporarily unavailable");
+                Serilog.Log.Error(ex, "Network error validating Maproulette project {ProjectId}", projectId);
+                Serilog.Log.Information("Check internet connection, site availability, retry later");
                 throw new InvalidOperationException($"Network error while validating Maproulette project {projectId}: {ex.Message}", ex);
             }
             catch (Exception ex) when (ex is not InvalidOperationException && ex is not ArgumentException && ex is not UnauthorizedAccessException)
             {
-                Console.WriteLine($"❌ Unexpected error validating Maproulette project {projectId}: {ex.Message}");
+                Serilog.Log.Error(ex, "Unexpected error validating Maproulette project {ProjectId}", projectId);
                 throw new InvalidOperationException($"Unexpected error validating Maproulette project {projectId}: {ex.Message}", ex);
             }
 
@@ -177,14 +166,14 @@ namespace prepareBikeParking
             // Check if file exists and has content
             if (!FileManager.SystemFileExists(systemName, fileName))
             {
-                Console.WriteLine($"No {taskType} stations file found at {fileName} for system {systemName}. Skipping {taskType} challenge creation.");
+                Serilog.Log.Information("No {Type} stations file {File} for system {System}; skipping challenge creation", taskType, fileName, systemName);
                 return;
             }
 
             string fileContent = await FileManager.ReadSystemTextFileAsync(systemName, fileName);
             if (string.IsNullOrWhiteSpace(fileContent))
             {
-                Console.WriteLine($"No {taskType} stations found. Skipping {taskType} challenge creation.");
+                Serilog.Log.Information("No {Type} stations found; skipping challenge creation", taskType);
                 return;
             }
 
@@ -197,7 +186,7 @@ namespace prepareBikeParking
 
             if (stations.Count == 0)
             {
-                Console.WriteLine($"No valid {taskType} stations found. Skipping {taskType} challenge creation.");
+                Serilog.Log.Information("No valid {Type} stations parsed; skipping challenge creation", taskType);
                 return;
             }
 
@@ -225,32 +214,27 @@ namespace prepareBikeParking
             if (!challengeResponse.IsSuccessStatusCode)
             {
                 var errorContent = await challengeResponse.Content.ReadAsStringAsync();
-                Console.WriteLine($"Failed to create {taskType} challenge: {errorContent}");
-                
+                Serilog.Log.Error("Failed to create {Type} challenge: {Error}", taskType, errorContent);
+
                 // Provide helpful error messages based on common issues
                 if (challengeResponse.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                 {
-                    Console.WriteLine("   This might be due to:");
-                    Console.WriteLine("   1. Invalid or expired MAPROULETTE_API_KEY");
-                    Console.WriteLine("   2. Insufficient permissions for the project");
+                    Serilog.Log.Information("Authorization failure likely due to invalid API key or insufficient permissions");
                     throw new UnauthorizedAccessException($"Failed to create {taskType} challenge due to authorization issues. Check your API key and project permissions.");
                 }
                 else if (challengeResponse.StatusCode == System.Net.HttpStatusCode.BadRequest)
                 {
-                    Console.WriteLine("   This might be due to:");
-                    Console.WriteLine("   1. Invalid challenge data or parameters");
-                    Console.WriteLine("   2. Project ID doesn't exist or isn't accessible");
-                    Console.WriteLine("   3. Duplicate challenge name");
+                    Serilog.Log.Information("Bad request: invalid data, inaccessible project, or duplicate name");
                     throw new InvalidOperationException($"Failed to create {taskType} challenge due to bad request. Check challenge parameters and project configuration.");
                 }
-                
+
                 throw new InvalidOperationException($"Failed to create {taskType} challenge. HTTP Status: {challengeResponse.StatusCode}, Response: {errorContent}");
             }
 
             var challengeResult = JsonSerializer.Deserialize<JsonElement>(await challengeResponse.Content.ReadAsStringAsync());
             var challengeId = challengeResult.GetProperty("id").GetInt32();
 
-            Console.WriteLine($"Creating {stations.Count} {taskType} tasks...");
+            Serilog.Log.Information("Creating {Count} {Type} tasks", stations.Count, taskType);
 
             // Create tasks one by one
             int successCount = 0;
@@ -268,12 +252,12 @@ namespace prepareBikeParking
                 if (taskResponse.IsSuccessStatusCode)
                 {
                     successCount++;
-                    Console.WriteLine($"Successfully created {taskType} task {i + 1}/{stations.Count}");
+                    Serilog.Log.Debug("Created {Type} task {Index}/{Total}", taskType, i + 1, stations.Count);
                 }
                 else
                 {
                     failureCount++;
-                    Console.WriteLine($"Failed to create {taskType} task {i + 1}/{stations.Count}: {await taskResponse.Content.ReadAsStringAsync()}");
+                    Serilog.Log.Warning("Failed to create {Type} task {Index}/{Total}: {Error}", taskType, i + 1, stations.Count, await taskResponse.Content.ReadAsStringAsync());
                 }
 
                 // Add a small delay to avoid overwhelming the API
@@ -282,11 +266,11 @@ namespace prepareBikeParking
 
             //await ResetTaskInstructionsAsync(taskType, client, challengeName, challengeId);
 
-            Console.WriteLine($"{taskType.ToUpper()} challenge creation completed: {challengeName} (ID: {challengeId})");
-            Console.WriteLine($"Tasks created successfully: {successCount}, Failed: {failureCount}, Total: {stations.Count}");
-            
+            Serilog.Log.Information("{Type} challenge creation completed: {Name} (ID: {Id})", taskType.ToUpper(), challengeName, challengeId);
+            Serilog.Log.Information("Task results - Success: {Success} Failed: {Fail} Total: {Total}", successCount, failureCount, stations.Count);
+
             // Provide link to the created challenge
-            Console.WriteLine($"View challenge: https://maproulette.org/admin/project/{projectId}/challenge/{challengeId}");
+            Serilog.Log.Information("View challenge: https://maproulette.org/admin/project/{ProjectId}/challenge/{ChallengeId}", projectId, challengeId);
         }
 
         private static async Task ResetTaskInstructionsAsync(string taskType, HttpClient client, string challengeName, int challengeId)
@@ -296,11 +280,11 @@ namespace prepareBikeParking
 
             if (resetResponse.IsSuccessStatusCode)
             {
-                Console.WriteLine($"Successfully reset task instructions for {taskType} challenge {challengeName} (ID: {challengeId})");
+                Serilog.Log.Information("Reset task instructions for {Type} challenge {Name} (ID: {Id})", taskType, challengeName, challengeId);
             }
             else
             {
-                Console.WriteLine($"Failed to reset task instructions for {taskType} challenge {challengeName} (ID: {challengeId}): {await resetResponse.Content.ReadAsStringAsync()}");
+                Serilog.Log.Warning("Failed to reset instructions for {Type} challenge {Name} (ID: {Id}): {Response}", taskType, challengeName, challengeId, await resetResponse.Content.ReadAsStringAsync());
             }
         }
     }
