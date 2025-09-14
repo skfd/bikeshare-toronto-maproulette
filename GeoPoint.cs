@@ -2,11 +2,19 @@
 
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 
 public class GeoPoint
 {
     public string id { get; set; }
-    public string name { get; set; }
+    
+    private string _name;
+    public string name 
+    { 
+        get => _name; 
+        set => _name = string.IsNullOrEmpty(value) ? value : Regex.Replace(value, @"\s+", " "); 
+    }
+    
     public int capacity { get; set; }
     public string lat { get; set; }
     public string lon { get; set; }
