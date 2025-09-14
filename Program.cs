@@ -1,60 +1,40 @@
-﻿// See https://aka.ms/new-console-template for more information
+﻿using System.CommandLine;
 using prepareBikeParking;
 
-// Parse command line arguments
-if (args.Length == 0 || args.Any(arg => arg == "--help" || arg == "-h"))
-{
-    Console.WriteLine("Bike Share Location Comparison Tool");
-    Console.WriteLine("===================================");
-    Console.WriteLine();
-    Console.WriteLine("Usage: prepareBikeParking <system-id>");
-    Console.WriteLine("       prepareBikeParking --list");
-    Console.WriteLine("       prepareBikeParking --test-project <project-id>");
-    Console.WriteLine("       prepareBikeParking --validate <system-id>");
-    Console.WriteLine();
-    Console.WriteLine("Arguments:");
-    Console.WriteLine("  system-id    Numeric ID of the bike share system (from bikeshare_systems.json)");
-    Console.WriteLine("  --list       List all available bike share systems");
-    Console.WriteLine("  --test-project  Test Maproulette project access (requires MAPROULETTE_API_KEY)");
-    Console.WriteLine("  --validate   Validate system setup with strict error checking");
-    Console.WriteLine();
-    Console.WriteLine("Examples:");
-    Console.WriteLine("  prepareBikeParking 1        # Run for Bike Share Toronto");
-    Console.WriteLine("  prepareBikeParking 2        # Run for Bixi Montreal");
-    Console.WriteLine("  prepareBikeParking --list   # Show all available systems");
-    Console.WriteLine("  prepareBikeParking --test-project 60735  # Test access to project 60735");
-    Console.WriteLine("  prepareBikeParking --validate 1  # Validate Bike Share Toronto setup");
-    Console.WriteLine();
-    Console.WriteLine("Note: The tool requires the MAPROULETTE_API_KEY environment variable to be set");
-    Console.WriteLine("      for creating Maproulette tasks.");
-    Console.WriteLine();
-    Console.WriteLine("For setting up new systems, see SETUP_NEW_SYSTEM.md");
-    return;
-}
+var root = new RootCommand("Bike Share Location Comparison Tool");
 
-// Handle --list command
-if (args.Length == 1 && (args[0] == "--list" || args[0] == "-l"))
+// 'run' command (default) - run full comparison for a system id
+var systemIdArg = new Argument<int>("system-id", description: "Numeric ID of the bike share system (from bikeshare_systems.json)");
+var runCommand = new Command("run", "Run comparison for a specific system ID") { systemIdArg };
+runCommand.SetHandler(async (int systemId) =>
+{
+    await RunSystemFlow(systemId);
+}, systemIdArg);
+
+// Support root invocation with just the system-id (treat as run)
+root.AddArgument(systemIdArg);
+root.SetHandler(async (int systemId) =>
+{
+    await RunSystemFlow(systemId);
+}, systemIdArg);
+
+// list command
+var listCommand = new Command("list", "List all available bike share systems");
+listCommand.SetHandler(async () =>
 {
     await BikeShareSystemLoader.ListAvailableSystemsAsync();
-    return;
-}
+});
 
-// Handle --test-project command
-if (args.Length == 2 && args[0] == "--test-project")
+// test-project command
+var projectIdArg = new Argument<int>("project-id", description: "Maproulette project ID to validate");
+var testProjectCommand = new Command("test-project", "Test Maproulette project access") { projectIdArg };
+testProjectCommand.SetHandler(async (int projectId) =>
 {
-    if (!int.TryParse(args[1], out int testProjectId))
-    {
-        Console.WriteLine("Error: Project ID must be a valid integer.");
-        Console.WriteLine("Example: prepareBikeParking --test-project 60735");
-        return;
-    }
-
-    Console.WriteLine($"Testing Maproulette project access for project ID: {testProjectId}");
+    Console.WriteLine($"Testing Maproulette project access for project ID: {projectId}");
     Console.WriteLine("=".PadRight(60, '='));
-    
     try
     {
-        var isValid = await MaprouletteTaskCreator.ValidateProjectAsync(testProjectId);
+        var isValid = await MaprouletteTaskCreator.ValidateProjectAsync(projectId);
         Console.WriteLine();
         Console.WriteLine("✅ Project validation successful!");
         Console.WriteLine("   You can use this project ID in your bikeshare_systems.json configuration.");
@@ -66,38 +46,23 @@ if (args.Length == 2 && args[0] == "--test-project")
         Console.WriteLine($"   Error: {ex.Message}");
         Console.WriteLine("   Please fix the issues above before using this project ID.");
     }
-    
-    return;
-}
+}, projectIdArg);
 
-// Handle --validate command
-if (args.Length == 2 && args[0] == "--validate")
+// validate command
+var validateSystemIdArg = new Argument<int>("system-id", description: "System ID to validate");
+var validateCommand = new Command("validate", "Validate system setup with strict error checking") { validateSystemIdArg };
+validateCommand.SetHandler(async (int validateSystemId) =>
 {
-    if (!int.TryParse(args[1], out int validateSystemId))
-    {
-        Console.WriteLine("Error: System ID must be a valid integer.");
-        Console.WriteLine("Example: prepareBikeParking --validate 1");
-        return;
-    }
-
     Console.WriteLine($"Validating system setup for system ID: {validateSystemId}");
     Console.WriteLine("=".PadRight(60, '='));
-    
     try
     {
-        // Load system configuration
         var validateSystem = await BikeShareSystemLoader.LoadSystemByIdAsync(validateSystemId);
         Console.WriteLine($"✅ System configuration loaded: {validateSystem.Name} ({validateSystem.City})");
-
-        // Validate system setup with strict checking
         SystemSetupHelper.ValidateSystemSetup(validateSystem.Name, throwOnMissing: true);
         Console.WriteLine("✅ System directory and files validated");
-
-        // Validate instruction files for task creation
         SystemSetupHelper.ValidateInstructionFilesForTaskCreation(validateSystem.Name);
         Console.WriteLine("✅ Instruction files validated for task creation");
-
-        // Validate Maproulette project if configured
         if (validateSystem.MaprouletteProjectId > 0)
         {
             var projectValid = await MaprouletteTaskCreator.ValidateProjectAsync(validateSystem.MaprouletteProjectId);
@@ -107,7 +72,6 @@ if (args.Length == 2 && args[0] == "--validate")
         {
             Console.WriteLine("ℹ️  No Maproulette project configured (task creation will be skipped)");
         }
-
         Console.WriteLine();
         Console.WriteLine("🎉 All validations passed! System is ready for use.");
     }
@@ -118,111 +82,99 @@ if (args.Length == 2 && args[0] == "--validate")
         Console.WriteLine($"   Error: {ex.Message}");
         Console.WriteLine("   Please fix the issues above before running the system.");
     }
-    
-    return;
-}
+}, validateSystemIdArg);
 
-if (args.Length != 1)
-{
-    Console.WriteLine("Error: Please provide exactly one system ID.");
-    Console.WriteLine("Use --help for usage information or --list to see available systems.");
-    return;
-}
+root.AddCommand(runCommand);
+root.AddCommand(listCommand);
+root.AddCommand(testProjectCommand);
+root.AddCommand(validateCommand);
 
-if (!int.TryParse(args[0], out int systemId))
-{
-    Console.WriteLine("Error: System ID must be a valid integer.");
-    Console.WriteLine("Use --list to see available system IDs.");
-    return;
-}
+return await root.InvokeAsync(args);
 
-// Load the bike share system configuration
-BikeShareSystem system;
-try
+async Task RunSystemFlow(int systemId)
 {
-    system = await BikeShareSystemLoader.LoadSystemByIdAsync(systemId);
-}
-catch (FileNotFoundException ex)
-{
-    Console.WriteLine($"Configuration Error: {ex.Message}");
-    Console.WriteLine();
-    Console.WriteLine("To fix this:");
-    Console.WriteLine("1. Ensure 'bikeshare_systems.json' exists in the project root directory");
-    Console.WriteLine("2. Check that the file is properly formatted JSON");
-    Console.WriteLine("3. See SETUP_NEW_SYSTEM.md for configuration examples");
-    return;
-}
-catch (Exception ex)
-{
-    Console.WriteLine($"Error loading system configuration: {ex.Message}");
-    Console.WriteLine("Use --list to see available systems or check SETUP_NEW_SYSTEM.md for help.");
-    return;
-}
-
-Console.WriteLine($"Running bike share location comparison for {system.Name} ({system.City})");
-Console.WriteLine($"System ID: {system.Id}");
-Console.WriteLine($"Maproulette Project ID: {system.MaprouletteProjectId}");
-Console.WriteLine($"GBFS API: {system.GbfsApi}");
-Console.WriteLine($"Station Information URL: {system.GetStationInformationUrl()}");
-
-// Validate Maproulette project ID if tasks will be created
-if (system.MaprouletteProjectId > 0)
-{
-    Console.WriteLine($"Validating Maproulette project {system.MaprouletteProjectId}...");
-    
-    // Test project access early to catch configuration issues
+    BikeShareSystem system;
     try
     {
-        var projectValid = await MaprouletteTaskCreator.ValidateProjectAsync(system.MaprouletteProjectId);
-        if (!projectValid)
-        {
-            throw new InvalidOperationException($"Maproulette project {system.MaprouletteProjectId} validation failed. Cannot proceed with task creation.");
-        }
-        Console.WriteLine("✅ Maproulette project validation successful.");
+        system = await BikeShareSystemLoader.LoadSystemByIdAsync(systemId);
+    }
+    catch (FileNotFoundException ex)
+    {
+        Console.WriteLine($"Configuration Error: {ex.Message}");
+        Console.WriteLine();
+        Console.WriteLine("To fix this:");
+        Console.WriteLine("1. Ensure 'bikeshare_systems.json' exists in the project root directory");
+        Console.WriteLine("2. Check that the file is properly formatted JSON");
+        Console.WriteLine("3. See SETUP_NEW_SYSTEM.md for configuration examples");
+        return;
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"❌ Maproulette project validation failed: {ex.Message}");
-        throw new InvalidOperationException($"Cannot proceed: Maproulette project {system.MaprouletteProjectId} validation failed. {ex.Message}", ex);
+        Console.WriteLine($"Error loading system configuration: {ex.Message}");
+        Console.WriteLine("Use list command to see available systems or check SETUP_NEW_SYSTEM.md for help.");
+        return;
     }
-}
-else
-{
-    Console.WriteLine("Info: No Maproulette project ID configured for this system. Task creation will be skipped.");
-}
 
-// Validate system setup before proceeding - use strict validation for critical components
-try
-{
-    var validationResult = SystemSetupHelper.ValidateSystemSetup(system.Name, throwOnMissing: false);
-    if (!validationResult.IsValid)
+    Console.WriteLine($"Running bike share location comparison for {system.Name} ({system.City})");
+    Console.WriteLine($"System ID: {system.Id}");
+    Console.WriteLine($"Maproulette Project ID: {system.MaprouletteProjectId}");
+    Console.WriteLine($"GBFS API: {system.GbfsApi}");
+    Console.WriteLine($"Station Information URL: {system.GetStationInformationUrl()}");
+
+    if (system.MaprouletteProjectId > 0)
     {
-        Console.WriteLine($"System Setup Issue: {validationResult.ErrorMessage}");
-        Console.WriteLine("The tool will attempt to create missing files automatically...");
+        Console.WriteLine($"Validating Maproulette project {system.MaprouletteProjectId}...");
+        try
+        {
+            var projectValid = await MaprouletteTaskCreator.ValidateProjectAsync(system.MaprouletteProjectId);
+            if (!projectValid)
+            {
+                throw new InvalidOperationException($"Maproulette project {system.MaprouletteProjectId} validation failed. Cannot proceed with task creation.");
+            }
+            Console.WriteLine("✅ Maproulette project validation successful.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Maproulette project validation failed: {ex.Message}");
+            throw new InvalidOperationException($"Cannot proceed: Maproulette project {system.MaprouletteProjectId} validation failed. {ex.Message}", ex);
+        }
     }
-}
-catch (Exception ex)
-{
-    Console.WriteLine($"❌ Critical system setup error: {ex.Message}");
-    throw;
-}
+    else
+    {
+        Console.WriteLine("Info: No Maproulette project ID configured for this system. Task creation will be skipped.");
+    }
 
-// Main execution flow - comment out any step you don't want to run
-try
-{
-    await RunBikeShareLocationComparison(system);
-}
-catch (Exception ex)
-{
-    Console.WriteLine($"Fatal Error: {ex.Message}");
-    Console.WriteLine();
-    Console.WriteLine("Troubleshooting tips:");
-    Console.WriteLine("1. Check your internet connection and GBFS API URL");
-    Console.WriteLine("2. Verify the system configuration in bikeshare_systems.json");
-    Console.WriteLine("3. Ensure you have write permissions to the data_results directory");
-    Console.WriteLine("4. See SETUP_NEW_SYSTEM.md for detailed setup instructions");
-    Console.WriteLine();
-    Console.WriteLine($"Full error details: {ex}");
+    try
+    {
+        var validationResult = SystemSetupHelper.ValidateSystemSetup(system.Name, throwOnMissing: false);
+        if (!validationResult.IsValid)
+        {
+            Console.WriteLine($"System Setup Issue: {validationResult.ErrorMessage}");
+            Console.WriteLine("The tool will attempt to create missing files automatically...");
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Critical system setup error: {ex.Message}");
+        throw;
+    }
+
+    try
+    {
+        await RunBikeShareLocationComparison(system);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Fatal Error: {ex.Message}");
+        Console.WriteLine();
+        Console.WriteLine("Troubleshooting tips:");
+        Console.WriteLine("1. Check your internet connection and GBFS API URL");
+        Console.WriteLine("2. Verify the system configuration in bikeshare_systems.json");
+        Console.WriteLine("3. Ensure you have write permissions to the data_results directory");
+        Console.WriteLine("4. See SETUP_NEW_SYSTEM.md for detailed setup instructions");
+        Console.WriteLine();
+        Console.WriteLine($"Full error details: {ex}");
+    }
 }
 
 async Task RunBikeShareLocationComparison(BikeShareSystem system)
@@ -238,12 +190,12 @@ async Task RunBikeShareLocationComparison(BikeShareSystem system)
         Console.WriteLine("Please check directory permissions and try again.");
         throw;
     }
-    
+
     // Check if this is a new system by looking for existing bikeshare.geojson file
     var geojsonFilePath = FileManager.GetSystemFullPath(system.Name, "bikeshare.geojson");
     var lastSyncDate = GitFunctions.GetLastCommitDateForFile(geojsonFilePath);
     bool isNewSystem = lastSyncDate == null;
-    
+
     if (isNewSystem)
     {
         Console.WriteLine("No previous bikeshare.geojson file found in git history. This appears to be a new system setup.");
@@ -303,7 +255,7 @@ async Task RunBikeShareLocationComparison(BikeShareSystem system)
             {
                 // Validate instruction files before creating tasks
                 SystemSetupHelper.ValidateInstructionFilesForTaskCreation(system.Name);
-                
+
                 // Pass isNewSystem flag to avoid creating deletion tasks for new systems
                 await MaprouletteTaskCreator.CreateTasksAsync(system.MaprouletteProjectId, lastSyncDate.Value, system.Name, isNewSystem);
             }
@@ -354,7 +306,7 @@ async Task CompareAndGenerateDiffFiles(List<GeoPoint> currentPoints, BikeShareSy
             .ToList();
 
         // Compare the current points with the last committed points
-        var (addedPoints, removedPoints, movedPoints, renamedPoints) = 
+        var (addedPoints, removedPoints, movedPoints, renamedPoints) =
             BikeShareComparer.ComparePoints(currentPoints, lastCommittedPoints, moveThreshold: 3);
 
         // Generate diff files
@@ -366,7 +318,7 @@ async Task CompareAndGenerateDiffFiles(List<GeoPoint> currentPoints, BikeShareSy
     {
         Console.WriteLine("No previous version found in git repository. This appears to be a new system.");
         Console.WriteLine("Treating all current stations as newly added.");
-        
+
         // For new systems, treat all current points as newly added
         await GenerateNewSystemDiffFiles(currentPoints, system);
     }
@@ -375,7 +327,7 @@ async Task CompareAndGenerateDiffFiles(List<GeoPoint> currentPoints, BikeShareSy
         Console.WriteLine($"Unable to compare with previous version: {ex.Message}");
         Console.WriteLine("This might be a new system or there might be an issue with git.");
         Console.WriteLine("Treating all current stations as newly added.");
-        
+
         // For new systems or when git comparison fails, treat all current points as newly added
         await GenerateNewSystemDiffFiles(currentPoints, system);
     }
@@ -386,10 +338,10 @@ async Task GenerateNewSystemDiffFiles(List<GeoPoint> currentPoints, BikeShareSys
     // For new systems, treat all current points as newly added
     var emptyList = new List<GeoPoint>();
     var emptyTupleList = new List<(GeoPoint current, GeoPoint old)>();
-    
+
     // Generate diff files with all stations marked as added
     await GeoJsonGenerator.GenerateDiffFilesAsync(currentPoints, emptyList, emptyList, emptyTupleList, system.Name);
-    
+
     Console.WriteLine($"Generated diff files for new system: {currentPoints.Count} stations marked as added, 0 removed, 0 moved, 0 renamed");
 }
 
@@ -407,7 +359,7 @@ async Task CompareWithOSMData(List<GeoPoint> bikeshareApiPoints, BikeShareSystem
         Console.WriteLine($"Found {osmPoints.Count} bikeshare stations in OSM");
 
         // Compare BikeShare API data with OSM data
-        var (missingInOSM, extraInOSM, differentInOSM, renamedInOSM) = 
+        var (missingInOSM, extraInOSM, differentInOSM, renamedInOSM) =
             BikeShareComparer.ComparePoints(bikeshareApiPoints, osmPoints, moveThreshold: 30);
 
         // Generate comparison files

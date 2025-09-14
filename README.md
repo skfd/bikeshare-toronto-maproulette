@@ -6,13 +6,30 @@ A comprehensive tool to automatically update bike share stations in OpenStreetMa
 
 ### List Available Systems
 ```bash
-dotnet run --list
+dotnet run -- list
 ```
 
 ### Run for a Specific System
+You can pass the system id directly (root handler) or use the explicit `run` command.
 ```bash
-dotnet run 1  # Bike Share Toronto
-dotnet run 2  # Bixi Montreal
+dotnet run -- 1          # Bike Share Toronto (root invocation)
+dotnet run -- 2          # Bixi Montreal
+dotnet run -- run 1      # Equivalent explicit command
+```
+
+### Validate a System Configuration
+```bash
+dotnet run -- validate 1
+```
+
+### Test Maproulette Project Access
+```bash
+dotnet run -- test-project 60735
+```
+
+### Help
+```bash
+dotnet run -- --help
 ```
 
 ### Add New Systems
@@ -31,7 +48,7 @@ The tool supports downloading current bikeshare station data from OpenStreetMap 
 
 **Features:**
 - ?? **Custom Overpass Queries**: Each system uses its own `data_results/SYSTEM_NAME/stations.overpass` file
-- ?? **Multi-Area Support**: Complex queries for systems spanning multiple cities or regions  
+- ?? **Multi-Area Support**: Complex queries for systems spanning multiple cities or regions
 - ?? **Version Controlled**: Overpass queries are tracked with your data for reproducible results
 - ? **Auto-Generated**: Default queries created automatically for new systems
 
@@ -121,7 +138,7 @@ out skel qt;
 ### Common Issues
 
 **Configuration Errors:**
-- Run `dotnet run --list` to validate your configuration
+- Run `dotnet run -- list` to validate your configuration
 - Check `bikeshare_systems.json` syntax
 - See [SETUP_NEW_SYSTEM.md](SETUP_NEW_SYSTEM.md) for examples
 
@@ -146,7 +163,7 @@ The tool provides detailed error messages and troubleshooting guidance for most 
 ## Contributing
 
 1. Add your bike share system to `bikeshare_systems.json`
-2. Test with `dotnet run <system-id>`
+2. Test with `dotnet run -- <system-id>` or `dotnet run -- run <system-id>`
 3. Submit a pull request with your configuration
 
 The tool handles the rest automatically!
