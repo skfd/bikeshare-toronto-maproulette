@@ -1,9 +1,40 @@
 using Serilog;
+using prepareBikeParking.Services;
+using prepareBikeParking.ServicesImpl;
 using prepareBikeParking;
 
-public static class BikeShareFlows
+public class BikeShareFlows
 {
-    public static async Task RunSystemFlow(int systemId)
+    private readonly IBikeShareDataFetcher _bikeShareFetcher;
+    private readonly IOSMDataFetcher _osmFetcher;
+    private readonly IGeoJsonWriter _geoWriter;
+    private readonly IComparerService _comparer;
+    private readonly IGitReader _git;
+    private readonly IMaprouletteService _maproulette;
+    private readonly ISystemSetupService _systemSetup;
+    private readonly IFilePathProvider _paths;
+
+    public BikeShareFlows(
+        IBikeShareDataFetcher bikeShareFetcher,
+        IOSMDataFetcher osmFetcher,
+        IGeoJsonWriter geoWriter,
+        IComparerService comparer,
+        IGitReader git,
+        IMaprouletteService maproulette,
+        ISystemSetupService systemSetup,
+        IFilePathProvider paths)
+    {
+        _bikeShareFetcher = bikeShareFetcher;
+        _osmFetcher = osmFetcher;
+        _geoWriter = geoWriter;
+        _comparer = comparer;
+        _git = git;
+        _maproulette = maproulette;
+        _systemSetup = systemSetup;
+        _paths = paths;
+    }
+
+    public async Task RunSystemFlow(int systemId)
     {
         BikeShareSystem system;
         try
@@ -29,7 +60,7 @@ public static class BikeShareFlows
             Log.Information("Validating Maproulette project {ProjectId}", system.MaprouletteProjectId);
             try
             {
-                var projectValid = await MaprouletteTaskCreator.ValidateProjectAsync(system.MaprouletteProjectId);
+                var projectValid = await _maproulette.ValidateProjectAsync(system.MaprouletteProjectId);
                 if (!projectValid)
                 {
                     throw new InvalidOperationException($"Maproulette project {system.MaprouletteProjectId} validation failed. Cannot proceed with task creation.");
@@ -71,7 +102,7 @@ public static class BikeShareFlows
         }
     }
 
-    public static async Task ValidateSystemAsync(int systemId)
+    public async Task ValidateSystemAsync(int systemId)
     {
         Log.Information("Validating system setup {SystemId}", systemId);
         try
@@ -80,11 +111,11 @@ public static class BikeShareFlows
             Log.Information("System configuration loaded: {Name} ({City})", system.Name, system.City);
             SystemSetupHelper.ValidateSystemSetup(system.Name, throwOnMissing: true);
             Log.Information("System directory and files validated for {Name}", system.Name);
-            SystemSetupHelper.ValidateInstructionFilesForTaskCreation(system.Name);
+            _systemSetup.ValidateInstructionFiles(system.Name);
             Log.Information("Instruction files validated for {Name}", system.Name);
             if (system.MaprouletteProjectId > 0)
             {
-                var projectValid = await MaprouletteTaskCreator.ValidateProjectAsync(system.MaprouletteProjectId);
+                var projectValid = await _maproulette.ValidateProjectAsync(system.MaprouletteProjectId);
                 if (projectValid) Log.Information("Maproulette project {ProjectId} validated", system.MaprouletteProjectId);
             }
             else
@@ -99,12 +130,12 @@ public static class BikeShareFlows
         }
     }
 
-    public static async Task TestProjectAsync(int projectId)
+    public async Task TestProjectAsync(int projectId)
     {
         Log.Information("Validating Maproulette project {ProjectId}", projectId);
         try
         {
-            var isValid = await MaprouletteTaskCreator.ValidateProjectAsync(projectId);
+            var isValid = await _maproulette.ValidateProjectAsync(projectId);
             if (isValid)
             {
                 Log.Information("Project {ProjectId} validation succeeded. ID can be used in configuration.", projectId);
@@ -116,11 +147,11 @@ public static class BikeShareFlows
         }
     }
 
-    private static async Task RunBikeShareLocationComparison(BikeShareSystem system)
+    private async Task RunBikeShareLocationComparison(BikeShareSystem system)
     {
         try
         {
-            await SystemSetupHelper.EnsureSystemSetUpAsync(system.Name, system.Name, system.Name, system.City);
+            await _systemSetup.EnsureAsync(system.Name, system.Name, system.Name, system.City);
         }
         catch (Exception ex)
         {
@@ -128,8 +159,8 @@ public static class BikeShareFlows
             throw;
         }
 
-        var geojsonFilePath = FileManager.GetSystemFullPath(system.Name, "bikeshare.geojson");
-        var lastSyncDate = GitFunctions.GetLastCommitDateForFile(geojsonFilePath);
+        var geojsonFilePath = _paths.GetSystemFullPath(system.Name, "bikeshare.geojson");
+        var lastSyncDate = _git.GetLastCommitDate(geojsonFilePath);
         bool isNewSystem = lastSyncDate == null;
 
         if (isNewSystem)
@@ -145,7 +176,7 @@ public static class BikeShareFlows
         List<GeoPoint> locationsList;
         try
         {
-            locationsList = await BikeShareDataFetcher.FetchFromApiAsync(system.GetStationInformationUrl());
+            locationsList = await _bikeShareFetcher.FetchStationsAsync(system.GetStationInformationUrl());
         }
         catch (Exception ex)
         {
@@ -153,7 +184,7 @@ public static class BikeShareFlows
             throw;
         }
 
-        await GeoJsonGenerator.GenerateMainFileAsync(locationsList, system.Name);
+        await _geoWriter.WriteMainAsync(locationsList, system.Name);
         await CompareAndGenerateDiffFiles(locationsList, system, isNewSystem);
         await CompareWithOSMData(locationsList, system);
 
@@ -172,8 +203,8 @@ public static class BikeShareFlows
             {
                 try
                 {
-                    SystemSetupHelper.ValidateInstructionFilesForTaskCreation(system.Name);
-                    await MaprouletteTaskCreator.CreateTasksAsync(system.MaprouletteProjectId, lastSyncDate.Value, system.Name, isNewSystem);
+                    _systemSetup.ValidateInstructionFiles(system.Name);
+                    await _maproulette.CreateTasksAsync(system.MaprouletteProjectId, lastSyncDate.Value, system.Name, isNewSystem);
                 }
                 catch (InvalidOperationException ex) when (ex.Message.Contains("instruction files"))
                 {
@@ -193,22 +224,21 @@ public static class BikeShareFlows
         }
     }
 
-    private static async Task CompareAndGenerateDiffFiles(List<GeoPoint> currentPoints, BikeShareSystem system, bool isNewSystem = false)
+    private async Task CompareAndGenerateDiffFiles(List<GeoPoint> currentPoints, BikeShareSystem system, bool isNewSystem = false)
     {
         Log.Information("Comparing current data with last committed version for {Name}", system.Name);
         try
         {
-            var geojsonFile = FileManager.GetSystemFullPath(system.Name, "bikeshare.geojson");
-            string lastCommittedVersion = GitDiffToGeojson.GetLastCommittedVersion(geojsonFile);
+            var geojsonFile = _paths.GetSystemFullPath(system.Name, "bikeshare.geojson");
+            string lastCommittedVersion = _git.GetLastCommittedVersion(geojsonFile);
             List<GeoPoint> lastCommittedPoints = lastCommittedVersion
                 .Split('\n', StringSplitOptions.RemoveEmptyEntries)
                 .Select(GeoPoint.ParseLine)
                 .ToList();
 
-            var (addedPoints, removedPoints, movedPoints, renamedPoints) =
-                BikeShareComparer.ComparePoints(currentPoints, lastCommittedPoints, moveThreshold: 3);
+            var (addedPoints, removedPoints, movedPoints, renamedPoints) = _comparer.Compare(currentPoints, lastCommittedPoints, moveThreshold: 3);
 
-            await GeoJsonGenerator.GenerateDiffFilesAsync(addedPoints, removedPoints, movedPoints, renamedPoints, system.Name);
+            await _geoWriter.WriteDiffAsync(addedPoints, removedPoints, movedPoints, renamedPoints, system.Name);
             Log.Information("Diff summary for {Name}: Added={Added} Removed={Removed} Moved={Moved} Renamed={Renamed}", system.Name, addedPoints.Count, removedPoints.Count, movedPoints.Count, renamedPoints.Count);
         }
         catch (FileNotFoundException ex) when (ex.Message.Contains("not found in git repository"))
@@ -223,25 +253,24 @@ public static class BikeShareFlows
         }
     }
 
-    private static async Task GenerateNewSystemDiffFiles(List<GeoPoint> currentPoints, BikeShareSystem system)
+    private async Task GenerateNewSystemDiffFiles(List<GeoPoint> currentPoints, BikeShareSystem system)
     {
         var emptyList = new List<GeoPoint>();
         var emptyTupleList = new List<(GeoPoint current, GeoPoint old)>();
-        await GeoJsonGenerator.GenerateDiffFilesAsync(currentPoints, emptyList, emptyList, emptyTupleList, system.Name);
+        await _geoWriter.WriteDiffAsync(currentPoints, emptyList, emptyList, emptyTupleList, system.Name);
         Log.Information("Generated diff files for new system {Name}: {Count} added", system.Name, currentPoints.Count);
     }
 
-    private static async Task CompareWithOSMData(List<GeoPoint> bikeshareApiPoints, BikeShareSystem system)
+    private async Task CompareWithOSMData(List<GeoPoint> bikeshareApiPoints, BikeShareSystem system)
     {
         try
         {
             Log.Information("Fetching OSM stations for {Name}", system.Name);
-            await OSMDataFetcher.EnsureStationsOverpassFileAsync(system.Name, system.City);
-            var osmPoints = await OSMDataFetcher.FetchFromOverpassApiAsync(system.Name);
+            await _osmFetcher.EnsureStationsFileAsync(system.Name, system.City);
+            var osmPoints = await _osmFetcher.FetchOsmStationsAsync(system.Name, system.City);
             Log.Information("Fetched {Count} OSM stations for {Name}", osmPoints.Count, system.Name);
-            var (missingInOSM, extraInOSM, differentInOSM, renamedInOSM) =
-                BikeShareComparer.ComparePoints(bikeshareApiPoints, osmPoints, moveThreshold: 30);
-            await GeoJsonGenerator.GenerateOSMComparisonFilesAsync(missingInOSM, extraInOSM, differentInOSM, renamedInOSM, system.Name);
+            var (missingInOSM, extraInOSM, differentInOSM, renamedInOSM) = _comparer.Compare(bikeshareApiPoints, osmPoints, moveThreshold: 30);
+            await _geoWriter.WriteOsmCompareAsync(missingInOSM, extraInOSM, differentInOSM, renamedInOSM, system.Name);
             await OsmFileFunctions.GenerateRenameOsmChangeFile(renamedInOSM, system.Name);
             Log.Information("OSM comparison for {Name}: Missing={Missing} Extra={Extra} Moved={Moved} Renamed={Renamed}", system.Name, missingInOSM.Count, extraInOSM.Count, differentInOSM.Count, renamedInOSM.Count);
         }

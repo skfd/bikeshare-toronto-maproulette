@@ -2,6 +2,9 @@
 using Serilog;
 using Serilog.Events;
 using prepareBikeParking;
+using Microsoft.Extensions.DependencyInjection;
+using prepareBikeParking.Services;
+using prepareBikeParking.ServicesImpl;
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
@@ -18,15 +21,27 @@ try
 {
     Log.Information("Startup arguments: {Args}", args);
 
+    var services = new ServiceCollection();
+    services.AddSingleton<IBikeShareDataFetcher, BikeShareDataFetcherService>();
+    services.AddSingleton<IOSMDataFetcher, OsmDataFetcherService>();
+    services.AddSingleton<IGeoJsonWriter, GeoJsonWriterService>();
+    services.AddSingleton<IComparerService, ComparerService>();
+    services.AddSingleton<IGitReader, GitReaderService>();
+    services.AddSingleton<IMaprouletteService, MaprouletteService>();
+    services.AddSingleton<ISystemSetupService, SystemSetupService>();
+    services.AddSingleton<IFilePathProvider, FilePathProvider>();
+    services.AddSingleton<BikeShareFlows>();
+    var provider = services.BuildServiceProvider();
+
     var root = new RootCommand("Bike Share Location Comparison Tool");
 
     // run command & root default
     var systemIdArg = new Argument<int>("system-id", description: "Numeric system ID from bikeshare_systems.json");
     var runCommand = new Command("run", "Run comparison for a system") { systemIdArg };
-    runCommand.SetHandler(async (int id) => await BikeShareFlows.RunSystemFlow(id), systemIdArg);
+    runCommand.SetHandler(async (int id) => await provider.GetRequiredService<BikeShareFlows>().RunSystemFlow(id), systemIdArg);
 
     root.AddArgument(systemIdArg); // treat root invocation same as run
-    root.SetHandler(async (int id) => await BikeShareFlows.RunSystemFlow(id), systemIdArg);
+    root.SetHandler(async (int id) => await provider.GetRequiredService<BikeShareFlows>().RunSystemFlow(id), systemIdArg);
 
     // list systems
     var listCommand = new Command("list", "List available systems");
@@ -35,12 +50,12 @@ try
     // validate system setup
     var validateSystemIdArg = new Argument<int>("system-id", "System ID to validate");
     var validateCommand = new Command("validate", "Validate system configuration & instructions") { validateSystemIdArg };
-    validateCommand.SetHandler(async (int id) => await BikeShareFlows.ValidateSystemAsync(id), validateSystemIdArg);
+    validateCommand.SetHandler(async (int id) => await provider.GetRequiredService<BikeShareFlows>().ValidateSystemAsync(id), validateSystemIdArg);
 
     // test maproulette project
     var projectIdArg = new Argument<int>("project-id", "Maproulette project ID to test");
     var testProjectCommand = new Command("test-project", "Validate Maproulette project accessibility") { projectIdArg };
-    testProjectCommand.SetHandler(async (int pid) => await BikeShareFlows.TestProjectAsync(pid), projectIdArg);
+    testProjectCommand.SetHandler(async (int pid) => await provider.GetRequiredService<BikeShareFlows>().TestProjectAsync(pid), projectIdArg);
 
     root.AddCommand(runCommand);
     root.AddCommand(listCommand);
