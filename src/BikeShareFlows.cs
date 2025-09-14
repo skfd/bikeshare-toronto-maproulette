@@ -196,6 +196,13 @@ public class BikeShareFlows
             throw;
         }
 
+        // Apply optional station name prefix from configuration if provided
+        var appliedCount = StationNamePrefixer.Apply(locationsList, system.StationNamePrefix);
+        if (appliedCount > 0)
+        {
+            Log.Information("Applied station name prefix '{Prefix}' to {Count} stations for {Name}", system.StationNamePrefix, appliedCount, system.Name);
+        }
+
         await _geoWriter.WriteMainAsync(locationsList, system.Name);
         await CompareAndGenerateDiffFiles(locationsList, system, isNewSystem);
         await CompareWithOSMData(locationsList, system);

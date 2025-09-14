@@ -29,6 +29,7 @@
     "city": "New York City",
     "maproulette_project_id": 60735,
     "gbfs_api": "https://gbfs.lyft.com/gbfs/2.3/bkn/en/station_information.json",
-    "brand:wikidata": "Q2974438"
+    "brand:wikidata": "Q2974438",
+    "station_name_prefix": "Citi Bike - "
   }
 ]

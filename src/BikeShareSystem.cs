@@ -22,6 +22,9 @@ namespace prepareBikeParking
         [JsonPropertyName("brand:wikidata")]
         public string? BrandWikidata { get; set; }
 
+    [JsonPropertyName("station_name_prefix")]
+    public string? StationNamePrefix { get; set; }
+
         /// <summary>
         /// Gets the station_information endpoint URL from the GBFS API base URL
         /// </summary>
