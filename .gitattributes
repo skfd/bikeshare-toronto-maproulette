@@ -1,0 +1,31 @@
+# Text normalization
+*                 text=auto
+
+# Core source & config (force LF)
+*.cs              text eol=lf working-tree-encoding=UTF-8 diff=csharp
+*.json            text eol=lf working-tree-encoding=UTF-8
+*.md              text eol=lf working-tree-encoding=UTF-8 diff=markdown
+*.geojson         text eol=lf working-tree-encoding=UTF-8
+*.osm             text eol=lf working-tree-encoding=UTF-8
+*.overpass        text eol=lf working-tree-encoding=UTF-8
+
+# Record separated GeoJSON outputs (ensure treated as text)
+data_results/*/*.geojson text
+
+# Instruction markdown & templates
+instructions/*.md text eol=lf working-tree-encoding=UTF-8
+
+# Binary / build artifacts
+bin/*              binary
+obj/*              binary
+*.dll              binary
+*.exe              binary
+*.pdb              binary
+logs/*             -text
+*.log              -text
+
+# Prevent accidental CRLF in shell scripts (if added later)
+*.sh               text eol=lf
+
+# Optional: Overpass queries are plain text
+*stations.overpass text eol=lf
