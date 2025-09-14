@@ -30,6 +30,9 @@ try
     services.AddSingleton<IMaprouletteService, MaprouletteService>();
     services.AddSingleton<ISystemSetupService, SystemSetupService>();
     services.AddSingleton<IFilePathProvider, FilePathProvider>();
+    services.AddSingleton<IPromptService, PromptService>();
+    services.AddSingleton<IBikeShareSystemLoader, BikeShareSystemLoaderService>();
+    services.AddSingleton<IOsmChangeWriter, OsmChangeWriterService>();
     services.AddSingleton<BikeShareFlows>();
     var provider = services.BuildServiceProvider();
 

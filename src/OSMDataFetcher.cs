@@ -3,13 +3,26 @@ using Serilog;
 
 namespace prepareBikeParking
 {
-    public static class OSMDataFetcher
+    public interface IOverpassHttpClientFactory
     {
+        HttpClient CreateClient();
+    }
+
+    public class DefaultOverpassHttpClientFactory : IOverpassHttpClientFactory
+    {
+        public HttpClient CreateClient() => new HttpClient();
+    }
+
+    public class OSMDataFetcher
+    {
+        private readonly IOverpassHttpClientFactory _clientFactory;
+        public OSMDataFetcher() : this(new DefaultOverpassHttpClientFactory()) {}
+        public OSMDataFetcher(IOverpassHttpClientFactory clientFactory) { _clientFactory = clientFactory; }
         /// <summary>
         /// Fetches bikeshare station data from OpenStreetMap using system-specific Overpass query file
         /// </summary>
         /// <param name="systemName">Name of the bike share system</param>
-        public static async Task<List<GeoPoint>> FetchFromOverpassApiAsync(string systemName)
+    public async Task<List<GeoPoint>> FetchFromOverpassApiAsync(string systemName)
         {
             // Try to load system-specific overpass query first
             string overpassQuery;
@@ -27,7 +40,7 @@ namespace prepareBikeParking
             }
 
             var url = "https://overpass-api.de/api/interpreter";
-            var client = new HttpClient();
+            var client = _clientFactory.CreateClient();
 
             var formData = new List<KeyValuePair<string, string>>
             {
@@ -57,7 +70,7 @@ namespace prepareBikeParking
         /// </summary>
         /// <param name="osmData">List of GeoPoint objects from OSM</param>
         /// <param name="systemName">Name of the bike share system</param>
-        private static async Task SaveOsmDataAsync(List<GeoPoint> osmData, string systemName)
+    private static async Task SaveOsmDataAsync(List<GeoPoint> osmData, string systemName)
         {
             try
             {
@@ -82,7 +95,7 @@ namespace prepareBikeParking
         /// </summary>
         /// <param name="systemName">Name of the bike share system</param>
         /// <returns>Default Overpass query string</returns>
-        private static string GenerateDefaultOverpassQuery(string systemName)
+    private static string GenerateDefaultOverpassQuery(string systemName)
         {
             // Map system names to cities for fallback
             var cityName = systemName switch
@@ -111,7 +124,7 @@ namespace prepareBikeParking
         /// </summary>
         /// <param name="systemName">Name of the bike share system</param>
         /// <param name="cityName">Name of the city for the query</param>
-        public static async Task EnsureStationsOverpassFileAsync(string systemName, string cityName)
+    public static async Task EnsureStationsOverpassFileAsync(string systemName, string cityName)
         {
             if (!FileManager.SystemFileExists(systemName, "stations.overpass"))
             {
@@ -136,7 +149,7 @@ out meta;
         /// <summary>
         /// Parses the Overpass API JSON response into GeoPoint objects
         /// </summary>
-        private static async Task<List<GeoPoint>> ParseOverpassResponseAsync(string jsonResponse)
+    private static async Task<List<GeoPoint>> ParseOverpassResponseAsync(string jsonResponse)
         {
             var geoPoints = new List<GeoPoint>();
 
@@ -164,11 +177,17 @@ out meta;
                     if (tags.TryGetProperty("bicycle_rental", out var rentalProp) &&
                         rentalProp.GetString() == "docking_station")
                     {
-                        var geoPoint = new GeoPoint();
-                        geoPoint.osmId = element.GetProperty("id").GetInt64().ToString();
-                        geoPoint.osmType = type;
-                        geoPoint.osmVersion = element.GetProperty("version").GetInt32();
-                        geoPoint.osmXmlElement = element;
+                        var geoPoint = new GeoPoint
+                        {
+                            id = string.Empty,
+                            name = string.Empty,
+                            lat = "0",
+                            lon = "0",
+                            osmId = element.GetProperty("id").GetInt64().ToString(),
+                            osmType = type,
+                            osmVersion = element.GetProperty("version").GetInt32(),
+                            osmXmlElement = element
+                        };
 
                         // Get coordinates
                         if (element.TryGetProperty("lat", out var latProp))
@@ -278,14 +297,19 @@ out meta;
         /// <summary>
         /// Processes a way element and adds it to the geoPoints list
         /// </summary>
-        private static void ProcessWayElement(JsonElement element, JsonElement tags, JsonElement nodeElement, List<GeoPoint> geoPoints)
+    private static void ProcessWayElement(JsonElement element, JsonElement tags, JsonElement nodeElement, List<GeoPoint> geoPoints)
         {
-            var geoPoint = new GeoPoint();
-
-            geoPoint.osmId = element.GetProperty("id").GetInt64().ToString();
-            geoPoint.osmType = "way";
-            geoPoint.osmVersion = element.GetProperty("version").GetInt32();
-            geoPoint.osmXmlElement = element;
+            var geoPoint = new GeoPoint
+            {
+                id = string.Empty,
+                name = string.Empty,
+                lat = "0",
+                lon = "0",
+                osmId = element.GetProperty("id").GetInt64().ToString(),
+                osmType = "way",
+                osmVersion = element.GetProperty("version").GetInt32(),
+                osmXmlElement = element
+            };
 
             // Get coordinates from the referenced node
             if (nodeElement.TryGetProperty("lat", out var latProp))
@@ -336,7 +360,7 @@ out meta;
         /// <summary>
         /// Finds a node by ID within the elements array (local search)
         /// </summary>
-        private static JsonElement? FindNodeInElements(JsonElement elements, long nodeId)
+    private static JsonElement? FindNodeInElements(JsonElement elements, long nodeId)
         {
             foreach (var element in elements.EnumerateArray())
             {
@@ -354,7 +378,7 @@ out meta;
         /// <summary>
         /// Fetches multiple nodes in batch using Overpass API
         /// </summary>
-        private static async Task<Dictionary<long, JsonElement>> FetchNodesBatchAsync(List<long> nodeIds)
+    private async Task<Dictionary<long, JsonElement>> FetchNodesBatchAsync(List<long> nodeIds)
         {
             var result = new Dictionary<long, JsonElement>();
 
@@ -373,7 +397,7 @@ out meta;
                     out geom;
                 ";
 
-                using var client = new HttpClient();
+                var client = _clientFactory.CreateClient();
                 var url = "https://overpass-api.de/api/interpreter";
 
                 var formData = new List<KeyValuePair<string, string>>

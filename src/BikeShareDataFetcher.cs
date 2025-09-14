@@ -5,32 +5,64 @@ using System.Text.RegularExpressions;
 
 namespace prepareBikeParking
 {
-    public static class BikeShareDataFetcher
+    public interface IHttpClientFactoryShim
     {
+        HttpClient CreateClient();
+    }
+
+    public class DefaultHttpClientFactoryShim : IHttpClientFactoryShim
+    {
+        public HttpClient CreateClient() => new HttpClient();
+    }
+
+    public class BikeShareDataFetcher
+    {
+        private readonly IHttpClientFactoryShim _clientFactory;
+
+        public BikeShareDataFetcher() : this(new DefaultHttpClientFactoryShim()) {}
+        public BikeShareDataFetcher(IHttpClientFactoryShim clientFactory)
+        {
+            _clientFactory = clientFactory;
+        }
         /// <summary>
         /// Fetches bike share locations from the official GBFS API
         /// </summary>
         /// <param name="apiUrl">Optional custom API URL. If not provided, defaults to Toronto's API.</param>
-        public static async Task<List<GeoPoint>> FetchFromApiAsync(string? url)
+    public async Task<List<GeoPoint>> FetchFromApiAsync(string? url)
         {
+            if (string.IsNullOrWhiteSpace(url)) throw new ArgumentException("API URL must be provided", nameof(url));
             Log.Information("Fetching bike share data from {Url}", url);
 
             try
             {
-                var client = new HttpClient();
+                var client = _clientFactory.CreateClient();
                 var fetchedJson = await client.GetStringAsync(url);
                 var parsedJson = JsonSerializer.Deserialize<JsonElement>(fetchedJson);
+                if (!parsedJson.TryGetProperty("data", out var dataNode) ||
+                    !dataNode.TryGetProperty("stations", out var stations) ||
+                    stations.ValueKind != JsonValueKind.Array)
+                {
+                    throw new JsonException("GBFS station feed missing data.stations array");
+                }
 
-                var stations = parsedJson.GetProperty("data").GetProperty("stations");
-                var locationList = stations.EnumerateArray()
-                    .Select(x => new GeoPoint
+                var locationList = new List<GeoPoint>();
+                foreach (var x in stations.EnumerateArray())
+                {
+                    try
                     {
-                        id = x.GetProperty("station_id").GetString(),
-                        name = x.GetProperty("name").GetString(),
-                        capacity = x.GetProperty("capacity").GetInt32(),
-                        lat = x.GetProperty("lat").GetDouble().ToString(System.Globalization.CultureInfo.InvariantCulture),
-                        lon = x.GetProperty("lon").GetDouble().ToString(System.Globalization.CultureInfo.InvariantCulture)
-                    });
+                        string id = x.TryGetProperty("station_id", out var idProp) ? (idProp.GetString() ?? string.Empty) : string.Empty;
+                        string name = x.TryGetProperty("name", out var nameProp) ? (nameProp.GetString() ?? string.Empty) : string.Empty;
+                        int capacity = x.TryGetProperty("capacity", out var capProp) && capProp.ValueKind == JsonValueKind.Number ? capProp.GetInt32() : 0;
+                        string lat = x.TryGetProperty("lat", out var latProp) && latProp.ValueKind == JsonValueKind.Number ? latProp.GetDouble().ToString(System.Globalization.CultureInfo.InvariantCulture) : "0";
+                        string lon = x.TryGetProperty("lon", out var lonProp) && lonProp.ValueKind == JsonValueKind.Number ? lonProp.GetDouble().ToString(System.Globalization.CultureInfo.InvariantCulture) : "0";
+                        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(name) || lat == "0" || lon == "0") continue;
+                        locationList.Add(new GeoPoint { id = id, name = name, capacity = capacity, lat = lat, lon = lon });
+                    }
+                    catch (Exception exInner)
+                    {
+                        Log.Warning(exInner, "Skipping malformed station entry in GBFS feed");
+                    }
+                }
 
                 var result = locationList.ToList();
                 Log.Information("Fetched {Count} bike share stations from {Url}", result.Count, url);

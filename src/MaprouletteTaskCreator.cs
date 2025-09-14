@@ -4,8 +4,19 @@ using Serilog;
 
 namespace prepareBikeParking
 {
+    public interface IMaprouletteHttpClientFactory
+    {
+        HttpClient CreateClient();
+    }
+
+    public class DefaultMaprouletteHttpClientFactory : IMaprouletteHttpClientFactory
+    {
+        public HttpClient CreateClient() => new HttpClient();
+    }
+
     public static class MaprouletteTaskCreator
     {
+        internal static IMaprouletteHttpClientFactory HttpFactory { get; set; } = new DefaultMaprouletteHttpClientFactory();
         public async static Task CreateTasksAsync(int projectId, DateTime lastSyncDate, string systemName = "Toronto", bool isNewSystem = false)
         {
             Serilog.Log.Information("Creating Maproulette tasks...");
@@ -66,7 +77,7 @@ namespace prepareBikeParking
         /// <returns>True if the project exists and is accessible, false otherwise</returns>
         private static async Task<bool> ValidateProjectExistsAsync(int projectId)
         {
-            var client = new HttpClient();
+            var client = HttpFactory.CreateClient();
             var apiKey = Environment.GetEnvironmentVariable("MAPROULETTE_API_KEY");
 
             if (string.IsNullOrEmpty(apiKey))
@@ -142,7 +153,7 @@ namespace prepareBikeParking
 
         private async static Task CreateTaskForTypeAsync(int projectId, string taskType, string challengeDescription, string instructionFilePath, string systemName, string fileName)
         {
-            var client = new HttpClient();
+            var client = HttpFactory.CreateClient();
             var apiKey = Environment.GetEnvironmentVariable("MAPROULETTE_API_KEY");
             if (string.IsNullOrEmpty(apiKey))
             {

@@ -37,4 +37,14 @@ public class GeoJsonGeneratorTests
         Assert.That(line.Contains("43.12346"));
         Assert.That(!line.Contains(",123"));
     }
+
+    [Test]
+    public void Escaping_SpecialCharactersPreserved()
+    {
+        var p = Pt("3","Station, \"Quoted\" & More",43.2,-79.4);
+        var line = GeoJsonGenerator.GenerateGeojsonLine(p, "Sys");
+        Assert.That(line.Contains("Station, "));
+        Assert.That(line.Contains("\"Quoted\""), "Quotes should appear escaped in JSON output");
+        Assert.That(line.Contains("& More"));
+    }
 }

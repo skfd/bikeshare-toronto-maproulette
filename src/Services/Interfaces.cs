@@ -40,10 +40,27 @@ public interface ISystemSetupService
 {
     Task EnsureAsync(string systemName, string operatorName, string brandName, string? cityName = null);
     void ValidateInstructionFiles(string systemName);
+    SystemValidationResult ValidateSystem(string systemName, bool throwOnMissing = false);
 }
 
 public interface IFilePathProvider
 {
     string GetSystemFullPath(string systemName, string fileName);
     bool SystemFileExists(string systemName, string fileName);
+}
+
+public interface IPromptService
+{
+    char ReadConfirmation(string message, char defaultAnswer = 'n');
+}
+
+public interface IBikeShareSystemLoader
+{
+    Task<BikeShareSystem> LoadByIdAsync(int id);
+    Task ListAsync();
+}
+
+public interface IOsmChangeWriter
+{
+    Task WriteRenameChangesAsync(List<(GeoPoint current, GeoPoint old)> renamed, string systemName);
 }

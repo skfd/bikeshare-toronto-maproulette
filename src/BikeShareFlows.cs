@@ -13,6 +13,9 @@ public class BikeShareFlows
     private readonly IMaprouletteService _maproulette;
     private readonly ISystemSetupService _systemSetup;
     private readonly IFilePathProvider _paths;
+    private readonly IPromptService _prompt;
+    private readonly IBikeShareSystemLoader _systemLoader;
+    private readonly IOsmChangeWriter _osmChangeWriter;
 
     public BikeShareFlows(
         IBikeShareDataFetcher bikeShareFetcher,
@@ -22,7 +25,10 @@ public class BikeShareFlows
         IGitReader git,
         IMaprouletteService maproulette,
         ISystemSetupService systemSetup,
-        IFilePathProvider paths)
+        IFilePathProvider paths,
+        IPromptService prompt,
+        IBikeShareSystemLoader systemLoader,
+        IOsmChangeWriter osmChangeWriter)
     {
         _bikeShareFetcher = bikeShareFetcher;
         _osmFetcher = osmFetcher;
@@ -32,6 +38,9 @@ public class BikeShareFlows
         _maproulette = maproulette;
         _systemSetup = systemSetup;
         _paths = paths;
+        _prompt = prompt;
+        _systemLoader = systemLoader;
+        _osmChangeWriter = osmChangeWriter;
     }
 
     public async Task RunSystemFlow(int systemId)
@@ -39,7 +48,7 @@ public class BikeShareFlows
         BikeShareSystem system;
         try
         {
-            system = await BikeShareSystemLoader.LoadSystemByIdAsync(systemId);
+            system = await _systemLoader.LoadByIdAsync(systemId);
         }
         catch (FileNotFoundException ex)
         {
@@ -78,18 +87,10 @@ public class BikeShareFlows
             Log.Warning("No Maproulette project configured for {Name}. Task creation skipped.", system.Name);
         }
 
-        try
+        var validationResult = _systemSetup.ValidateSystem(system.Name, throwOnMissing: false);
+        if (!validationResult.IsValid)
         {
-            var validationResult = SystemSetupHelper.ValidateSystemSetup(system.Name, throwOnMissing: false);
-            if (!validationResult.IsValid)
-            {
-                Log.Warning("System setup issue for {Name}: {Issue}. Attempting auto-create.", system.Name, validationResult.ErrorMessage);
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Critical system setup error for {Name}", system.Name);
-            throw;
+            Log.Warning("System setup issue for {Name}: {Issue}. Attempting auto-create.", system.Name, validationResult.ErrorMessage);
         }
 
         try
@@ -107,7 +108,7 @@ public class BikeShareFlows
         Log.Information("Validating system setup {SystemId}", systemId);
         try
         {
-            var system = await BikeShareSystemLoader.LoadSystemByIdAsync(systemId);
+            var system = await _systemLoader.LoadByIdAsync(systemId);
             Log.Information("System configuration loaded: {Name} ({City})", system.Name, system.City);
             SystemSetupHelper.ValidateSystemSetup(system.Name, throwOnMissing: true);
             Log.Information("System directory and files validated for {Name}", system.Name);
@@ -188,10 +189,7 @@ public class BikeShareFlows
         await CompareAndGenerateDiffFiles(locationsList, system, isNewSystem);
         await CompareWithOSMData(locationsList, system);
 
-        Log.Information("Prompting user for Maproulette task creation (y/N)");
-        Log.Information("Do you want to create Maproulette tasks for the new locations? (y/N)");
-        var confirm = Console.ReadKey().KeyChar; // Input kept; logging replaces output
-        Log.Debug("User response to task creation prompt: {Key}", confirm);
+        var confirm = _prompt.ReadConfirmation("Create Maproulette tasks for new locations?", 'n');
         if (confirm.ToString().ToLower() != "y")
         {
             Log.Information("User declined task creation.");
@@ -204,7 +202,7 @@ public class BikeShareFlows
                 try
                 {
                     _systemSetup.ValidateInstructionFiles(system.Name);
-                    await _maproulette.CreateTasksAsync(system.MaprouletteProjectId, lastSyncDate.Value, system.Name, isNewSystem);
+                    await _maproulette.CreateTasksAsync(system.MaprouletteProjectId, lastSyncDate ?? DateTime.UtcNow, system.Name, isNewSystem);
                 }
                 catch (InvalidOperationException ex) when (ex.Message.Contains("instruction files"))
                 {
@@ -271,7 +269,7 @@ public class BikeShareFlows
             Log.Information("Fetched {Count} OSM stations for {Name}", osmPoints.Count, system.Name);
             var (missingInOSM, extraInOSM, differentInOSM, renamedInOSM) = _comparer.Compare(bikeshareApiPoints, osmPoints, moveThreshold: 30);
             await _geoWriter.WriteOsmCompareAsync(missingInOSM, extraInOSM, differentInOSM, renamedInOSM, system.Name);
-            await OsmFileFunctions.GenerateRenameOsmChangeFile(renamedInOSM, system.Name);
+            await _osmChangeWriter.WriteRenameChangesAsync(renamedInOSM, system.Name);
             Log.Information("OSM comparison for {Name}: Missing={Missing} Extra={Extra} Moved={Moved} Renamed={Renamed}", system.Name, missingInOSM.Count, extraInOSM.Count, differentInOSM.Count, renamedInOSM.Count);
         }
         catch (Exception ex)

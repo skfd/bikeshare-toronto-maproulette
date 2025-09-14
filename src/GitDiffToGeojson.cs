@@ -34,32 +34,40 @@ namespace prepareBikeParking
             StringBuilder output = new StringBuilder();
             StringBuilder errorOutput = new StringBuilder();
 
-            using (Process process = Process.Start(startInfo))
+            using (Process? process = Process.Start(startInfo))
             {
-                if (process != null)
+                if (process == null)
                 {
-                    while (!process.StandardOutput.EndOfStream)
-                    {
-                        output.AppendLine(process.StandardOutput.ReadLine());
-                    }
+                    throw new InvalidOperationException("Failed to start git process for retrieving last committed version.");
+                }
 
-                    while (!process.StandardError.EndOfStream)
-                    {
-                        errorOutput.AppendLine(process.StandardError.ReadLine());
-                    }
+                string? line;
+                while ((line = process.StandardOutput.ReadLine()) != null)
+                {
+                    output.AppendLine(line);
+                }
 
-                    process.WaitForExit();
+                while ((line = process.StandardError.ReadLine()) != null)
+                {
+                    errorOutput.AppendLine(line);
+                }
 
-                    if (process.ExitCode != 0)
+                process.WaitForExit();
+
+                if (process.ExitCode != 0)
+                {
+                    var errorMessage = errorOutput.ToString();
+                    if (string.IsNullOrWhiteSpace(errorMessage))
                     {
-                        var errorMessage = errorOutput.ToString();
-                        // Check if it's a "file not found in git" error
-                        if (errorMessage.Contains("does not exist") || errorMessage.Contains("Path") || errorMessage.Contains("fatal"))
-                        {
-                            throw new FileNotFoundException($"File '{filePath}' not found in git repository. This might be a new system.", filePath);
-                        }
-                        throw new Exception($"Git command failed: {errorMessage}");
+                        errorMessage = "Unknown git error (no stderr output).";
                     }
+                    if (errorMessage.Contains("does not exist", StringComparison.OrdinalIgnoreCase) ||
+                        errorMessage.Contains("path", StringComparison.OrdinalIgnoreCase) ||
+                        errorMessage.Contains("fatal", StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new FileNotFoundException($"File '{filePath}' not found in git repository. This might be a new system.", filePath);
+                    }
+                    throw new Exception($"Git command failed: {errorMessage}");
                 }
             }
 
@@ -97,34 +105,35 @@ namespace prepareBikeParking
             StringBuilder errorOutput = new StringBuilder(); // Create a StringBuilder to store the error output
 
             // Start the process
-            using Process process = Process.Start(startInfo);
-            if (process != null)
+            using Process? process = Process.Start(startInfo);
+            if (process == null)
             {
-                // Read the output
-                while (!process.StandardOutput.EndOfStream)
-                {
-                    output.AppendLine(process.StandardOutput.ReadLine());
-                }
+                Log.Warning("Failed to start git diff process for {File}", targetFile);
+                return string.Empty;
+            }
 
-                // Read the error output
-                while (!process.StandardError.EndOfStream)
-                {
-                    errorOutput.AppendLine(process.StandardError.ReadLine());
-                }
+            string? line;
+            while ((line = process.StandardOutput.ReadLine()) != null)
+            {
+                output.AppendLine(line);
+            }
 
-                // Wait for the process to finish
-                process.WaitForExit();
+            while ((line = process.StandardError.ReadLine()) != null)
+            {
+                errorOutput.AppendLine(line);
+            }
 
-                var stdOut = output.ToString();
-                var stdErr = errorOutput.ToString();
-                if (!string.IsNullOrWhiteSpace(stdOut))
-                {
-                    Log.Debug("git diff stdout for {File}: {StdOut}", targetFile, stdOut);
-                }
-                if (!string.IsNullOrWhiteSpace(stdErr))
-                {
-                    Log.Debug("git diff stderr for {File}: {StdErr}", targetFile, stdErr);
-                }
+            process.WaitForExit();
+
+            var stdOut = output.ToString();
+            var stdErr = errorOutput.ToString();
+            if (!string.IsNullOrWhiteSpace(stdOut))
+            {
+                Log.Debug("git diff stdout for {File}: {StdOut}", targetFile, stdOut);
+            }
+            if (!string.IsNullOrWhiteSpace(stdErr))
+            {
+                Log.Debug("git diff stderr for {File}: {StdErr}", targetFile, stdErr);
             }
 
             var result = output.ToString();
@@ -134,7 +143,12 @@ namespace prepareBikeParking
 
         private static (List<string>, List<string>) ExtractDiffedLines(string gitDiffInput)
         {
-            var lines = gitDiffInput.Split("\n");
+            if (string.IsNullOrEmpty(gitDiffInput))
+            {
+                return (new List<string>(), new List<string>());
+            }
+
+            var lines = gitDiffInput.Split('\n');
 
             var addedObjects =
                 lines

@@ -67,4 +67,15 @@ public class ComparerTests
         Assert.That(moved, Is.Empty);
         Assert.That(renamed, Is.Empty);
     }
+
+    [Test]
+    public void RenamedAndMoved_ClassifiedAsMovedOnly()
+    {
+        var prev = new List<GeoPoint>{ Pt("1","Old Name",43.000000,-79.000000)};
+        // Move north slightly over threshold AND rename
+        var curr = new List<GeoPoint>{ Pt("1","New Name",43.000040,-79.000000)}; // ~4.4m
+        var (added, removed, moved, renamed) = BikeShareComparer.ComparePoints(curr, prev, 3);
+        Assert.That(moved.Select(p=>p.id), Is.EquivalentTo(new[]{"1"}));
+        Assert.That(renamed, Is.Empty, "Should not list renamed when also moved");
+    }
 }

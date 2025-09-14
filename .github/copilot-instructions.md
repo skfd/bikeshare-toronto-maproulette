@@ -2,6 +2,9 @@
 
 Concise operational guidance for AI assistants contributing to this repository. Focus on THESE concrete patterns; avoid inventing new abstractions unless asked.
 
+## TODO Management
+All todos should be saved to `todo.md` in the project root. Completed items must be clearly marked as completed in the file.
+
 ## Purpose
 Automate comparison between GBFS bike share station data and OpenStreetMap (OSM); emit structured diff GeoJSON + optional Maproulette challenges + OSM rename changeset.
 
