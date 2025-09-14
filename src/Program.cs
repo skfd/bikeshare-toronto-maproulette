@@ -65,7 +65,7 @@ try
     var saveGlobalServiceCommand = new Command("save-global-service", "Download and save the global GBFS service provider list");
     saveGlobalServiceCommand.SetHandler(async () =>
     {
-        var filePath = Path.Combine("data_results", "global_gbfs_services.json");
+        var filePath = Path.Combine("data_results", "global_gbfs_services.csv");
         await GlobalGbfsServiceFetcher.SaveGlobalServiceListAsync(filePath);
         Log.Information("Global GBFS service provider list saved to {Path}", filePath);
     });

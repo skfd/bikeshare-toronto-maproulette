@@ -8,24 +8,23 @@ namespace prepareBikeParking
 {
     public static class GlobalGbfsServiceFetcher
     {
-        private const string GlobalGbfsUrl = "https://gbfs.org/gbfs-versions.json";
-        private const string ProvidersListUrl = "https://gbfs.org/gbfs.json";
+        private const string SystemsCsvUrl = "https://github.com/MobilityData/gbfs/raw/master/systems.csv";
 
         public static async Task<string> FetchGlobalServiceListAsync()
         {
             using var client = new HttpClient();
-            Log.Information("Fetching global GBFS service provider list from {Url}", ProvidersListUrl);
-            var json = await client.GetStringAsync(ProvidersListUrl);
-            return json;
+            Log.Information("Fetching global GBFS service provider list from {Url}", SystemsCsvUrl);
+            var csv = await client.GetStringAsync(SystemsCsvUrl);
+            return csv;
         }
 
         public static async Task SaveGlobalServiceListAsync(string filePath)
         {
-            var json = await FetchGlobalServiceListAsync();
+            var csv = await FetchGlobalServiceListAsync();
             var dir = Path.GetDirectoryName(filePath);
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
-            await File.WriteAllTextAsync(filePath, json);
+            await File.WriteAllTextAsync(filePath, csv);
             Log.Information("Saved global GBFS service provider list to {Path}", filePath);
         }
     }
