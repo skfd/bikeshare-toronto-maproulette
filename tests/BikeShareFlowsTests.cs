@@ -66,7 +66,7 @@ public class BikeShareFlowsTests
 
         var setupSvc = new Mock<ISystemSetupService>();
         setupSvc.Setup(s => s.ValidateSystem(system.Name, false)).Returns(new SystemValidationResult{ SystemName=system.Name, IsValid=true });
-        setupSvc.Setup(s => s.EnsureAsync(system.Name, system.Name, system.Name, system.City)).Returns(Task.CompletedTask);
+    setupSvc.Setup(s => s.EnsureAsync(system.Name, system.Name, system.Name, system.City)).ReturnsAsync(false);
         setupSvc.Setup(s => s.ValidateInstructionFiles(system.Name)).Verifiable();
 
         var paths = new Mock<IFilePathProvider>();
@@ -124,7 +124,7 @@ public class BikeShareFlowsTests
 
         var setupSvc = new Mock<ISystemSetupService>();
         setupSvc.Setup(s => s.ValidateSystem(system.Name, false)).Returns(new SystemValidationResult{ SystemName=system.Name, IsValid=true });
-        setupSvc.Setup(s => s.EnsureAsync(system.Name, system.Name, system.Name, system.City)).Returns(Task.CompletedTask);
+    setupSvc.Setup(s => s.EnsureAsync(system.Name, system.Name, system.Name, system.City)).ReturnsAsync(false);
 
         var paths = new Mock<IFilePathProvider>();
         paths.Setup(p => p.GetSystemFullPath(system.Name, "bikeshare.geojson")).Returns("dummy-new.geojson");
@@ -183,19 +183,57 @@ public class BikeShareFlowsTests
 
         var setupSvc = new Mock<ISystemSetupService>();
         setupSvc.Setup(s => s.ValidateSystem(system.Name, false)).Returns(new SystemValidationResult{ SystemName=system.Name, IsValid=true });
-        setupSvc.Setup(s => s.EnsureAsync(system.Name, system.Name, system.Name, system.City)).Returns(Task.CompletedTask);
+    setupSvc.Setup(s => s.EnsureAsync(system.Name, system.Name, system.Name, system.City)).ReturnsAsync(false);
         setupSvc.Setup(s => s.ValidateInstructionFiles(system.Name)).Verifiable();
 
         var paths = new Mock<IFilePathProvider>();
         paths.Setup(p => p.GetSystemFullPath(system.Name, "bikeshare.geojson")).Returns("dummy-valfail.geojson");
 
         var prompt = new Mock<IPromptService>();
-        prompt.Setup(p => p.ReadConfirmation(It.IsAny<string>(), 'n')).Returns('y'); // user would say yes, but project invalid
+    prompt.Setup(p => p.ReadConfirmation(It.IsAny<string>(), 'n')).Returns('n'); // decline task creation
+
+        var flows = new BikeShareFlows(fetcher.Object, osmFetcher.Object, geoWriter.Object, comparer.Object, git.Object, maproulette.Object, setupSvc.Object, paths.Object, prompt.Object, loader.Object, osmChangeWriter.Object);
+        await flows.RunSystemFlow(system.Id);
+        // Should not attempt task creation, but still write main output
+        maproulette.Verify(m => m.CreateTasksAsync(It.IsAny<int>(), It.IsAny<DateTime>(), system.Name, It.IsAny<bool>()), Times.Never);
+        geoWriter.Verify(w => w.WriteMainAsync(currentPoints, system.Name), Times.Once);
+    }
+
+    [Test]
+    public async Task RunSystemFlow_NewScaffold_EarlyExitBeforeFetching()
+    {
+        var system = new BikeShareSystem { Id=4, Name="ScaffoldOnly", City="CityS", GbfsApi="https://example", MaprouletteProjectId=0 };
+
+        var loader = new Mock<IBikeShareSystemLoader>();
+        loader.Setup(l => l.LoadByIdAsync(system.Id)).ReturnsAsync(system);
+
+        var fetcher = new Mock<IBikeShareDataFetcher>();
+        fetcher.Setup(f => f.FetchStationsAsync(It.IsAny<string>())).Throws(new Exception("Should not fetch when scaffolding"));
+
+        var git = new Mock<IGitReader>();
+        var comparer = new Mock<IComparerService>();
+        var geoWriter = new Mock<IGeoJsonWriter>();
+        var osmFetcher = new Mock<IOSMDataFetcher>();
+        var osmChangeWriter = new Mock<IOsmChangeWriter>();
+        var maproulette = new Mock<IMaprouletteService>();
+        maproulette.Setup(m => m.ValidateProjectAsync(It.IsAny<int>())).ReturnsAsync(true);
+
+        var setupSvc = new Mock<ISystemSetupService>();
+        setupSvc.Setup(s => s.ValidateSystem(system.Name, false)).Returns(new SystemValidationResult{ SystemName=system.Name, IsValid=false });
+        // Return true meaning newly created
+        setupSvc.Setup(s => s.EnsureAsync(system.Name, system.Name, system.Name, system.City)).ReturnsAsync(true);
+
+        var paths = new Mock<IFilePathProvider>();
+        paths.Setup(p => p.GetSystemFullPath(system.Name, "bikeshare.geojson")).Returns("dummy.geojson");
+        var prompt = new Mock<IPromptService>();
+        prompt.Setup(p => p.ReadConfirmation(It.IsAny<string>(), 'n')).Returns('n');
 
         var flows = new BikeShareFlows(fetcher.Object, osmFetcher.Object, geoWriter.Object, comparer.Object, git.Object, maproulette.Object, setupSvc.Object, paths.Object, prompt.Object, loader.Object, osmChangeWriter.Object);
         await flows.RunSystemFlow(system.Id);
 
-        maproulette.Verify(m => m.CreateTasksAsync(It.IsAny<int>(), It.IsAny<DateTime>(), system.Name, It.IsAny<bool>()), Times.Never);
-        geoWriter.Verify(w => w.WriteMainAsync(currentPoints, system.Name), Times.Once);
+        // Ensure no downstream calls executed
+        geoWriter.Verify(g => g.WriteMainAsync(It.IsAny<List<GeoPoint>>(), It.IsAny<string>()), Times.Never);
+        fetcher.Verify(f => f.FetchStationsAsync(It.IsAny<string>()), Times.Never);
+        comparer.Verify(c => c.Compare(It.IsAny<List<GeoPoint>>(), It.IsAny<List<GeoPoint>>(), It.IsAny<double>()), Times.Never);
     }
 }

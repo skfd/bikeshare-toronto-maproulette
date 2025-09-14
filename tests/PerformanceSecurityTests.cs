@@ -39,7 +39,9 @@ public class PerformanceSecurityTests
     {
         var sys = "../evil";
         var path = FileManager.GetSystemFullPath(sys, "file.txt");
-        Assert.That(path.Replace('\\','/').Contains("data_results/evil/file.txt"));
-        Assert.That(!path.Contains(".."));
+        var normalized = path.Replace('\\','/');
+        // Expect ".." removed and path rooted under data_results with sanitized name
+        Assert.That(normalized.Contains("data_results/_evil/file.txt"), $"Sanitized path unexpected: {normalized}");
+        Assert.That(!normalized.Contains(".."));
     }
 }

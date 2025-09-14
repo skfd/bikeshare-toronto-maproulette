@@ -54,7 +54,7 @@ public class MaprouletteService : IMaprouletteService
 
 public class SystemSetupService : ISystemSetupService
 {
-    public Task EnsureAsync(string systemName, string operatorName, string brandName, string? cityName = null) => SystemSetupHelper.EnsureSystemSetUpAsync(systemName, operatorName, brandName, cityName);
+    public Task<bool> EnsureAsync(string systemName, string operatorName, string brandName, string? cityName = null) => SystemSetupHelper.EnsureSystemSetUpAsync(systemName, operatorName, brandName, cityName);
     public void ValidateInstructionFiles(string systemName) => SystemSetupHelper.ValidateInstructionFilesForTaskCreation(systemName);
     public SystemValidationResult ValidateSystem(string systemName, bool throwOnMissing = false) => SystemSetupHelper.ValidateSystemSetup(systemName, throwOnMissing);
 }

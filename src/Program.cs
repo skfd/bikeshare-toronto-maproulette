@@ -100,6 +100,26 @@ try
     root.AddCommand(saveGlobalServiceCommand);
     root.AddCommand(fetchBrandTagsCommand);
 
+    // setup-system command (scaffolds only and exits)
+    var setupSystemIdArg = new Argument<int>("system-id", description: "Numeric system ID to scaffold (no data fetch)");
+    var setupCommand = new Command("setup", "Create instruction templates and overpass file for a system") { setupSystemIdArg };
+    setupCommand.SetHandler(async (int id) => {
+        try
+        {
+            var sys = await provider.GetRequiredService<IBikeShareSystemLoader>().LoadByIdAsync(id);
+            var created = await SystemSetupHelper.EnsureSystemSetUpAsync(sys.Name, sys.Name, sys.Name, sys.City);
+            if (created)
+                Log.Information("Scaffolding created for {System}. You can now run comparison.", sys.Name);
+            else
+                Log.Information("System {System} already set up.", sys.Name);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Setup failed for system {Id}", id);
+        }
+    }, setupSystemIdArg);
+    root.AddCommand(setupCommand);
+
     var exitCode = await root.InvokeAsync(args);
     Log.Information("Exiting with code {Code}", exitCode);
     return exitCode;

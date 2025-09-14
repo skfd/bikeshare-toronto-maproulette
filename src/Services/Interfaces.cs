@@ -38,7 +38,7 @@ public interface IMaprouletteService
 
 public interface ISystemSetupService
 {
-    Task EnsureAsync(string systemName, string operatorName, string brandName, string? cityName = null);
+    Task<bool> EnsureAsync(string systemName, string operatorName, string brandName, string? cityName = null);
     void ValidateInstructionFiles(string systemName);
     SystemValidationResult ValidateSystem(string systemName, bool throwOnMissing = false);
 }

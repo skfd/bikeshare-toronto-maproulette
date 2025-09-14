@@ -64,6 +64,7 @@ public class BikeShareFlows
         Log.Information("Starting comparison run for {Name} ({City}) Id={Id} Project={ProjectId}", system.Name, system.City, system.Id, system.MaprouletteProjectId);
         Log.Debug("System endpoints: GbfsApi={Api} StationInfoUrl={StationUrl}", system.GbfsApi, system.GetStationInformationUrl());
 
+        var projectValidForTasks = false;
         if (system.MaprouletteProjectId > 0)
         {
             Log.Information("Validating Maproulette project {ProjectId}", system.MaprouletteProjectId);
@@ -72,14 +73,17 @@ public class BikeShareFlows
                 var projectValid = await _maproulette.ValidateProjectAsync(system.MaprouletteProjectId);
                 if (!projectValid)
                 {
-                    throw new InvalidOperationException($"Maproulette project {system.MaprouletteProjectId} validation failed. Cannot proceed with task creation.");
+                    Log.Warning("Maproulette project {ProjectId} invalid; task creation will be skipped.", system.MaprouletteProjectId);
                 }
-                Log.Information("Maproulette project {ProjectId} validation successful", system.MaprouletteProjectId);
+                else
+                {
+                    Log.Information("Maproulette project {ProjectId} validation successful", system.MaprouletteProjectId);
+                    projectValidForTasks = true;
+                }
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Maproulette project validation failed for {ProjectId}", system.MaprouletteProjectId);
-                throw new InvalidOperationException($"Cannot proceed: Maproulette project {system.MaprouletteProjectId} validation failed. {ex.Message}", ex);
+                Log.Error(ex, "Maproulette project validation failed for {ProjectId}; continuing without tasks", system.MaprouletteProjectId);
             }
         }
         else
@@ -95,7 +99,7 @@ public class BikeShareFlows
 
         try
         {
-            await RunBikeShareLocationComparison(system);
+            await RunBikeShareLocationComparison(system, projectValidForTasks);
         }
         catch (Exception ex)
         {
@@ -148,16 +152,23 @@ public class BikeShareFlows
         }
     }
 
-    private async Task RunBikeShareLocationComparison(BikeShareSystem system)
+    private async Task RunBikeShareLocationComparison(BikeShareSystem system, bool projectValidForTasks)
     {
+        bool newlyCreated = false;
         try
         {
-            await _systemSetup.EnsureAsync(system.Name, system.Name, system.Name, system.City);
+            newlyCreated = await _systemSetup.EnsureAsync(system.Name, system.Name, system.Name, system.City);
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Error setting up system files for {Name}.", system.Name);
             throw;
+        }
+
+        if (newlyCreated)
+        {
+            Log.Information("Initial scaffold created for {Name}. Re-run the command to fetch and compare data after reviewing instructions.", system.Name);
+            return; // Do not proceed further on the initial scaffolding run
         }
 
         var geojsonFilePath = _paths.GetSystemFullPath(system.Name, "bikeshare.geojson");
@@ -189,36 +200,34 @@ public class BikeShareFlows
         await CompareAndGenerateDiffFiles(locationsList, system, isNewSystem);
         await CompareWithOSMData(locationsList, system);
 
+        // Gate task creation entirely if no valid project configured
+        if (!(system.MaprouletteProjectId > 0 && projectValidForTasks))
+        {
+            Log.Warning("Skipping Maproulette task creation for {Name} (no valid project).", system.Name);
+            return;
+        }
+
         var confirm = _prompt.ReadConfirmation("Create Maproulette tasks for new locations?", 'n');
         if (confirm.ToString().ToLower() != "y")
         {
             Log.Information("User declined task creation.");
             return;
         }
-        else
+
+        try
         {
-            if (system.MaprouletteProjectId > 0)
-            {
-                try
-                {
-                    _systemSetup.ValidateInstructionFiles(system.Name);
-                    await _maproulette.CreateTasksAsync(system.MaprouletteProjectId, lastSyncDate ?? DateTime.UtcNow, system.Name, isNewSystem);
-                }
-                catch (InvalidOperationException ex) when (ex.Message.Contains("instruction files"))
-                {
-                    Log.Error(ex, "Instruction file issue prevented task creation for {Name}", system.Name);
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    Log.Error(ex, "Error creating Maproulette tasks for {Name}", system.Name);
-                    throw;
-                }
-            }
-            else
-            {
-                Log.Warning("No valid Maproulette project ID configured for {Name}; skipping task creation.", system.Name);
-            }
+            _systemSetup.ValidateInstructionFiles(system.Name);
+            await _maproulette.CreateTasksAsync(system.MaprouletteProjectId, lastSyncDate ?? DateTime.UtcNow, system.Name, isNewSystem);
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("instruction files"))
+        {
+            Log.Error(ex, "Instruction file issue prevented task creation for {Name}", system.Name);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Error creating Maproulette tasks for {Name}", system.Name);
+            throw;
         }
     }
 

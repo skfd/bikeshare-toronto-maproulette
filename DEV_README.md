@@ -151,6 +151,10 @@ You may also pass a system id directly to the root (equivalent to `run`).
 | Command | Description | Example |
 |---------|-------------|---------|
 | (root) | Run comparison for system | `dotnet run -- 1` |
+
+New scaffolding-only command:
+
+- `dotnet run -- setup <id>` Creates instruction templates + stations.overpass for the system, then exits without fetching GBFS/OSM data. First invocation of a new system via `run` now also auto-scaffolds and exits early.
 | `run <system-id>` | Same as root run | `dotnet run -- run 2` |
 | `list` | List configured systems | `dotnet run -- list` |
 | `validate <system-id>` | Validate system config + instruction files + project | `dotnet run -- validate 1` |

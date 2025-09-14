@@ -193,18 +193,21 @@ Steps:
         /// <param name="operatorName">Operator name (used for default templates)</param>
         /// <param name="brandName">Brand name (used for default templates)</param>
         /// <param name="cityName">City name for Overpass query (optional)</param>
-        public static async Task EnsureSystemSetUpAsync(string systemName, string operatorName, string brandName, string? cityName = null)
+        public static async Task<bool> EnsureSystemSetUpAsync(string systemName, string operatorName, string brandName, string? cityName = null)
         {
+            var newlyCreated = false;
             if (!IsSystemSetUp(systemName))
             {
                 Serilog.Log.Warning("System {System} not fully set up. Creating missing instruction files...", systemName);
                 await SetupNewSystemAsync(systemName, operatorName, brandName, "public", null, null, cityName);
+                newlyCreated = true;
             }
             else
             {
                 // Even if system is set up, ensure stations.overpass file exists
                 await OSMDataFetcher.EnsureStationsOverpassFileAsync(systemName, cityName ?? systemName);
             }
+            return newlyCreated;
         }
 
         /// <summary>

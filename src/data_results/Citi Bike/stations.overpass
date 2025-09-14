@@ -1,0 +1,14 @@
+﻿[out:json];
+
+(
+  area[name="City of New York"][border_type=city];
+  area[name="Jersey City"][border_type=city];
+  area[wikidata="Q138578"][border_type=city];
+)->.city;
+(
+    node(area.city)[bicycle_rental=docking_station];
+    way(area.city)[bicycle_rental=docking_station];
+    relation(area.city)[bicycle_rental=docking_station];
+);
+
+out meta;

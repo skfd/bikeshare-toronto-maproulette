@@ -18,11 +18,17 @@ namespace prepareBikeParking
         /// </summary>
         private static string GetBasePath()
         {
-            // Try different possible base paths depending on working directory
-            var possibleBasePaths = new[] {
-                "..\\..\\..\\",     // From build output directory (VS debugging)
-                "",                 // From src directory (dotnet run from src)
-                "src\\"            // From project root (dotnet run from root)
+            // Resolution strategy (ordered):
+            // 1. Current directory (running from src)
+            // 2. src/ relative to current directory (running from project root)
+            // 3. ../../../../src (running from bin/Debug/netX.Y)
+            // 4. ../../../../ (fallback if data_results later moved to root)
+            var possibleBasePaths = new[]
+            {
+                "",                    // from src directory
+                "src\\",              // from project root
+                "..\\..\\..\\src\\", // from bin output directory back to src
+                "..\\..\\..\\"        // fallback root (future-proof if layout changes)
             };
 
             foreach (var basePath in possibleBasePaths)
@@ -34,7 +40,7 @@ namespace prepareBikeParking
                 }
             }
 
-            // If none found, default to current directory and create data_results if needed
+            // As a last resort create data_results in current directory (should rarely happen)
             return "";
         }
 
@@ -48,7 +54,11 @@ namespace prepareBikeParking
         /// <returns>Full path to the file</returns>
         public static string GetSystemFilePath(string systemName, string fileName)
         {
-            return Path.Combine(DataResultsPath, systemName, fileName);
+            // Basic sanitization: remove any path traversal characters
+            var safeSystemName = systemName.Replace("..", string.Empty)
+                                           .Replace('/', '_')
+                                           .Replace('\\', '_');
+            return Path.Combine(DataResultsPath, safeSystemName, fileName);
         }
 
         #endregion

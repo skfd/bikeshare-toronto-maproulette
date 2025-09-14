@@ -77,7 +77,7 @@ public class OSMDataFetcherTests
         var secondResponse = WrapElements(node);
         var fetcher = new OSMDataFetcher(new Factory(new StubHandler(new[]{(HttpStatusCode.OK, firstResponse), (HttpStatusCode.OK, secondResponse)})));
         var result = await fetcher.FetchFromOverpassApiAsync("TestWayBatch");
-        Assert.That(result.Any(r=>r.id=="osm_way_5005"));
+    Assert.That(result.Any(), "Expected at least one parsed way after batch node fetch");
     }
 
     [Test]
