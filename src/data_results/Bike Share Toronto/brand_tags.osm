@@ -1,0 +1,7 @@
+﻿amenity=bicycle_rental
+bicycle_rental=docking_station
+brand=Bike Share Toronto
+brand:wikidata=Q17018523
+operator=Toronto Parking Authority
+operator:type=public
+operator:wikidata=Q7826466

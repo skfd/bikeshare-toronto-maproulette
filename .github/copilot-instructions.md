@@ -24,6 +24,7 @@ Automate comparison between GBFS bike share station data and OpenStreetMap (OSM)
 - Overpass query: `stations.overpass` (customizable; auto-created)
 - OSM rename changes: `bikeshare_renames.osc`
 - Task templates: `instructions/{added,removed,moved,renamed}.md`
+- Brand tags: `brand_tags.osm` (OSM XML template with tagging suggestions from Name Suggestion Index)
 
 ## GeoJSON Line Format
 Each line = whole FeatureCollection (single Feature) prefixed with `\u001e` for git-friendly diffs. Parsing uses `GeoPoint.ParseLine`. Maintain this exact structure when creating new generators.
@@ -42,11 +43,20 @@ Each line = whole FeatureCollection (single Feature) prefixed with `\u001e` for 
 - GBFS station_information endpoint per system (`gbfs_api` field).
 - Overpass API (`https://overpass-api.de/api/interpreter`).
 - Maproulette API (`https://maproulette.org/api/v2/*`) requires `MAPROULETTE_API_KEY` env var.
+- Name Suggestion Index (`https://github.com/osmlab/name-suggestion-index/raw/main/data/brands/amenity/bicycle_rental.json`) for OSM brand tagging.
 - AngleSharp only used by legacy HTML scraper (`FetchFromWebsiteAsync`) – avoid extending unless reviving that path.
 
 ## Adding / Modifying Systems
 - Edit `bikeshare_systems.json`; keep unique integer `id`; validate URL.
+- Each system entry supports these fields:
+  - `id` (required): Unique integer identifier
+  - `name` (required): Display name of the bike share system
+  - `city` (required): City or region name
+  - `gbfs_api` (required): GBFS station_information endpoint URL
+  - `maproulette_project_id` (required): Numeric Maproulette project ID for task creation
+  - `brand:wikidata` (optional): Wikidata Q-identifier for the bike share brand (e.g., "Q17018523" for Bike Share Toronto)
 - First run auto-creates directory + instruction templates + `stations.overpass`.
+- Use `fetch-brand-tags` command to download OSM tagging suggestions based on `brand:wikidata` values.
 - Commit generated baseline GeoJSON so future diffs work (git history essential for `GetLastCommittedVersion`).
 
 ## Safe Change Guidelines
@@ -56,7 +66,7 @@ Each line = whole FeatureCollection (single Feature) prefixed with `\u001e` for 
 
 ## Common Pitfalls
 - Missing `bikeshare_systems.json` → loader throws detailed guidance.
-- New system with no git history: treat all stations as added (handled; don’t special-case unless changing baseline logic).
+- New system with no git history: treat all stations as added (handled; don't special-case unless changing baseline logic).
 - Empty or absent instruction markdown blocks Maproulette creation (validation throws).
 - Overpass rate limits: failures are logged & non-fatal; do not abort main GBFS diff generation.
 - Locale issues: always format lat/lon with `InvariantCulture` (follow existing code).
@@ -74,6 +84,12 @@ Caching Overpass responses, bulk Maproulette adds, status feed integration, CLI 
  dotnet run -- 1
 # Validate system 1
  dotnet run -- validate 1
+# Fetch brand tags for all systems
+ dotnet run -- fetch-brand-tags
+# Fetch brand tags for specific system
+ dotnet run -- fetch-brand-tags 1
+# Download global GBFS service list
+ dotnet run -- save-global-service
 ```
 
 ## When Unsure

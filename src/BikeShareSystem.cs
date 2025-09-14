@@ -19,6 +19,9 @@ namespace prepareBikeParking
         [JsonPropertyName("gbfs_api")]
         public string GbfsApi { get; set; } = string.Empty;
 
+        [JsonPropertyName("brand:wikidata")]
+        public string? BrandWikidata { get; set; }
+
         /// <summary>
         /// Gets the station_information endpoint URL from the GBFS API base URL
         /// </summary>

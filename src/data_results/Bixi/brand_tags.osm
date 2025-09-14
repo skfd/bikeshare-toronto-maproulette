@@ -1,0 +1,10 @@
+﻿amenity=bicycle_rental
+bicycle_rental=docking_station
+brand=Bixi
+brand:wikidata=Q386
+name=Bixi
+network=Bixi
+network:wikidata=Q386
+operator=Bixi
+operator:type=private
+operator:wikidata=Q386

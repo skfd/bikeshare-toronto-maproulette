@@ -15,6 +15,10 @@
     "quebec": {
       "commandName": "Project",
       "commandLineArgs": "3"
+    },
+    "fetch-brand-tags": {
+      "commandName": "Project",
+      "commandLineArgs": "fetch-brand-tags"
     }
   }
 }

@@ -70,11 +70,35 @@ try
         Log.Information("Global GBFS service provider list saved to {Path}", filePath);
     });
 
+    // fetch-brand-tags command
+    var fetchBrandTagsSystemIdArg = new Argument<int?>("system-id", () => null, "System ID to fetch brand tags for (optional - fetches for all systems if not specified)");
+    var fetchBrandTagsCommand = new Command("fetch-brand-tags", "Fetch OSM brand tags from Name Suggestion Index for bike share systems") { fetchBrandTagsSystemIdArg };
+    fetchBrandTagsCommand.SetHandler(async (int? systemId) =>
+    {
+        if (systemId.HasValue)
+        {
+            // Fetch for specific system
+            var system = await BikeShareSystemLoader.LoadSystemByIdAsync(systemId.Value);
+            var success = await NameSuggestionIndexFetcher.FetchAndSaveOsmTagsForSystemAsync(system);
+            if (!success)
+            {
+                Log.Warning("No OSM brand tags found for system {SystemId}: {Name}. Ensure brand:wikidata is set in bikeshare_systems.json", systemId.Value, system.Name);
+            }
+        }
+        else
+        {
+            // Fetch for all systems
+            var successCount = await NameSuggestionIndexFetcher.FetchAndSaveOsmTagsForAllSystemsAsync();
+            Log.Information("Brand tags fetch completed for {Success} systems", successCount);
+        }
+    }, fetchBrandTagsSystemIdArg);
+
     root.AddCommand(runCommand);
     root.AddCommand(listCommand);
     root.AddCommand(validateCommand);
     root.AddCommand(testProjectCommand);
     root.AddCommand(saveGlobalServiceCommand);
+    root.AddCommand(fetchBrandTagsCommand);
 
     var exitCode = await root.InvokeAsync(args);
     Log.Information("Exiting with code {Code}", exitCode);
