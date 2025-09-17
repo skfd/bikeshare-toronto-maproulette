@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(iconv:*)",
+      "Bash(dotnet build)",
+      "Bash(dotnet run:*)",
+      "Bash(python:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

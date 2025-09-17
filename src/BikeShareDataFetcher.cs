@@ -2,6 +2,8 @@ using AngleSharp.Html.Parser;
 using Serilog;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Diagnostics;
+using prepareBikeParking.Logging;
 
 namespace prepareBikeParking
 {
@@ -31,12 +33,17 @@ namespace prepareBikeParking
     public async Task<List<GeoPoint>> FetchFromApiAsync(string? url)
         {
             if (string.IsNullOrWhiteSpace(url)) throw new ArgumentException("API URL must be provided", nameof(url));
-            Log.Information("Fetching bike share data from {Url}", url);
+
+            var stopwatch = Stopwatch.StartNew();
+            var logger = Log.Logger.ForOperation("FetchFromApi");
+            logger.Information("Fetching bike share data. Url: {Url}", url);
 
             try
             {
                 var client = _clientFactory.CreateClient();
                 var fetchedJson = await client.GetStringAsync(url);
+                var fetchDuration = stopwatch.ElapsedMilliseconds;
+                logger.LogApiCall("GBFS", url, 200, fetchDuration);
                 var parsedJson = JsonSerializer.Deserialize<JsonElement>(fetchedJson);
                 if (!parsedJson.TryGetProperty("data", out var dataNode) ||
                     !dataNode.TryGetProperty("stations", out var stations) ||
@@ -46,6 +53,9 @@ namespace prepareBikeParking
                 }
 
                 var locationList = new List<GeoPoint>();
+                var skippedCount = 0;
+                var invalidCount = 0;
+
                 foreach (var x in stations.EnumerateArray())
                 {
                     try
@@ -55,22 +65,50 @@ namespace prepareBikeParking
                         int capacity = x.TryGetProperty("capacity", out var capProp) && capProp.ValueKind == JsonValueKind.Number ? capProp.GetInt32() : 0;
                         string lat = x.TryGetProperty("lat", out var latProp) && latProp.ValueKind == JsonValueKind.Number ? latProp.GetDouble().ToString(System.Globalization.CultureInfo.InvariantCulture) : "0";
                         string lon = x.TryGetProperty("lon", out var lonProp) && lonProp.ValueKind == JsonValueKind.Number ? lonProp.GetDouble().ToString(System.Globalization.CultureInfo.InvariantCulture) : "0";
-                        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(name) || lat == "0" || lon == "0") continue;
+
+                        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(name) || lat == "0" || lon == "0")
+                        {
+                            invalidCount++;
+                            logger.LogDataQualityIssue("InvalidStation", "Missing required fields", new { id, name, lat, lon });
+                            continue;
+                        }
                         locationList.Add(new GeoPoint { id = id, name = name, capacity = capacity, lat = lat, lon = lon });
                     }
                     catch (Exception exInner)
                     {
-                        Log.Warning(exInner, "Skipping malformed station entry in GBFS feed");
+                        skippedCount++;
+                        logger.Warning(exInner, "Skipping malformed station entry. Error: {Error}", exInner.Message);
                     }
                 }
 
                 var result = locationList.ToList();
-                Log.Information("Fetched {Count} bike share stations from {Url}", result.Count, url);
+                stopwatch.Stop();
+
+                var metrics = new LoggingMetrics.DataProcessingMetrics
+                {
+                    ItemsProcessed = result.Count,
+                    ItemsFailed = invalidCount,
+                    ItemsSkipped = skippedCount,
+                    TotalProcessingTimeMs = stopwatch.ElapsedMilliseconds
+                };
+
+                logger.Information("GBFS fetch completed. Stations: {StationCount}, Invalid: {InvalidCount}, Skipped: {SkippedCount}, Duration: {DurationMs}ms",
+                    result.Count, invalidCount, skippedCount, stopwatch.ElapsedMilliseconds);
+                logger.LogPerformanceMetric("GbfsFetchDuration", stopwatch.ElapsedMilliseconds, "ms");
+
                 return result;
+            }
+            catch (HttpRequestException httpEx)
+            {
+                stopwatch.Stop();
+                logger.LogApiCall("GBFS", url, 0, stopwatch.ElapsedMilliseconds);
+                logger.Error(httpEx, "HTTP request failed. Url: {Url}, Duration: {DurationMs}ms", url, stopwatch.ElapsedMilliseconds);
+                throw new Exception($"Failed to fetch bike share data from {url}: {httpEx.Message}", httpEx);
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Failed to fetch bike share data from {Url}", url);
+                stopwatch.Stop();
+                logger.Error(ex, "Failed to fetch bike share data. Url: {Url}, Duration: {DurationMs}ms", url, stopwatch.ElapsedMilliseconds);
                 throw new Exception($"Failed to fetch bike share data from {url}: {ex.Message}", ex);
             }
         }

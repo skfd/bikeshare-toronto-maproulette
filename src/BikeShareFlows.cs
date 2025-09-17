@@ -2,6 +2,8 @@ using Serilog;
 using prepareBikeParking.Services;
 using prepareBikeParking.ServicesImpl;
 using prepareBikeParking;
+using prepareBikeParking.Logging;
+using System.Diagnostics;
 
 public class BikeShareFlows
 {
@@ -45,6 +47,8 @@ public class BikeShareFlows
 
     public async Task RunSystemFlow(int systemId)
     {
+        using var operationTimer = Log.Logger.TimedOperation($"RunSystemFlow-{systemId}");
+
         BikeShareSystem system;
         try
         {
@@ -52,49 +56,56 @@ public class BikeShareFlows
         }
         catch (FileNotFoundException ex)
         {
-            Log.Error(ex, "Configuration file missing or invalid. See setup guide.");
+            Log.Error(ex, "Configuration file missing or invalid. SystemId: {SystemId}", systemId);
             return;
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Failed loading system configuration for {SystemId}", systemId);
+            Log.Error(ex, "Failed loading system configuration. SystemId: {SystemId}", systemId);
             return;
         }
 
-        Log.Information("Starting comparison run for {Name} ({City}) Id={Id} Project={ProjectId}", system.Name, system.City, system.Id, system.MaprouletteProjectId);
-        Log.Debug("System endpoints: GbfsApi={Api} StationInfoUrl={StationUrl}", system.GbfsApi, system.GetStationInformationUrl());
+        var systemLogger = Log.Logger.ForBikeShareSystem(system.Name, system.Id);
+        systemLogger.Information("Starting comparison run. City: {City}, MaprouletteProject: {ProjectId}",
+            system.City, system.MaprouletteProjectId);
+        systemLogger.Debug("System endpoints configured. GbfsApi: {Api}, StationInfoUrl: {StationUrl}",
+            system.GbfsApi, system.GetStationInformationUrl());
 
         var projectValidForTasks = false;
         if (system.MaprouletteProjectId > 0)
         {
-            Log.Information("Validating Maproulette project {ProjectId}", system.MaprouletteProjectId);
+            systemLogger.Information("Validating Maproulette project. ProjectId: {ProjectId}", system.MaprouletteProjectId);
             try
             {
                 var projectValid = await _maproulette.ValidateProjectAsync(system.MaprouletteProjectId);
                 if (!projectValid)
                 {
-                    Log.Warning("Maproulette project {ProjectId} invalid; task creation will be skipped.", system.MaprouletteProjectId);
+                    systemLogger.Warning("Maproulette project validation failed. ProjectId: {ProjectId}, Action: SkippingTaskCreation",
+                        system.MaprouletteProjectId);
                 }
                 else
                 {
-                    Log.Information("Maproulette project {ProjectId} validation successful", system.MaprouletteProjectId);
+                    systemLogger.Information("Maproulette project validated successfully. ProjectId: {ProjectId}",
+                        system.MaprouletteProjectId);
                     projectValidForTasks = true;
                 }
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Maproulette project validation failed for {ProjectId}; continuing without tasks", system.MaprouletteProjectId);
+                systemLogger.Error(ex, "Maproulette project validation error. ProjectId: {ProjectId}, Action: ContinuingWithoutTasks",
+                    system.MaprouletteProjectId);
             }
         }
         else
         {
-            Log.Warning("No Maproulette project configured for {Name}. Task creation skipped.", system.Name);
+            systemLogger.Warning("No Maproulette project configured. Action: SkippingTaskCreation");
         }
 
         var validationResult = _systemSetup.ValidateSystem(system.Name, throwOnMissing: false);
         if (!validationResult.IsValid)
         {
-            Log.Warning("System setup issue for {Name}: {Issue}. Attempting auto-create.", system.Name, validationResult.ErrorMessage);
+            systemLogger.Warning("System setup validation failed. Issue: {Issue}, Action: AttemptingAutoCreate",
+                validationResult.ErrorMessage);
         }
 
         try

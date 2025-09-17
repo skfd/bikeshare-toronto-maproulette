@@ -5,6 +5,7 @@ using prepareBikeParking;
 using Microsoft.Extensions.DependencyInjection;
 using prepareBikeParking.Services;
 using prepareBikeParking.ServicesImpl;
+using prepareBikeParking.Logging;
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
@@ -12,14 +13,26 @@ Log.Logger = new LoggerConfiguration()
     .Enrich.FromLogContext()
     .Enrich.WithThreadId()
     .Enrich.WithEnvironmentName()
-    .WriteTo.Console(outputTemplate: "[${Timestamp:HH:mm:ss} ${Level:u3}] ${Message:lj}${NewLine}${Exception}")
-    .WriteTo.File("logs/bikeshare-.log", rollingInterval: RollingInterval.Day, retainedFileCountLimit: 7,
-        outputTemplate: "${Timestamp:O} [${Level:u3}] ${Message:lj} ${Properties:j}${NewLine}${Exception}")
+    .Enrich.WithMachineName()
+    .Enrich.With<SystemContextEnricher>()
+    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] [{CorrelationId}] {Message:lj}{NewLine}{Exception}")
+    .WriteTo.File("logs/bikeshare-.log",
+        rollingInterval: RollingInterval.Day,
+        retainedFileCountLimit: 7,
+        outputTemplate: "{Timestamp:O} [{Level:u3}] [{CorrelationId}] {Message:lj} {Properties:j}{NewLine}{Exception}")
+    .WriteTo.File(new Serilog.Formatting.Compact.CompactJsonFormatter(),
+        "logs/metrics-.json",
+        rollingInterval: RollingInterval.Day,
+        retainedFileCountLimit: 7)
     .CreateLogger();
+
+using var correlationScope = CorrelationIdMiddleware.BeginCorrelationScope();
 
 try
 {
-    Log.Information("Startup arguments: {Args}", args);
+    Log.Information("Application started. Version: {Version}, Arguments: {Args}",
+        System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "Unknown",
+        args);
 
     var services = new ServiceCollection();
     services.AddSingleton<IBikeShareDataFetcher, BikeShareDataFetcherService>();
