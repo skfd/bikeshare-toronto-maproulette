@@ -62,7 +62,7 @@ jobs:
 
     steps:
     - name: Checkout PR
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 0
 
@@ -104,7 +104,7 @@ jobs:
 
     steps:
     - name: Checkout PR
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 0
 
@@ -153,7 +153,7 @@ jobs:
 
     steps:
     - name: Checkout PR
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Check for documentation updates
       run: |
@@ -187,10 +187,10 @@ jobs:
 
     steps:
     - name: Checkout PR
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Checkout base branch
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         ref: ${{ github.base_ref }}
         path: base
