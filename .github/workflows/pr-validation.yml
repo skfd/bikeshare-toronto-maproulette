@@ -1,0 +1,264 @@
+name: PR Validation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+jobs:
+  pr-metadata:
+    name: Validate PR Metadata
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+
+    steps:
+    - name: Check PR title
+      uses: amannn/action-semantic-pull-request@v5
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        types: |
+          feat
+          fix
+          docs
+          style
+          refactor
+          perf
+          test
+          build
+          ci
+          chore
+          revert
+        validateSingleCommit: false
+
+    - name: Check PR size
+      uses: codelytv/pr-size-labeler@v1
+      with:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        xs_label: 'size/XS'
+        xs_max_size: '10'
+        s_label: 'size/S'
+        s_max_size: '100'
+        m_label: 'size/M'
+        m_max_size: '500'
+        l_label: 'size/L'
+        l_max_size: '1000'
+        xl_label: 'size/XL'
+        fail_if_xl: false
+
+    - name: Label PR
+      uses: actions/labeler@v4
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+  code-review:
+    name: Automated Code Review
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+
+    steps:
+    - name: Checkout PR
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore
+      working-directory: src
+
+    - name: Check for breaking changes
+      run: |
+        echo "Checking for breaking API changes..."
+        # This would normally use a tool like ApiCompat
+        dotnet build --configuration Release
+      working-directory: src
+
+    - name: Run linters
+      run: |
+        dotnet tool install -g dotnet-format
+        dotnet format --verify-no-changes --verbosity diagnostic
+      working-directory: src
+      continue-on-error: true
+
+    - name: Check for TODOs
+      run: |
+        TODOS=$(grep -r "TODO\|FIXME\|HACK\|XXX" --include="*.cs" src/ || true)
+        if [ -n "$TODOS" ]; then
+          echo "::warning::Found TODO/FIXME/HACK comments in code:"
+          echo "$TODOS"
+        fi
+
+  test-coverage-delta:
+    name: Test Coverage Analysis
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+
+    steps:
+    - name: Checkout PR
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore dependencies
+      run: |
+        dotnet restore src/
+        dotnet restore tests/
+
+    - name: Run tests with coverage
+      run: |
+        dotnet test --configuration Release \
+          --collect:"XPlat Code Coverage" \
+          --results-directory ./TestResults \
+          -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
+      working-directory: tests
+
+    - name: Generate coverage report
+      uses: danielpalme/ReportGenerator-GitHub-Action@5
+      with:
+        reports: 'tests/TestResults/**/coverage.opencover.xml'
+        targetdir: 'coveragereport'
+        reporttypes: 'Html;Badges;MarkdownSummary'
+
+    - name: Comment coverage on PR
+      uses: marocchino/sticky-pull-request-comment@v2
+      with:
+        path: coveragereport/Summary.md
+        header: coverage
+
+    - name: Upload coverage report
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-report
+        path: coveragereport/
+        retention-days: 7
+
+  documentation-check:
+    name: Documentation Check
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+
+    steps:
+    - name: Checkout PR
+      uses: actions/checkout@v4
+
+    - name: Check for documentation updates
+      run: |
+        FILES_CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+        CODE_CHANGED=$(echo "$FILES_CHANGED" | grep -E '\.(cs|csproj)$' || true)
+        DOCS_CHANGED=$(echo "$FILES_CHANGED" | grep -E '\.(md)$' || true)
+
+        if [ -n "$CODE_CHANGED" ] && [ -z "$DOCS_CHANGED" ]; then
+          echo "::warning::Code changes detected but no documentation updates. Please ensure documentation is updated if needed."
+        fi
+
+    - name: Check README completeness
+      run: |
+        REQUIRED_SECTIONS=("Installation" "Usage" "Configuration" "Contributing")
+        for section in "${REQUIRED_SECTIONS[@]}"; do
+          if ! grep -q "## $section\|# $section" README.md; then
+            echo "::warning::README.md is missing section: $section"
+          fi
+        done
+
+    - name: Validate markdown
+      uses: DavidAnson/markdownlint-cli2-action@v13
+      with:
+        globs: '**/*.md'
+      continue-on-error: true
+
+  performance-check:
+    name: Performance Regression Check
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+
+    steps:
+    - name: Checkout PR
+      uses: actions/checkout@v4
+
+    - name: Checkout base branch
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.base_ref }}
+        path: base
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Run performance tests on base
+      run: |
+        dotnet test --configuration Release \
+          --filter "Category=Performance" \
+          --logger "trx;LogFileName=base-perf.trx"
+      working-directory: base/tests
+      continue-on-error: true
+
+    - name: Run performance tests on PR
+      run: |
+        dotnet test --configuration Release \
+          --filter "Category=Performance" \
+          --logger "trx;LogFileName=pr-perf.trx"
+      working-directory: tests
+      continue-on-error: true
+
+    - name: Compare results
+      run: |
+        echo "Performance comparison would be done here"
+        # In a real scenario, you'd parse and compare the TRX files
+
+  pr-summary:
+    name: Generate PR Summary
+    runs-on: ubuntu-latest
+    needs: [pr-metadata, code-review, test-coverage-delta, documentation-check, performance-check]
+    if: always() && github.event.pull_request.draft == false
+
+    steps:
+    - name: Create PR comment
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const pr_number = context.payload.pull_request.number;
+
+          let comment = '## 🤖 Automated PR Review Summary\n\n';
+          comment += '### ✅ Checks Status\n';
+          comment += '- [ ] Code builds successfully\n';
+          comment += '- [ ] All tests pass\n';
+          comment += '- [ ] Code coverage maintained or improved\n';
+          comment += '- [ ] No security vulnerabilities detected\n';
+          comment += '- [ ] Documentation updated\n';
+          comment += '- [ ] No performance regressions\n\n';
+
+          comment += '### 📊 Metrics\n';
+          comment += '| Metric | Value |\n';
+          comment += '|--------|-------|\n';
+          comment += '| Files Changed | ${{ github.event.pull_request.changed_files }} |\n';
+          comment += '| Lines Added | +${{ github.event.pull_request.additions }} |\n';
+          comment += '| Lines Removed | -${{ github.event.pull_request.deletions }} |\n';
+          comment += '| Commits | ${{ github.event.pull_request.commits }} |\n\n';
+
+          comment += '### 🔗 Links\n';
+          comment += `- [View Changes](${context.payload.pull_request.html_url}/files)\n`;
+          comment += `- [View Checks](${context.payload.pull_request.html_url}/checks)\n`;
+
+          github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: pr_number,
+            body: comment
+          });

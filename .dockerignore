@@ -1,0 +1,60 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Build outputs
+**/bin/
+**/obj/
+**/out/
+**/publish/
+
+# Test results
+**/TestResults/
+**/BenchmarkDotNet.Artifacts/
+**/*.trx
+**/coverage.*.xml
+**/coverage.*.json
+
+# IDE files
+.vs/
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.swp
+*~
+.DS_Store
+
+# Documentation
+*.md
+docs/
+LICENSE
+
+# GitHub
+.github/
+
+# Logs
+logs/
+*.log
+
+# Data files (will be mounted as volume)
+data_results/
+
+# Local environment files
+.env
+.env.local
+appsettings.Development.json
+appsettings.Local.json
+
+# Package manager
+packages/
+node_modules/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.cache

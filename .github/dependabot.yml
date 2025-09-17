@@ -1,0 +1,63 @@
+# Dependabot configuration for automated dependency updates
+version: 2
+updates:
+  # Enable version updates for NuGet packages
+  - package-ecosystem: "nuget"
+    directory: "/src"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+    reviewers:
+      - "@your-username"  # Replace with actual GitHub username
+    labels:
+      - "dependencies"
+      - "nuget"
+    open-pull-requests-limit: 10
+    groups:
+      microsoft-packages:
+        patterns:
+          - "Microsoft.*"
+          - "System.*"
+      serilog:
+        patterns:
+          - "Serilog*"
+      test-packages:
+        patterns:
+          - "NUnit*"
+          - "Moq"
+          - "coverlet*"
+          - "*Test*"
+
+  # Enable version updates for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "03:00"
+    reviewers:
+      - "@your-username"  # Replace with actual GitHub username
+    labels:
+      - "dependencies"
+      - "github-actions"
+    open-pull-requests-limit: 5
+
+  # Enable version updates for test project
+  - package-ecosystem: "nuget"
+    directory: "/tests"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+    reviewers:
+      - "@your-username"  # Replace with actual GitHub username
+    labels:
+      - "dependencies"
+      - "nuget"
+      - "tests"
+    open-pull-requests-limit: 5
+    groups:
+      test-dependencies:
+        patterns:
+          - "*"

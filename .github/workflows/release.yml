@@ -1,0 +1,285 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Is this a pre-release?'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  validate-version:
+    name: Validate Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      version_without_v: ${{ steps.version.outputs.version_without_v }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Get version
+      id: version
+      run: |
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          VERSION="${{ github.event.inputs.version }}"
+        else
+          VERSION="${{ github.ref_name }}"
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "version_without_v=${VERSION#v}" >> $GITHUB_OUTPUT
+
+    - name: Validate semantic version
+      run: |
+        VERSION="${{ steps.version.outputs.version_without_v }}"
+        if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$ ]]; then
+          echo "Invalid semantic version: $VERSION"
+          exit 1
+        fi
+
+  build-release:
+    name: Build Release Binaries
+    needs: validate-version
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            runtime: linux-x64
+            artifact_name: bikeshare-sync-linux-x64
+          - os: ubuntu-latest
+            runtime: linux-arm64
+            artifact_name: bikeshare-sync-linux-arm64
+          - os: windows-latest
+            runtime: win-x64
+            artifact_name: bikeshare-sync-win-x64
+          - os: windows-latest
+            runtime: win-arm64
+            artifact_name: bikeshare-sync-win-arm64
+          - os: macos-latest
+            runtime: osx-x64
+            artifact_name: bikeshare-sync-osx-x64
+          - os: macos-latest
+            runtime: osx-arm64
+            artifact_name: bikeshare-sync-osx-arm64
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore
+      working-directory: src
+
+    - name: Run tests
+      run: dotnet test --configuration Release --verbosity normal
+      working-directory: tests
+
+    - name: Publish application
+      run: |
+        dotnet publish \
+          --configuration Release \
+          --runtime ${{ matrix.runtime }} \
+          --self-contained true \
+          -p:PublishSingleFile=true \
+          -p:PublishTrimmed=true \
+          -p:Version=${{ needs.validate-version.outputs.version_without_v }} \
+          -p:AssemblyVersion=${{ needs.validate-version.outputs.version_without_v }} \
+          -p:FileVersion=${{ needs.validate-version.outputs.version_without_v }} \
+          --output ./publish/${{ matrix.runtime }}
+      working-directory: src
+
+    - name: Create archive (Linux/macOS)
+      if: runner.os != 'Windows'
+      run: |
+        cd src/publish/${{ matrix.runtime }}
+        tar -czf ../../../${{ matrix.artifact_name }}.tar.gz *
+        cd ../../..
+        sha256sum ${{ matrix.artifact_name }}.tar.gz > ${{ matrix.artifact_name }}.tar.gz.sha256
+
+    - name: Create archive (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        Compress-Archive -Path src\publish\${{ matrix.runtime }}\* -DestinationPath ${{ matrix.artifact_name }}.zip
+        (Get-FileHash ${{ matrix.artifact_name }}.zip -Algorithm SHA256).Hash | Out-File ${{ matrix.artifact_name }}.zip.sha256
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ matrix.artifact_name }}
+        path: |
+          ${{ matrix.artifact_name }}.*
+        retention-days: 7
+
+  create-github-release:
+    name: Create GitHub Release
+    needs: [validate-version, build-release]
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+      with:
+        path: ./artifacts
+
+    - name: Prepare release assets
+      run: |
+        mkdir -p release-assets
+        find ./artifacts -type f \( -name "*.tar.gz*" -o -name "*.zip*" \) -exec mv {} ./release-assets/ \;
+        ls -la ./release-assets/
+
+    - name: Generate release notes
+      id: release_notes
+      run: |
+        VERSION="${{ needs.validate-version.outputs.version }}"
+
+        echo "# Release $VERSION" > release-notes.md
+        echo "" >> release-notes.md
+        echo "## 📋 What's Changed" >> release-notes.md
+        echo "" >> release-notes.md
+
+        # Get commit messages since last tag
+        PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+        if [[ -n "$PREV_TAG" ]]; then
+          echo "### Commits since $PREV_TAG:" >> release-notes.md
+          git log --pretty=format:"- %s (%an)" $PREV_TAG..HEAD >> release-notes.md
+        else
+          echo "### Recent commits:" >> release-notes.md
+          git log --pretty=format:"- %s (%an)" -20 >> release-notes.md
+        fi
+
+        echo "" >> release-notes.md
+        echo "" >> release-notes.md
+        echo "## 📦 Installation" >> release-notes.md
+        echo "" >> release-notes.md
+        echo "### Linux/macOS" >> release-notes.md
+        echo '```bash' >> release-notes.md
+        echo 'tar -xzf bikeshare-sync-{platform}.tar.gz' >> release-notes.md
+        echo './prepareBikeParking --help' >> release-notes.md
+        echo '```' >> release-notes.md
+        echo "" >> release-notes.md
+        echo "### Windows" >> release-notes.md
+        echo '```powershell' >> release-notes.md
+        echo 'Expand-Archive bikeshare-sync-win-x64.zip' >> release-notes.md
+        echo '.\prepareBikeParking.exe --help' >> release-notes.md
+        echo '```' >> release-notes.md
+        echo "" >> release-notes.md
+        echo "## 🔐 Checksums" >> release-notes.md
+        echo "" >> release-notes.md
+        echo '```' >> release-notes.md
+        cat ./release-assets/*.sha256 >> release-notes.md
+        echo '```' >> release-notes.md
+        echo "" >> release-notes.md
+        echo "## 📝 Full Changelog" >> release-notes.md
+        echo "https://github.com/${{ github.repository }}/compare/$PREV_TAG...$VERSION" >> release-notes.md
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ needs.validate-version.outputs.version }}
+        name: Release ${{ needs.validate-version.outputs.version }}
+        body_path: release-notes.md
+        draft: false
+        prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+        files: |
+          release-assets/*
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-docker:
+    name: Publish Docker Image
+    needs: [validate-version, build-release]
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+      if: secrets.DOCKER_USERNAME != ''
+
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: |
+          ghcr.io/${{ github.repository }}:${{ needs.validate-version.outputs.version_without_v }}
+          ghcr.io/${{ github.repository }}:latest
+        labels: |
+          org.opencontainers.image.title=Bike Share OSM Sync
+          org.opencontainers.image.version=${{ needs.validate-version.outputs.version_without_v }}
+          org.opencontainers.image.source=${{ github.event.repository.html_url }}
+          org.opencontainers.image.revision=${{ github.sha }}
+      continue-on-error: true
+
+  update-documentation:
+    name: Update Documentation
+    needs: [validate-version, create-github-release]
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Update version in README
+      run: |
+        VERSION="${{ needs.validate-version.outputs.version_without_v }}"
+        sed -i "s/version: .*/version: $VERSION/g" README.md || true
+        sed -i "s/Latest Release: .*/Latest Release: $VERSION/g" README.md || true
+
+    - name: Commit documentation updates
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add -A
+        git diff --quiet && git diff --staged --quiet || git commit -m "docs: Update version to ${{ needs.validate-version.outputs.version }}"
+        git push
+      continue-on-error: true

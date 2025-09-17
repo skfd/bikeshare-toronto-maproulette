@@ -1,0 +1,314 @@
+name: CI Build and Test
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.github/*.md'
+  pull_request:
+    branches: [ main, develop ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.github/*.md'
+  workflow_dispatch:
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  DOTNET_NOLOGO: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        configuration: [Debug, Release]
+      fail-fast: false
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Full history for GitVersion
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Cache NuGet packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+
+    - name: Restore dependencies
+      run: dotnet restore
+      working-directory: src
+
+    - name: Build
+      run: dotnet build --configuration ${{ matrix.configuration }} --no-restore -warnaserror
+      working-directory: src
+
+    - name: Run tests
+      run: |
+        dotnet test --configuration ${{ matrix.configuration }} --no-build --verbosity normal \
+          --logger "trx;LogFileName=test-results.trx" \
+          --logger "console;verbosity=detailed" \
+          --collect:"XPlat Code Coverage" \
+          --results-directory ./TestResults \
+          -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
+      working-directory: tests
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-results-${{ matrix.os }}-${{ matrix.configuration }}
+        path: tests/TestResults/
+        retention-days: 7
+
+    - name: Upload coverage to Codecov
+      if: matrix.os == 'ubuntu-latest' && matrix.configuration == 'Release'
+      uses: codecov/codecov-action@v3
+      with:
+        files: tests/TestResults/**/coverage.cobertura.xml
+        flags: unittests
+        name: codecov-${{ matrix.os }}
+        fail_ci_if_error: false
+
+  code-quality:
+    name: Code Quality Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Install dotnet-format
+      run: dotnet tool install -g dotnet-format
+
+    - name: Check code formatting
+      run: dotnet format --verify-no-changes --verbosity diagnostic
+      working-directory: src
+
+    - name: Run .NET analyzers
+      run: |
+        dotnet build /p:RunAnalyzersDuringBuild=true \
+          /p:TreatWarningsAsErrors=true \
+          /p:WarningsAsErrors="CS8600;CS8602;CS8603;CS8604;CS8625"
+      working-directory: src
+
+  security-scan:
+    name: Security Vulnerability Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Restore dependencies
+      run: dotnet restore
+      working-directory: src
+
+    - name: Scan for vulnerable packages
+      run: |
+        dotnet list package --vulnerable --include-transitive
+      working-directory: src
+
+    - name: Run security audit
+      run: |
+        dotnet tool install -g security-scan
+        security-scan src/prepareBikeParking.csproj || true
+      continue-on-error: true
+
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.event_name == 'pull_request'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Restore dependencies
+      run: dotnet restore
+      working-directory: tests
+
+    - name: Run performance tests
+      run: |
+        dotnet test --configuration Release \
+          --filter "Category=Performance" \
+          --logger "console;verbosity=detailed"
+      working-directory: tests
+      continue-on-error: true
+
+    - name: Upload performance results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-results
+        path: tests/BenchmarkDotNet.Artifacts/
+        retention-days: 30
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Restore dependencies
+      run: dotnet restore
+      working-directory: src
+
+    - name: Build
+      run: dotnet build --configuration Release --no-restore
+      working-directory: src
+
+    - name: Run integration tests
+      run: |
+        dotnet test --configuration Release \
+          --filter "Category=Integration" \
+          --logger "console;verbosity=detailed"
+      working-directory: tests
+      env:
+        INTEGRATION_TEST: true
+      continue-on-error: true
+
+  publish-artifacts:
+    name: Publish Build Artifacts
+    runs-on: ubuntu-latest
+    needs: [build-and-test, code-quality, security-scan]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Restore dependencies
+      run: dotnet restore
+      working-directory: src
+
+    - name: Publish Linux x64
+      run: |
+        dotnet publish --configuration Release \
+          --runtime linux-x64 \
+          --self-contained true \
+          -p:PublishSingleFile=true \
+          -p:PublishTrimmed=true \
+          --output ./publish/linux-x64
+      working-directory: src
+
+    - name: Publish Windows x64
+      run: |
+        dotnet publish --configuration Release \
+          --runtime win-x64 \
+          --self-contained true \
+          -p:PublishSingleFile=true \
+          -p:PublishTrimmed=true \
+          --output ./publish/win-x64
+      working-directory: src
+
+    - name: Publish macOS x64
+      run: |
+        dotnet publish --configuration Release \
+          --runtime osx-x64 \
+          --self-contained true \
+          -p:PublishSingleFile=true \
+          -p:PublishTrimmed=true \
+          --output ./publish/osx-x64
+      working-directory: src
+
+    - name: Upload Linux artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: bikeshare-sync-linux-x64
+        path: src/publish/linux-x64/
+        retention-days: 30
+
+    - name: Upload Windows artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: bikeshare-sync-win-x64
+        path: src/publish/win-x64/
+        retention-days: 30
+
+    - name: Upload macOS artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: bikeshare-sync-osx-x64
+        path: src/publish/osx-x64/
+        retention-days: 30
+
+  create-release-notes:
+    name: Generate Release Notes
+    runs-on: ubuntu-latest
+    needs: publish-artifacts
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Generate changelog
+      id: changelog
+      run: |
+        echo "## Changes in this build" > release-notes.md
+        echo "" >> release-notes.md
+        git log --pretty=format:"- %s (%h)" -10 >> release-notes.md
+        echo "" >> release-notes.md
+        echo "### Statistics" >> release-notes.md
+        echo "- Commit: ${{ github.sha }}" >> release-notes.md
+        echo "- Build: ${{ github.run_number }}" >> release-notes.md
+        echo "- Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> release-notes.md
+
+    - name: Upload release notes
+      uses: actions/upload-artifact@v3
+      with:
+        name: release-notes
+        path: release-notes.md
+        retention-days: 30
