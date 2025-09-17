@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using Xunit;
+using NUnit.Framework;
 
 namespace prepareBikeParking.Tests
 {
@@ -9,12 +9,11 @@ namespace prepareBikeParking.Tests
         {
             id = id,
             name = name,
-            latitude = 0,
-            longitude = 0,
-            address = id
+            lat = "0",
+            lon = "0"
         };
 
-        [Fact]
+        [Test]
         public void Apply_AddsPrefix_WhenMissing()
         {
             var pts = new List<GeoPoint>
@@ -23,11 +22,14 @@ namespace prepareBikeParking.Tests
                 MakePoint("2", "Beta")
             };
             var count = StationNamePrefixer.Apply(pts, "Pre - ");
-            Assert.Equal(2, count);
-            Assert.All(pts, p => Assert.StartsWith("Pre - ", p.name));
+            Assert.That(count, Is.EqualTo(2));
+            foreach (var p in pts)
+            {
+                Assert.That(p.name, Does.StartWith("Pre - "));
+            }
         }
 
-        [Fact]
+        [Test]
         public void Apply_Skips_WhenAlreadyPrefixed_IgnoringCase()
         {
             var pts = new List<GeoPoint>
@@ -36,17 +38,17 @@ namespace prepareBikeParking.Tests
                 MakePoint("2", "pre - Beta")
             };
             var count = StationNamePrefixer.Apply(pts, "Pre - ");
-            Assert.Equal(0, count);
+            Assert.That(count, Is.EqualTo(0));
         }
 
-        [Fact]
+        [Test]
         public void Apply_NoOp_WhenPrefixNullOrWhitespace()
         {
             var pts = new List<GeoPoint> { MakePoint("1", "Name") };
             var count = StationNamePrefixer.Apply(pts, null);
-            Assert.Equal(0, count);
+            Assert.That(count, Is.EqualTo(0));
             count = StationNamePrefixer.Apply(pts, "   ");
-            Assert.Equal(0, count);
+            Assert.That(count, Is.EqualTo(0));
         }
     }
 }
