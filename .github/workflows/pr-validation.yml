@@ -175,7 +175,7 @@ jobs:
         done
 
     - name: Validate markdown
-      uses: DavidAnson/markdownlint-cli2-action@v13
+      uses: DavidAnson/markdownlint-cli2-action@v20
       with:
         globs: '**/*.md'
       continue-on-error: true
