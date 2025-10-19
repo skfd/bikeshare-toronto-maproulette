@@ -10,7 +10,13 @@
       "Bash(dotnet test --filter \"PathSanitization_SystemNameDoesNotEscapeRoot\")",
       "Bash(dotnet test --filter \"Duplicate\")",
       "Bash(dotnet build --configuration Release)",
-      "Bash(dotnet test --configuration Release --verbosity normal)"
+      "Bash(dotnet test --configuration Release --verbosity normal)",
+      "Bash(dotnet add package Spectre.Console)",
+      "Bash(pwsh sync.ps1 -?)",
+      "Bash(pwsh -Command \"Get-Help ./sync.ps1\")",
+      "Bash(pwsh -Command \"Get-Help ./sync.ps1 -Detailed\")",
+      "Bash(dotnet test --configuration Release --verbosity quiet)",
+      "Bash(pwsh sync.ps1 -SkipTests)"
     ],
     "deny": [],
     "ask": []

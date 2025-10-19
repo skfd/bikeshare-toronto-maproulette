@@ -34,8 +34,16 @@ dotnet build
 ```
 Add or edit `bikeshare_systems.json` (example already present). Then run:
 ```bash
-dotnet run -- list        # show systems
-dotnet run -- 1           # run system with id 1
+# Using the PowerShell script (recommended)
+.\sync.ps1              # sync all systems
+.\sync.ps1 1            # sync system with id 1
+.\sync.ps1 -SkipTests   # skip tests and sync all
+
+# Or use dotnet directly
+dotnet run -- list      # show systems
+dotnet run -- 1         # run system with id 1
+dotnet run -- 1 -v      # run with verbose output
+dotnet run -- 1 -q      # run with quiet output
 ```
 
 ## Typical Run Flow

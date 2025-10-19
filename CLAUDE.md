@@ -71,9 +71,16 @@ dotnet build
 # Run tests
 dotnet test
 
-# Run the application
+# Run the application (using PowerShell script - recommended)
+.\sync.ps1                   # Sync all systems
+.\sync.ps1 <system-id>       # Sync specific system
+.\sync.ps1 -SkipTests        # Skip tests before syncing
+
+# Or use dotnet directly
 dotnet run -- list           # List configured systems
 dotnet run -- <system-id>    # Run for specific system
+dotnet run -- <system-id> -v # Run with verbose output
+dotnet run -- <system-id> -q # Run with quiet output
 dotnet run -- test-project <system-id>  # Test MapRoulette connection
 
 # Clean build artifacts

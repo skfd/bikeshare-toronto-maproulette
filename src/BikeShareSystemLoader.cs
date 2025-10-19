@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Serilog;
+using Spectre.Console;
 
 namespace prepareBikeParking
 {
@@ -157,28 +158,54 @@ namespace prepareBikeParking
             try
             {
                 var systems = await LoadAllSystemsAsync();
-                Log.Information("Available Bike Share Systems (Count={Count})", systems.Count);
 
                 if (systems.Count == 0)
                 {
-                    Log.Warning("No bike share systems configured. Add entries to bikeshare_systems.json. See SETUP_NEW_SYSTEM.md");
+                    AnsiConsole.MarkupLine("[yellow]⚠[/] No bike share systems configured.");
+                    AnsiConsole.MarkupLine("[grey]Add entries to bikeshare_systems.json (see SETUP_NEW_SYSTEM.md)[/]");
                     return;
                 }
 
-                foreach (var system in systems)
+                // Create a table
+                var table = new Table()
+                    .Border(TableBorder.Rounded)
+                    .BorderColor(Color.Grey)
+                    .Title("[bold cyan]Available Bike Share Systems[/]");
+
+                table.AddColumn(new TableColumn("[bold]ID[/]").Centered());
+                table.AddColumn("[bold]System Name[/]");
+                table.AddColumn("[bold]City[/]");
+                table.AddColumn(new TableColumn("[bold]API[/]").Centered());
+                table.AddColumn(new TableColumn("[bold]MapRoulette[/]").Centered());
+
+                foreach (var system in systems.OrderBy(s => s.Id))
                 {
-                    var projectStatus = system.MaprouletteProjectId > 0 ? system.MaprouletteProjectId.ToString() : "None";
                     var apiValid = Uri.TryCreate(system.GbfsApi, UriKind.Absolute, out _);
-                    Log.Information("System {Id}: {Name} ({City}) | Project={ProjectStatus} | ApiValid={ApiValid} | Url={Url}",
-                        system.Id, system.Name, system.City, projectStatus, apiValid, system.GbfsApi);
+                    var apiIcon = apiValid ? "[green]✓[/]" : "[red]✗[/]";
+                    var projectText = system.MaprouletteProjectId > 0
+                        ? $"[cyan]{system.MaprouletteProjectId}[/]"
+                        : "[grey]-[/]";
+
+                    table.AddRow(
+                        $"[cyan]{system.Id}[/]",
+                        Markup.Escape(system.Name),
+                        Markup.Escape(system.City),
+                        apiIcon,
+                        projectText
+                    );
                 }
-                Log.Information("Total systems configured: {Count}", systems.Count);
-                Log.Information("Usage: dotnet run -- run --system-id <id>");
+
+                AnsiConsole.Write(table);
+                AnsiConsole.WriteLine();
+                AnsiConsole.MarkupLine($"[grey]Total: {systems.Count} system(s) configured[/]");
+                AnsiConsole.MarkupLine($"[grey]Usage: [/][bold]bikeshare-sync <id>[/]");
+                AnsiConsole.WriteLine();
             }
             catch (Exception ex)
             {
+                ConsoleUI.PrintError($"Error loading bike share systems: {ex.Message}");
+                AnsiConsole.MarkupLine("[grey]To fix: ensure bikeshare_systems.json exists and contains valid JSON[/]");
                 Log.Error(ex, "Error loading bike share systems configuration");
-                Log.Information("To fix: ensure bikeshare_systems.json exists, JSON is valid, and matches SETUP_NEW_SYSTEM.md");
             }
         }
     }

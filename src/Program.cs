@@ -6,7 +6,9 @@ using Microsoft.Extensions.DependencyInjection;
 using prepareBikeParking.Services;
 using prepareBikeParking.ServicesImpl;
 using prepareBikeParking.Logging;
+using Spectre.Console;
 
+// Initial logger - will be reconfigured after parsing command line args
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
     .MinimumLevel.Override("System", LogEventLevel.Warning)
@@ -15,7 +17,7 @@ Log.Logger = new LoggerConfiguration()
     .Enrich.WithEnvironmentName()
     .Enrich.WithMachineName()
     .Enrich.With<SystemContextEnricher>()
-    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] [{CorrelationId}] {Message:lj}{NewLine}{Exception}")
+    .WriteTo.Console(outputTemplate: "[{Level:u3}] {Message:lj}{NewLine}{Exception}")
     .WriteTo.File("logs/bikeshare-.log",
         rollingInterval: RollingInterval.Day,
         retainedFileCountLimit: 7,
@@ -51,13 +53,36 @@ try
 
     var root = new RootCommand("Bike Share Location Comparison Tool");
 
+    // Global options for verbosity
+    var verboseOption = new Option<bool>(
+        aliases: new[] { "--verbose", "-v" },
+        description: "Show detailed logging output");
+    var quietOption = new Option<bool>(
+        aliases: new[] { "--quiet", "-q" },
+        description: "Show minimal output (errors and summary only)");
+
+    root.AddGlobalOption(verboseOption);
+    root.AddGlobalOption(quietOption);
+
     // run command & root default
     var systemIdArg = new Argument<int>("system-id", description: "Numeric system ID from bikeshare_systems.json");
     var runCommand = new Command("run", "Run comparison for a system") { systemIdArg };
-    runCommand.SetHandler(async (int id) => await provider.GetRequiredService<BikeShareFlows>().RunSystemFlow(id), systemIdArg);
+    runCommand.SetHandler(async (int id, bool verbose, bool quiet) =>
+    {
+        ConsoleUI.IsVerbose = verbose;
+        ConsoleUI.IsQuiet = quiet;
+        ConsoleUI.ConfigureLogging();
+        await provider.GetRequiredService<BikeShareFlows>().RunSystemFlow(id);
+    }, systemIdArg, verboseOption, quietOption);
 
     root.AddArgument(systemIdArg); // treat root invocation same as run
-    root.SetHandler(async (int id) => await provider.GetRequiredService<BikeShareFlows>().RunSystemFlow(id), systemIdArg);
+    root.SetHandler(async (int id, bool verbose, bool quiet) =>
+    {
+        ConsoleUI.IsVerbose = verbose;
+        ConsoleUI.IsQuiet = quiet;
+        ConsoleUI.ConfigureLogging();
+        await provider.GetRequiredService<BikeShareFlows>().RunSystemFlow(id);
+    }, systemIdArg, verboseOption, quietOption);
 
     // list systems
     var listCommand = new Command("list", "List available systems");
