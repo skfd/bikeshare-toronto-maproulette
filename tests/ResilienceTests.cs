@@ -40,7 +40,7 @@ public class ResilienceTests
     }
 
     [Test]
-    public async Task OverpassFailureInFlow_LogsAndDoesNotThrow()
+    public void OverpassFailureInFlow_LogsAndDoesNotThrow()
     {
         // Simulate Overpass failure by using OSMDataFetcher with handler that always fails
         var fetcher = new prepareBikeParking.OSMDataFetcher(new prepareBikeParking.Tests.OSMDataFetcherTests.Factory(new System.Net.Http.HttpClientHandler()));

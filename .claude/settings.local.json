@@ -8,7 +8,9 @@
       "Bash(dotnet test)",
       "Bash(dotnet restore)",
       "Bash(dotnet test --filter \"PathSanitization_SystemNameDoesNotEscapeRoot\")",
-      "Bash(dotnet test --filter \"Duplicate\")"
+      "Bash(dotnet test --filter \"Duplicate\")",
+      "Bash(dotnet build --configuration Release)",
+      "Bash(dotnet test --configuration Release --verbosity normal)"
     ],
     "deny": [],
     "ask": []

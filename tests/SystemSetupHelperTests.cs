@@ -49,7 +49,7 @@ public class SystemSetupHelperTests
     }
 
     [Test]
-    public async Task ValidateInstructionFilesForTaskCreation_ThrowsWhenEmpty()
+    public void ValidateInstructionFilesForTaskCreation_ThrowsWhenEmpty()
     {
         Directory.CreateDirectory(SystemPath);
         Directory.CreateDirectory(InstructionsPath);

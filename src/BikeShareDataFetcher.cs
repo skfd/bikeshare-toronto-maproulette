@@ -127,6 +127,11 @@ namespace prepareBikeParking
             var document = parser.ParseDocument(html);
 
             var displaylist = document.GetElementById("infoWind");
+            if (displaylist == null)
+            {
+                throw new InvalidOperationException("Could not find element 'infoWind' in HTML response");
+            }
+
             var namesAndCapacities = displaylist.Children.Select(x => new
             {
                 id = x.GetAttribute("id"),
@@ -137,10 +142,25 @@ namespace prepareBikeParking
                         IntParseOrZero(x.Children[2].TextContent) : 0,
             });
 
-            var locations = document.GetElementById("arr_adr").GetAttribute("value");
+            var locationsElement = document.GetElementById("arr_adr");
+            if (locationsElement == null)
+            {
+                throw new InvalidOperationException("Could not find element 'arr_adr' in HTML response");
+            }
+
+            var locations = locationsElement.GetAttribute("value");
+            if (locations == null)
+            {
+                throw new InvalidOperationException("Element 'arr_adr' has no 'value' attribute");
+            }
 
             // Parse JSON
             var json = JsonSerializer.Deserialize<Dictionary<string, string>>(locations);
+            if (json == null)
+            {
+                throw new InvalidOperationException("Failed to parse locations JSON");
+            }
+
             var locationsDict = json.ToDictionary(x => x.Key, x => x.Value.Split("_"));
 
             var locationsList = locationsDict.Select(x => new GeoPoint
