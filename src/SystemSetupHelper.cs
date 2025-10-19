@@ -174,20 +174,29 @@ Steps:
         /// </summary>
         private static string GenerateDuplicatesInstructions()
         {
-            return @"This station has a duplicate 'ref' value in OpenStreetMap. Multiple stations are using the same reference ID, which is incorrect.
+            return @"**DUPLICATE REF VALUE DETECTED**
 
-**Data Quality Issue:** Duplicate ref={{address}}
+This task shows ONE station that has a duplicate 'ref' value in OpenStreetMap. The error message in the task shows how many total stations share this ref value.
 
-Steps to fix:
-1. Examine all stations listed with this ref value (check OSM ID in task properties)
-2. Verify which station has the correct ref value (cross-reference with official bike share data)
-3. For incorrectly tagged stations, either:
-   - Update the ref tag to the correct value if you can determine it
-   - Remove the ref tag if the correct value is unknown (add fixme=verify ref value)
-4. Ensure only ONE station has each unique ref value
-5. If you're unsure which is correct, add a note requesting verification from local mappers
+**What's the problem?**
+The ref={{address}} appears multiple times in OSM. Each bike share station MUST have a unique ref value.
 
-**Important:** The 'ref' tag should match the official bike share station ID. Each station must have a unique ref value.
+**All duplicates are included:**
+Look for other tasks with the same ref value - they show all the stations sharing this duplicate ref. The error message tells you the total count.
+
+**How to fix:**
+1. **Find all duplicates**: Look for all tasks with ref={{address}} - they show each station using this ref
+2. **Identify the correct one**: Compare locations and names with official bike share data
+3. **Fix the incorrect stations**:
+   - If you can determine the correct ref: Update the ref tag to the right value
+   - If unknown: Remove the ref tag and add `fixme=verify correct ref value`
+4. **Verify uniqueness**: When done, only ONE station should have ref={{address}}
+
+**Important notes:**
+- The 'ref' tag must match the official bike share station ID
+- Check the OSM element type and ID shown in the error message
+- All stations with this duplicate ref are shown as separate tasks
+- Fix all duplicates to ensure data quality
 
 ";
         }

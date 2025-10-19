@@ -332,6 +332,9 @@ out meta;
                         dup.Key, dup.Count(), osmDetails);
                 }
 
+                // Create a dictionary to lookup duplicate counts by ref
+                var duplicateCounts = duplicates.ToDictionary(g => g.Key, g => g.Count());
+
                 // Generate GeoJSON file with duplicate stations for editor review
                 try
                 {
@@ -342,7 +345,7 @@ out meta;
                         point => GeoJsonGenerator.GenerateGeojsonLineWithError(
                             point,
                             systemName,
-                            $"Duplicate ref: {point.id} (OSM {point.osmType}/{point.osmId})"
+                            $"Duplicate ref '{point.id}' appears {duplicateCounts[point.id]} times in OSM (this is OSM {point.osmType}/{point.osmId})"
                         )
                     );
 
