@@ -292,10 +292,6 @@ Environment:
 ```bash
 export MAPROULETTE_API_KEY=xxxxxxxxxxxxxxxx
 ```
-On Windows PowerShell:
-```powershell
-$env:MAPROULETTE_API_KEY = "xxxxxxxx"
-```
 
 ---
 

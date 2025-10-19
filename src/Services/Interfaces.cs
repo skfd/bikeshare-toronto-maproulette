@@ -34,6 +34,7 @@ public interface IMaprouletteService
 {
     Task<bool> ValidateProjectAsync(int projectId);
     Task CreateTasksAsync(int projectId, DateTime lastSyncDate, string systemName, bool isNewSystem);
+    Task CreateDuplicateTasksAsync(int projectId, string systemName);
 }
 
 public interface ISystemSetupService
@@ -41,6 +42,7 @@ public interface ISystemSetupService
     Task<bool> EnsureAsync(string systemName, string operatorName, string brandName, string? cityName = null);
     void ValidateInstructionFiles(string systemName);
     SystemValidationResult ValidateSystem(string systemName, bool throwOnMissing = false);
+    Task EnsureDuplicatesInstructionFileAsync(string systemName);
 }
 
 public interface IFilePathProvider

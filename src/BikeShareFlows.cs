@@ -218,6 +218,32 @@ public class BikeShareFlows
         await CompareAndGenerateDiffFiles(locationsList, system, isNewSystem);
         await CompareWithOSMData(locationsList, system);
 
+        // Check for duplicate ref values and prompt to create tasks
+        var duplicatesFile = _paths.GetSystemFullPath(system.Name, "bikeshare_osm_duplicates.geojson");
+        if (File.Exists(duplicatesFile) && system.MaprouletteProjectId > 0 && projectValidForTasks)
+        {
+            var confirmDuplicates = _prompt.ReadConfirmation("Duplicate ref values found in OSM. Create MapRoulette tasks to fix them?", 'n');
+            if (confirmDuplicates.ToString().ToLower() == "y")
+            {
+                try
+                {
+                    // Ensure duplicates instruction file exists (for existing systems)
+                    await _systemSetup.EnsureDuplicatesInstructionFileAsync(system.Name);
+
+                    await _maproulette.CreateDuplicateTasksAsync(system.MaprouletteProjectId, system.Name);
+                    Log.Information("Duplicate detection tasks created successfully");
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "Error creating duplicate detection tasks for {Name}", system.Name);
+                }
+            }
+            else
+            {
+                Log.Information("User declined duplicate detection task creation.");
+            }
+        }
+
         // Gate task creation entirely if no valid project configured
         if (!(system.MaprouletteProjectId > 0 && projectValidForTasks))
         {

@@ -64,6 +64,25 @@ namespace prepareBikeParking
         }
 
         /// <summary>
+        /// Creates MapRoulette tasks for duplicate ref values found in OSM data
+        /// </summary>
+        public async static Task CreateDuplicateTasksAsync(int projectId, string systemName)
+        {
+            Serilog.Log.Information("Checking for duplicate ref value tasks to create...");
+
+            // First, validate that the project exists and is accessible
+            if (!await ValidateProjectExistsAsync(projectId))
+            {
+                throw new InvalidOperationException($"Maproulette project validation failed for project ID {projectId}. Cannot proceed with duplicate task creation.");
+            }
+
+            await CreateTaskForTypeAsync(projectId, "duplicates", $"{systemName} -- Duplicate ref values found at {DateTime.Now:yyyy-MM-dd}",
+                Path.Combine("instructions", "duplicates.md"), systemName, "bikeshare_osm_duplicates.geojson");
+
+            Serilog.Log.Information("Duplicate detection task creation completed");
+        }
+
+        /// <summary>
         /// Validates that a Maproulette project exists and is accessible (public method for testing)
         /// </summary>
         /// <param name="projectId">The project ID to validate</param>

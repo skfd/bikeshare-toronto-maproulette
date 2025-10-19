@@ -49,6 +49,7 @@ namespace prepareBikeParking
             await CreateInstructionFileAsync(systemName, "removed.md", GenerateRemovedInstructions());
             await CreateInstructionFileAsync(systemName, "moved.md", GenerateMovedInstructions());
             await CreateInstructionFileAsync(systemName, "renamed.md", GenerateRenamedInstructions());
+            await CreateInstructionFileAsync(systemName, "duplicates.md", GenerateDuplicatesInstructions());
 
             // Create stations.overpass file for OSM data fetching
             await OSMDataFetcher.EnsureStationsOverpassFileAsync(systemName, cityName ?? systemName);
@@ -166,6 +167,37 @@ Steps:
 4. If you observe a different name on-site, prioritize the name actually displayed at the station
 
 ";
+        }
+
+        /// <summary>
+        /// Generates the "duplicates" instruction template
+        /// </summary>
+        private static string GenerateDuplicatesInstructions()
+        {
+            return @"This station has a duplicate 'ref' value in OpenStreetMap. Multiple stations are using the same reference ID, which is incorrect.
+
+**Data Quality Issue:** Duplicate ref={{address}}
+
+Steps to fix:
+1. Examine all stations listed with this ref value (check OSM ID in task properties)
+2. Verify which station has the correct ref value (cross-reference with official bike share data)
+3. For incorrectly tagged stations, either:
+   - Update the ref tag to the correct value if you can determine it
+   - Remove the ref tag if the correct value is unknown (add fixme=verify ref value)
+4. Ensure only ONE station has each unique ref value
+5. If you're unsure which is correct, add a note requesting verification from local mappers
+
+**Important:** The 'ref' tag should match the official bike share station ID. Each station must have a unique ref value.
+
+";
+        }
+
+        /// <summary>
+        /// Ensures the duplicates instruction file exists for an existing system
+        /// </summary>
+        public static async Task EnsureDuplicatesInstructionFileAsync(string systemName)
+        {
+            await CreateInstructionFileAsync(systemName, "duplicates.md", GenerateDuplicatesInstructions());
         }
 
         /// <summary>

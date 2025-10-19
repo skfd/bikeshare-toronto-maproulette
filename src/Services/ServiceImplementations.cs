@@ -1,4 +1,5 @@
 using prepareBikeParking.Services;
+using Spectre.Console;
 
 namespace prepareBikeParking.ServicesImpl;
 
@@ -50,6 +51,7 @@ public class MaprouletteService : IMaprouletteService
 {
     public Task<bool> ValidateProjectAsync(int projectId) => MaprouletteTaskCreator.ValidateProjectAsync(projectId);
     public Task CreateTasksAsync(int projectId, DateTime lastSyncDate, string systemName, bool isNewSystem) => MaprouletteTaskCreator.CreateTasksAsync(projectId, lastSyncDate, systemName, isNewSystem);
+    public Task CreateDuplicateTasksAsync(int projectId, string systemName) => MaprouletteTaskCreator.CreateDuplicateTasksAsync(projectId, systemName);
 }
 
 public class SystemSetupService : ISystemSetupService
@@ -57,6 +59,7 @@ public class SystemSetupService : ISystemSetupService
     public Task<bool> EnsureAsync(string systemName, string operatorName, string brandName, string? cityName = null) => SystemSetupHelper.EnsureSystemSetUpAsync(systemName, operatorName, brandName, cityName);
     public void ValidateInstructionFiles(string systemName) => SystemSetupHelper.ValidateInstructionFilesForTaskCreation(systemName);
     public SystemValidationResult ValidateSystem(string systemName, bool throwOnMissing = false) => SystemSetupHelper.ValidateSystemSetup(systemName, throwOnMissing);
+    public Task EnsureDuplicatesInstructionFileAsync(string systemName) => SystemSetupHelper.EnsureDuplicatesInstructionFileAsync(systemName);
 }
 
 public class FilePathProvider : IFilePathProvider
@@ -69,15 +72,39 @@ public class PromptService : IPromptService
 {
     public char ReadConfirmation(string message, char defaultAnswer = 'n')
     {
-        Serilog.Log.Information(message + " (y/N)");
+        // In quiet mode, auto-decline without prompting
+        if (ConsoleUI.IsQuiet)
+        {
+            Serilog.Log.Debug("Quiet mode: auto-declining prompt");
+            return defaultAnswer;
+        }
+
+        // Check if we're in an interactive console
+        if (Console.IsInputRedirected || Console.IsOutputRedirected)
+        {
+            Serilog.Log.Warning("Non-interactive mode detected. Auto-declining prompt: {Message}", message);
+            AnsiConsole.MarkupLine($"[yellow]⚠[/] Non-interactive mode: auto-declining - {Markup.Escape(message)}");
+            return defaultAnswer;
+        }
+
+        // Interactive mode: use Spectre.Console for better prompts
+        var defaultChoice = defaultAnswer == 'y' ? "y" : "n";
+        var prompt = new TextPrompt<string>($"[cyan]?[/] {Markup.Escape(message)}")
+            .AddChoice("y")
+            .AddChoice("n")
+            .DefaultValue(defaultChoice)
+            .ShowChoices(true)
+            .ShowDefaultValue(true);
+
         try
         {
-            var key = Console.ReadKey(intercept: true).KeyChar;
-            Serilog.Log.Debug("Prompt response {Key}", key);
-            return key == '\0' ? defaultAnswer : key;
+            var response = AnsiConsole.Prompt(prompt);
+            Serilog.Log.Debug("Prompt response: {Response}", response);
+            return response.ToLowerInvariant()[0];
         }
-        catch
+        catch (Exception ex)
         {
+            Serilog.Log.Warning(ex, "Error reading confirmation, using default: {Default}", defaultAnswer);
             return defaultAnswer;
         }
     }
