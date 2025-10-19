@@ -10,6 +10,7 @@ Fetches official GBFS station data, compares it with:
 Then produces:
 - Diff GeoJSON (added / removed / moved / renamed)
 - OSM comparison GeoJSON (missing / extra / moved / renamed)
+- OSM validation reports (duplicate ref values)
 - Optional Maproulette challenges (added + optionally others)
 - `.osc` file for batch station renames (apply in JOSM)
 
@@ -45,19 +46,25 @@ Ensure system entry has `"maproulette_project_id": <id>`.
 ## Operator Responsibilities
 - Review GeoJSON outputs (`data_results/<SYSTEM>/`)
 - Open diffs in JOSM / QGIS for validation
+- **Check for `bikeshare_osm_duplicates.geojson`** - if present, fix duplicate ref values in OSM
 - Complete Maproulette tasks (added / etc.)
 - Load `bikeshare_renames.osc` in JOSM and upload after verifying on imagery / ground truth
 - Commit updated `bikeshare.geojson` so next run has a baseline
 
 ## Key Files (per system)
 ```
-bikeshare.geojson
-bikeshare_added.geojson
-bikeshare_removed.geojson
-bikeshare_moved.geojson
-data_results/<SYSTEM>/bikeshare_renames.osc
-stations.overpass
-instructions/*.md (task text templates)
+bikeshare.geojson                     # Current GBFS data
+bikeshare_added.geojson               # New stations (vs git)
+bikeshare_removed.geojson             # Removed stations (vs git)
+bikeshare_moved.geojson               # Moved stations (vs git)
+bikeshare_renamed.geojson             # Renamed stations (vs git)
+bikeshare_osm.geojson                 # Current OSM data
+bikeshare_osm_duplicates.geojson      # OSM data quality issues (if found)
+bikeshare_missing_in_osm.geojson      # Stations not in OSM
+bikeshare_extra_in_osm.geojson        # OSM stations not in GBFS
+bikeshare_renames.osc                 # JOSM changeset for renames
+stations.overpass                     # Overpass query for OSM data
+instructions/*.md                     # MapRoulette task templates
 ```
 All GeoJSON lines are record‑separated with an initial `\u001e` control character. Keep this format.
 

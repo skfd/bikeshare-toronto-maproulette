@@ -57,7 +57,7 @@ namespace prepareBikeParking
                 throw new Exception($"Overpass API request failed: {response.StatusCode} - {responseText}");
             }
 
-            var osmData = await ParseOverpassResponseAsync(responseText);
+            var osmData = await ParseOverpassResponseAsync(responseText, systemName);
 
             // Save the OSM data to bikeshare_osm.geojson file
             await SaveOsmDataAsync(osmData, systemName);
@@ -149,7 +149,9 @@ out meta;
         /// <summary>
         /// Parses the Overpass API JSON response into GeoPoint objects
         /// </summary>
-    private async Task<List<GeoPoint>> ParseOverpassResponseAsync(string jsonResponse)
+        /// <param name="jsonResponse">JSON response from Overpass API</param>
+        /// <param name="systemName">Name of the bike share system (for validation reporting)</param>
+    private async Task<List<GeoPoint>> ParseOverpassResponseAsync(string jsonResponse, string systemName)
         {
             var geoPoints = new List<GeoPoint>();
 
@@ -292,7 +294,70 @@ out meta;
                 }
             }
 
+            // Validate for duplicate ref values
+            await ValidateAndReportDuplicates(geoPoints, systemName);
+
             return geoPoints;
+        }
+
+        /// <summary>
+        /// Validates OSM data for duplicate ref values and generates a report if found
+        /// </summary>
+        private static async Task ValidateAndReportDuplicates(List<GeoPoint> geoPoints, string systemName)
+        {
+            // Group by ref ID, excluding auto-generated IDs (those starting with "osm_")
+            var duplicates = geoPoints
+                .Where(p => !string.IsNullOrEmpty(p.id) && !p.id.StartsWith("osm_"))
+                .GroupBy(p => p.id)
+                .Where(g => g.Count() > 1)
+                .ToList();
+
+            if (duplicates.Any())
+            {
+                var duplicateStations = duplicates.SelectMany(g => g).ToList();
+                var totalDuplicateRefs = duplicates.Count;
+                var totalAffectedStations = duplicateStations.Count;
+
+                // Log warning to console
+                Log.Warning("Found {DuplicateRefs} duplicate ref values in OSM data for {System}. " +
+                           "Total affected stations: {AffectedStations}. " +
+                           "See data_results/{System}/bikeshare_osm_duplicates.geojson for details",
+                           totalDuplicateRefs, systemName, totalAffectedStations, systemName);
+
+                // Log each duplicate ref with OSM element details
+                foreach (var dup in duplicates)
+                {
+                    var osmDetails = string.Join(", ", dup.Select(d => $"{d.osmType}/{d.osmId}"));
+                    Log.Warning("  Duplicate ref '{Ref}' found in {Count} OSM elements: {OsmIds}",
+                        dup.Key, dup.Count(), osmDetails);
+                }
+
+                // Generate GeoJSON file with duplicate stations for editor review
+                try
+                {
+                    await FileManager.WriteSystemGeoJsonFileAsync(
+                        systemName,
+                        "bikeshare_osm_duplicates.geojson",
+                        duplicateStations,
+                        point => GeoJsonGenerator.GenerateGeojsonLineWithError(
+                            point,
+                            systemName,
+                            $"Duplicate ref: {point.id} (OSM {point.osmType}/{point.osmId})"
+                        )
+                    );
+
+                    Log.Information("Duplicate validation report saved to data_results/{System}/bikeshare_osm_duplicates.geojson",
+                        systemName);
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "Could not save duplicate validation report for {System}", systemName);
+                }
+            }
+            else
+            {
+                Log.Debug("No duplicate ref values found in OSM data for {System}", systemName);
+            }
         }
 
         /// <summary>

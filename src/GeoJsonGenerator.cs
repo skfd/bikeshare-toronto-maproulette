@@ -70,6 +70,34 @@ namespace prepareBikeParking
                 oldName.Trim());
         }
 
+        public static string GenerateGeojsonLineWithError(GeoPoint point, string systemName, string errorMessage)
+        {
+            var template = "\u001e{{\"type\":\"FeatureCollection\"" +
+                ",\"features\":[{{\"type\":\"Feature\",\"geometry\":{{\"type\":\"Point\"," +
+                "\"coordinates\":[{0},{1}]}},\"properties\":{{" +
+                        "\"address\":\"{2}\"," +
+                        "\"latitude\":\"{1}\"," +
+                        "\"longitude\":\"{0}\"," +
+                        "\"name\":\"{3}\"," +
+                        "\"capacity\":\"{4}\"," +
+                        "\"operator\":\"{5}\"," +
+                        "\"error\":\"{6}\"," +
+                        "\"osmType\":\"{7}\"," +
+                        "\"osmId\":\"{8}\"}}}}]}}";
+
+            return string.Format(
+                template,
+                GeoPoint.ParseCoords(point.lon).ToString(System.Globalization.CultureInfo.InvariantCulture),
+                GeoPoint.ParseCoords(point.lat).ToString(System.Globalization.CultureInfo.InvariantCulture),
+                point.id,
+                point.name.Trim(),
+                point.capacity,
+                systemName,
+                errorMessage.Replace("\"", "\\\""),
+                point.osmType ?? "",
+                point.osmId ?? "");
+        }
+
         public static async Task GenerateOSMComparisonFilesAsync(List<GeoPoint> missingInOSM, List<GeoPoint> extraInOSM, List<GeoPoint> differentInOSM, List<(GeoPoint current, GeoPoint old)> renamedInOSM, string systemName)
         {
             Log.Information("Generating OSM comparison files for {SystemName}: Missing={Missing} Extra={Extra} Moved={Moved} Renamed={Renamed}", systemName, missingInOSM.Count, extraInOSM.Count, differentInOSM.Count, renamedInOSM.Count);

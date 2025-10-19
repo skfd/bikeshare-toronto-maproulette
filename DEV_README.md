@@ -10,6 +10,7 @@ Automate synchronization between official bike share (GBFS) station data and wha
 
 * Downloads current station data (GBFS `station_information.json`)
 * Compares against the last committed snapshot and OSM data (via custom Overpass queries)
+* Validates OSM data quality (detects duplicate ref values)
 * Produces rich GeoJSON diff + review files
 * (Optionally) creates Maproulette challenges for community mapping
 * Creates OSM changeset file for renamed stations (use JOSM to apply)
@@ -44,6 +45,7 @@ Automate synchronization between official bike share (GBFS) station data and wha
 * Multi‑system support (configure any GBFS network)
 * Automatic first‑run setup (directories, instruction templates, default Overpass query)
 * Git-aware diffing (compares with last committed GeoJSON state)
+* OSM data validation (duplicate ref detection with GeoJSON reports)
 * Structured JSON & GeoJSON outputs for downstream tooling
 * Deterministic station comparison (added / removed / moved / renamed)
 
@@ -71,8 +73,8 @@ Automate synchronization between official bike share (GBFS) station data and wha
 | `Program.cs` | CLI definition + logging bootstrap |
 | `BikeShareFlows.cs` | Orchestrated workflows (run, validate, test project) |
 | `BikeShareDataFetcher.cs` | GBFS API ingestion |
-| `OSMDataFetcher.cs` | Overpass fetch + caching of OSM station data |
-| `GeoJsonGenerator.cs` | GeoJSON & diff file creation |
+| `OSMDataFetcher.cs` | Overpass fetch + OSM data validation (duplicate ref detection) |
+| `GeoJsonGenerator.cs` | GeoJSON & diff file creation (including error reports) |
 | `BikeShareComparer.cs` | Spatial + attribute comparison logic |
 | `GitDiffToGeojson.cs` / `GitFunctions.cs` | Git history access for previous snapshot |
 | `MaprouletteTaskCreator.cs` | Challenge/task creation & validation |
@@ -185,6 +187,8 @@ All under: `data_results/<SYSTEM_NAME>/`
 | `bikeshare_removed.geojson` | Stations missing vs previous snapshot |
 | `bikeshare_moved.geojson` | Stations moved beyond threshold (coordinates changed) |
 | `bikeshare_renamed.geojson` | Name changed but same location |
+| `bikeshare_osm.geojson` | Current OSM station data |
+| `bikeshare_osm_duplicates.geojson` | **OSM data quality issues** (duplicate ref values, if found) |
 | `bikeshare_missing_in_osm.geojson` | Present in API, absent in OSM |
 | `bikeshare_extra_in_osm.geojson` | Present in OSM, absent in API |
 | `bikeshare_moved_in_osm.geojson` | Spatial divergence vs OSM data |
@@ -194,6 +198,32 @@ All under: `data_results/<SYSTEM_NAME>/`
 | `instructions/*.md` | Maproulette challenge/task templates |
 
 Diff GeoJSON lines are emitted as record‑separated objects (RS `\u001e`) for efficient streaming & git diff friendliness.
+
+### OSM Data Validation
+
+The tool automatically validates OSM data for quality issues during each run:
+
+**Duplicate `ref` Detection**
+- Identifies OSM stations with the same `ref` value
+- Excludes auto-generated IDs (starting with `osm_`) from validation
+- Generates `bikeshare_osm_duplicates.geojson` when duplicates are found
+- Logs warnings to console with OSM element details
+
+**Example Console Output:**
+```
+[WRN] Found 2 duplicate ref values in OSM data for BikeShareToronto.
+      Total affected stations: 5. See data_results/BikeShareToronto/bikeshare_osm_duplicates.geojson
+[WRN]   Duplicate ref '7001' found in 3 OSM elements: node/123456, node/234567, way/345678
+```
+
+**Using the Validation Report:**
+1. Open `bikeshare_osm_duplicates.geojson` in JOSM or iD editor
+2. Click on duplicate markers to see exact locations on the map
+3. Check the `error` property for details about each duplicate
+4. Fix the incorrect `ref` values in OpenStreetMap
+5. Re-run the sync to verify fixes
+
+This is non-blocking - the sync continues even if duplicates are found, allowing you to fix data quality issues separately.
 
 ---
 

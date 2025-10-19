@@ -6,9 +6,10 @@ This is a C#/.NET 8 application that synchronizes bike share station data from G
 ## Core Functionality
 1. **GBFS Data Fetching**: Downloads current station information from bike share APIs
 2. **OSM Comparison**: Queries Overpass API for existing OSM bike share stations
-3. **Diff Generation**: Creates GeoJSON files showing added/removed/moved/renamed stations
-4. **MapRoulette Integration**: Optionally creates mapping tasks for community resolution
-5. **OSM Changeset Generation**: Creates .osc files for batch station renames in JOSM
+3. **OSM Data Validation**: Detects duplicate ref values and generates validation reports
+4. **Diff Generation**: Creates GeoJSON files showing added/removed/moved/renamed stations
+5. **MapRoulette Integration**: Optionally creates mapping tasks for community resolution
+6. **OSM Changeset Generation**: Creates .osc files for batch station renames in JOSM
 
 ## Tech Stack & Dependencies
 - **Language**: C# with .NET 8
@@ -31,10 +32,17 @@ bikeshare-sync/
 │   └── prepareBikeParking.Tests.csproj
 ├── data_results/                  # Generated outputs (per system)
 │   └── <SYSTEM_NAME>/
-│       ├── bikeshare.geojson
-│       ├── bikeshare_added.geojson
-│       ├── bikeshare_removed.geojson
-│       └── stations.overpass
+│       ├── bikeshare.geojson              # Current GBFS data
+│       ├── bikeshare_added.geojson        # New stations (vs git)
+│       ├── bikeshare_removed.geojson      # Removed stations (vs git)
+│       ├── bikeshare_moved.geojson        # Moved stations (vs git)
+│       ├── bikeshare_renamed.geojson      # Renamed stations (vs git)
+│       ├── bikeshare_osm.geojson          # Current OSM data
+│       ├── bikeshare_osm_duplicates.geojson  # OSM validation issues (if found)
+│       ├── bikeshare_missing_in_osm.geojson  # Stations not in OSM
+│       ├── bikeshare_extra_in_osm.geojson    # OSM stations not in GBFS
+│       ├── bikeshare_renames.osc          # JOSM changeset for renames
+│       └── stations.overpass              # Overpass query for this system
 └── logs/                          # Rolling log files
 
 ```
@@ -85,9 +93,10 @@ dotnet clean
 2. GBFS data fetched and saved to `data_results/<SYSTEM>/bikeshare.geojson`
 3. Git diff computed against last committed version
 4. OSM data fetched using system-specific Overpass query
-5. Comparison generates multiple GeoJSON outputs
-6. Optional MapRoulette challenge creation
-7. OSC file generated for bulk renames
+5. **OSM data validated** for duplicate ref values (generates `bikeshare_osm_duplicates.geojson` if issues found)
+6. Comparison generates multiple GeoJSON outputs (diff and OSM comparison files)
+7. Optional MapRoulette challenge creation
+8. OSC file generated for bulk renames
 
 ## Testing Strategy
 - Unit tests for all core services
@@ -95,6 +104,7 @@ dotnet clean
 - Performance tests for large datasets
 - Idempotency tests for Overpass queries
 - Culture/formatting tests for internationalization
+- Data validation tests (duplicate detection, path sanitization, etc.)
 
 ## Security Considerations
 - API keys stored as environment variables, never in code
