@@ -18,6 +18,7 @@ This is a C#/.NET 8 application that synchronizes bike share station data from G
 - **Testing**: NUnit with Moq for mocking
 - **HTTP Parsing**: AngleSharp
 - **DI Container**: Microsoft.Extensions.DependencyInjection
+- **CI/CD**: Minimal GitHub Actions (build + test only)
 
 ## Project Structure
 ```
@@ -106,11 +107,29 @@ dotnet clean
 - Culture/formatting tests for internationalization
 - Data validation tests (duplicate detection, path sanitization, etc.)
 
-## Security Considerations
+## Security & Trust Model
+
+**This is a local workstation tool for trusted operators.**
+
+### Design Assumptions
+- Single user running on their own workstation
+- Operator controls all configuration files
+- No web interface, no remote access, no multi-user scenarios
+- System names come from `bikeshare_systems.json` (operator-maintained)
+- Data fetched from trusted public APIs (GBFS, Overpass)
+
+### Actual Security Measures
 - API keys stored as environment variables, never in code
-- Input validation on all external data
-- Rate limiting respect for external APIs
+- Basic path sanitization prevents accidental filesystem errors
 - No credentials stored in version control
+- HTTPS used for all API communications
+
+### Not Applicable
+This tool does NOT need protection against malicious input because:
+- The operator is the only user (you can't attack yourself)
+- All inputs are operator-controlled (config files, CLI args)
+- No untrusted data processing (just public GBFS/OSM data)
+- No multi-tenant or web service scenarios
 
 ## Common Tasks
 

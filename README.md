@@ -2,6 +2,18 @@
 
 Minimal operator guide. For full technical documentation see `DEV_README.md`.
 
+## Intended Use
+
+**This is a local workstation tool for trusted operators.**
+
+- Runs on your personal computer, not a server
+- You control all inputs (config files, command-line arguments)
+- Fetches data from trusted public APIs (GBFS feeds, Overpass API)
+- No web interface, no remote access, no multi-user scenarios
+- System names come from `bikeshare_systems.json` (which you maintain)
+
+**Trust model:** The tool trusts that you're not trying to attack yourself. Basic filesystem safety prevents accidental typos, not malicious input.
+
 ## What It Does
 Fetches official GBFS station data, compares it with:
 1. Previous committed snapshot

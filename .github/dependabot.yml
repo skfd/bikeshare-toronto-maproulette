@@ -1,63 +1,23 @@
-# Dependabot configuration for automated dependency updates
+# Dependabot configuration - keep dependencies updated
+# Note: For a single-maintainer local tool, you can also just run
+# 'dotnet list package --outdated' manually instead of using this.
+
 version: 2
 updates:
-  # Enable version updates for NuGet packages
+  # NuGet package updates - monthly is fine for a local tool
   - package-ecosystem: "nuget"
-    directory: "/src"
+    directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "03:00"
-    reviewers:
-      - "@your-username"  # Replace with actual GitHub username
-    labels:
-      - "dependencies"
-      - "nuget"
-    open-pull-requests-limit: 10
+      interval: "monthly"
+    open-pull-requests-limit: 5
     groups:
-      microsoft-packages:
+      all-dependencies:
         patterns:
-          - "Microsoft.*"
-          - "System.*"
-      serilog:
-        patterns:
-          - "Serilog*"
-      test-packages:
-        patterns:
-          - "NUnit*"
-          - "Moq"
-          - "coverlet*"
-          - "*Test*"
+          - "*"  # Group all updates into single PRs
 
-  # Enable version updates for GitHub Actions
+  # GitHub Actions updates
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "monthly"
-      day: "monday"
-      time: "03:00"
-    reviewers:
-      - "@your-username"  # Replace with actual GitHub username
-    labels:
-      - "dependencies"
-      - "github-actions"
-    open-pull-requests-limit: 5
-
-  # Enable version updates for test project
-  - package-ecosystem: "nuget"
-    directory: "/tests"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "03:00"
-    reviewers:
-      - "@your-username"  # Replace with actual GitHub username
-    labels:
-      - "dependencies"
-      - "nuget"
-      - "tests"
-    open-pull-requests-limit: 5
-    groups:
-      test-dependencies:
-        patterns:
-          - "*"
+    open-pull-requests-limit: 3

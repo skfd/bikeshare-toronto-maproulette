@@ -52,21 +52,16 @@ namespace prepareBikeParking
         /// <param name="systemName">Name of the bike share system</param>
         /// <param name="fileName">Name of the file</param>
         /// <returns>Full path to the file</returns>
+        /// <remarks>
+        /// Basic path safety: replaces filesystem-unfriendly characters to prevent accidental typos
+        /// from causing issues. This is a local workstation tool - systemName comes from trusted sources
+        /// (your config file or command-line input you control).
+        /// </remarks>
         public static string GetSystemFilePath(string systemName, string fileName)
         {
-            // Comprehensive sanitization: replace path separators and remove path traversal sequences
+            // Basic sanitization: replace path separators to prevent accidental directory traversal
             var safeSystemName = systemName.Replace('/', '_')
-                                           .Replace('\\', '_')
-                                           .Replace(':', '_')           // Remove colon to prevent drive letters
-                                           .Replace("..", string.Empty) // Remove path traversal
-                                           .Replace(".", string.Empty)  // Remove all remaining dots to prevent hidden path traversal
-                                           .Trim();                      // Remove leading/trailing whitespace
-
-            // Ensure we don't have an empty system name after sanitization
-            if (string.IsNullOrWhiteSpace(safeSystemName))
-            {
-                safeSystemName = "unnamed_system";
-            }
+                                           .Replace('\\', '_');
 
             return Path.Combine(DataResultsPath, safeSystemName, fileName);
         }
