@@ -1,1 +1,1 @@
-﻿
+﻿{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[-79.6,43.6]},"properties":{"address":"osm_way_5005","latitude":"43.6","longitude":"-79.6","name":"DeferredWay","capacity":"0","operator":"TestWayBatch"}}]}

@@ -149,7 +149,7 @@ out meta;
         /// <summary>
         /// Parses the Overpass API JSON response into GeoPoint objects
         /// </summary>
-    private static async Task<List<GeoPoint>> ParseOverpassResponseAsync(string jsonResponse)
+    private async Task<List<GeoPoint>> ParseOverpassResponseAsync(string jsonResponse)
         {
             var geoPoints = new List<GeoPoint>();
 
@@ -275,9 +275,8 @@ out meta;
             if (missingNodeIds.Count > 0)
             {
                 Log.Debug("Fetching {Count} missing nodes in batch for way centroids", missingNodeIds.Count);
-                // Use an instance to call FetchNodesBatchAsync
-                var fetcher = new OSMDataFetcher();
-                fetchedNodes = await fetcher.FetchNodesBatchAsync(missingNodeIds.ToList());
+                // Use this instance to call FetchNodesBatchAsync to reuse the client factory
+                fetchedNodes = await FetchNodesBatchAsync(missingNodeIds.ToList());
             }
 
             // Second pass: process way elements with fetched nodes

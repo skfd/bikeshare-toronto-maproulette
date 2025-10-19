@@ -54,10 +54,20 @@ namespace prepareBikeParking
         /// <returns>Full path to the file</returns>
         public static string GetSystemFilePath(string systemName, string fileName)
         {
-            // Basic sanitization: remove any path traversal characters
-            var safeSystemName = systemName.Replace("..", string.Empty)
-                                           .Replace('/', '_')
-                                           .Replace('\\', '_');
+            // Comprehensive sanitization: replace path separators and remove path traversal sequences
+            var safeSystemName = systemName.Replace('/', '_')
+                                           .Replace('\\', '_')
+                                           .Replace(':', '_')           // Remove colon to prevent drive letters
+                                           .Replace("..", string.Empty) // Remove path traversal
+                                           .Replace(".", string.Empty)  // Remove all remaining dots to prevent hidden path traversal
+                                           .Trim();                      // Remove leading/trailing whitespace
+
+            // Ensure we don't have an empty system name after sanitization
+            if (string.IsNullOrWhiteSpace(safeSystemName))
+            {
+                safeSystemName = "unnamed_system";
+            }
+
             return Path.Combine(DataResultsPath, safeSystemName, fileName);
         }
 
@@ -275,7 +285,9 @@ namespace prepareBikeParking
         /// <returns>Full path</returns>
         public static string GetFullPath(string relativePath)
         {
-            return Path.Combine(GetBasePath(), relativePath);
+            var combinedPath = Path.Combine(GetBasePath(), relativePath);
+            // Normalize the path to resolve any ".." sequences
+            return Path.GetFullPath(combinedPath);
         }
 
         /// <summary>

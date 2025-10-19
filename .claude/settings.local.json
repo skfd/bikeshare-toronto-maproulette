@@ -4,7 +4,10 @@
       "Bash(iconv:*)",
       "Bash(dotnet build)",
       "Bash(dotnet run:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(dotnet test)",
+      "Bash(dotnet restore)",
+      "Bash(dotnet test --filter \"PathSanitization_SystemNameDoesNotEscapeRoot\")"
     ],
     "deny": [],
     "ask": []
