@@ -364,6 +364,95 @@ out meta;
         }
 
         /// <summary>
+        /// Generates an enhanced duplicate report that includes GBFS data for comparison
+        /// </summary>
+        /// <param name="osmPoints">OSM data points that may contain duplicates</param>
+        /// <param name="gbfsPoints">GBFS/API data points for reference</param>
+        /// <param name="systemName">Name of the bike share system</param>
+        public static async Task GenerateEnhancedDuplicateReportAsync(List<GeoPoint> osmPoints, List<GeoPoint> gbfsPoints, string systemName)
+        {
+            // Find duplicate ref values in OSM data
+            var duplicates = osmPoints
+                .Where(p => !string.IsNullOrEmpty(p.id) && !p.id.StartsWith("osm_"))
+                .GroupBy(p => p.id)
+                .Where(g => g.Count() > 1)
+                .ToList();
+
+            if (!duplicates.Any())
+            {
+                Log.Debug("No duplicate ref values found - enhanced report not needed");
+                return;
+            }
+
+            var enhancedStations = new List<GeoPoint>();
+            var duplicateCounts = duplicates.ToDictionary(g => g.Key, g => g.Count());
+
+            foreach (var duplicateGroup in duplicates)
+            {
+                var refValue = duplicateGroup.Key;
+                var count = duplicateGroup.Count();
+
+                // Add all OSM stations with this duplicate ref
+                foreach (var osmStation in duplicateGroup)
+                {
+                    enhancedStations.Add(osmStation);
+                }
+
+                // Find matching GBFS station (if any) with this ref
+                var gbfsStation = gbfsPoints.FirstOrDefault(g => g.id == refValue);
+                if (gbfsStation != null)
+                {
+                    // Add GBFS station for comparison with special marker
+                    var gbfsForComparison = new GeoPoint
+                    {
+                        id = gbfsStation.id,
+                        name = gbfsStation.name,
+                        lat = gbfsStation.lat,
+                        lon = gbfsStation.lon,
+                        capacity = gbfsStation.capacity,
+                        osmType = "GBFS",  // Mark as GBFS data
+                        osmId = "official", // Mark as official source
+                        osmVersion = 0,
+                        osmXmlElement = default(JsonElement)
+                    };
+                    enhancedStations.Add(gbfsForComparison);
+                }
+            }
+
+            // Generate enhanced GeoJSON file
+            try
+            {
+                await FileManager.WriteSystemGeoJsonFileAsync(
+                    systemName,
+                    "bikeshare_osm_duplicates.geojson",
+                    enhancedStations,
+                    point => {
+                        var refValue = point.id;
+                        var count = duplicateCounts.ContainsKey(refValue) ? duplicateCounts[refValue] : 0;
+
+                        string errorMsg;
+                        if (point.osmType == "GBFS")
+                        {
+                            errorMsg = $"OFFICIAL GBFS DATA for ref '{refValue}' - Compare with OSM duplicates above to verify which is correct";
+                        }
+                        else
+                        {
+                            errorMsg = $"Duplicate ref '{refValue}' appears {count} times in OSM (this is OSM {point.osmType}/{point.osmId})";
+                        }
+
+                        return GeoJsonGenerator.GenerateGeojsonLineWithError(point, systemName, errorMsg);
+                    }
+                );
+
+                Log.Information("Enhanced duplicate report with GBFS comparison saved to data_results/{System}/bikeshare_osm_duplicates.geojson", systemName);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Failed to generate enhanced duplicate report for {System}", systemName);
+            }
+        }
+
+        /// <summary>
         /// Processes a way element and adds it to the geoPoints list
         /// </summary>
     private static void ProcessWayElement(JsonElement element, JsonElement tags, JsonElement nodeElement, List<GeoPoint> geoPoints)

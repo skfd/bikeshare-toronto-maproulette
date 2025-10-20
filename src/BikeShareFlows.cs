@@ -287,7 +287,9 @@ public class BikeShareFlows
                 .Select(GeoPoint.ParseLine)
                 .ToList();
 
-            var (addedPoints, removedPoints, movedPoints, renamedPoints) = _comparer.Compare(currentPoints, lastCommittedPoints, moveThreshold: 3);
+            var moveThreshold = system.GetMoveThresholdMeters();
+            Log.Debug("Using move threshold: {Threshold}m for {Name}", moveThreshold, system.Name);
+            var (addedPoints, removedPoints, movedPoints, renamedPoints) = _comparer.Compare(currentPoints, lastCommittedPoints, moveThreshold);
 
             await _geoWriter.WriteDiffAsync(addedPoints, removedPoints, movedPoints, renamedPoints, system.Name);
             Log.Information("Diff summary for {Name}: Added={Added} Removed={Removed} Moved={Moved} Renamed={Renamed}", system.Name, addedPoints.Count, removedPoints.Count, movedPoints.Count, renamedPoints.Count);
@@ -320,7 +322,13 @@ public class BikeShareFlows
             await _osmFetcher.EnsureStationsFileAsync(system.Name, system.City);
             var osmPoints = await _osmFetcher.FetchOsmStationsAsync(system.Name, system.City);
             Log.Information("Fetched {Count} OSM stations for {Name}", osmPoints.Count, system.Name);
-            var (missingInOSM, extraInOSM, differentInOSM, renamedInOSM) = _comparer.Compare(bikeshareApiPoints, osmPoints, moveThreshold: 30);
+
+            // Generate enhanced duplicate report with GBFS data for comparison
+            await OSMDataFetcher.GenerateEnhancedDuplicateReportAsync(osmPoints, bikeshareApiPoints, system.Name);
+
+            var osmComparisonThreshold = system.GetOsmComparisonThresholdMeters();
+            Log.Debug("Using OSM comparison threshold: {Threshold}m for {Name}", osmComparisonThreshold, system.Name);
+            var (missingInOSM, extraInOSM, differentInOSM, renamedInOSM) = _comparer.Compare(bikeshareApiPoints, osmPoints, osmComparisonThreshold);
             await _geoWriter.WriteOsmCompareAsync(missingInOSM, extraInOSM, differentInOSM, renamedInOSM, system.Name);
             await _osmChangeWriter.WriteRenameChangesAsync(renamedInOSM, system.Name);
             Log.Information("OSM comparison for {Name}: Missing={Missing} Extra={Extra} Moved={Moved} Renamed={Renamed}", system.Name, missingInOSM.Count, extraInOSM.Count, differentInOSM.Count, renamedInOSM.Count);

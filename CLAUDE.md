@@ -87,7 +87,11 @@ dotnet clean
 - `OVERPASS_API_URL`: Optional, defaults to public Overpass API
 
 ## Configuration Files
-- `bikeshare_systems.json`: System configurations with GBFS URLs and MapRoulette project IDs
+- `bikeshare_systems.json`: System configurations with GBFS URLs, MapRoulette project IDs, and optional thresholds
+  - `move_threshold_meters` (default: 3.0): Distance threshold for detecting moved stations in git diff
+  - `osm_comparison_threshold_meters` (default: 30.0): Distance threshold for matching stations with OSM
+  - `station_name_prefix`: Optional prefix to add to all station names
+  - `brand:wikidata`: Wikidata ID for the bike share brand
 - `stations.overpass`: Per-system Overpass queries (auto-generated on first run)
 - `instructions/*.md`: MapRoulette task templates (customizable per system)
 

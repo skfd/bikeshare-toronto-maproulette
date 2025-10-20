@@ -1,0 +1,13 @@
+[
+  {
+    "id": 1,
+    "name": "Example Bike Share System",
+    "city": "Example City",
+    "maproulette_project_id": 12345,
+    "gbfs_api": "https://example.com/gbfs/station_information.json",
+    "brand:wikidata": "Q12345",
+    "station_name_prefix": "Example Prefix - ",
+    "move_threshold_meters": 3.0,
+    "osm_comparison_threshold_meters": 30.0
+  }
+]

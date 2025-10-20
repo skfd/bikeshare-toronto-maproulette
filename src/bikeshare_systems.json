@@ -5,7 +5,9 @@
     "city": "Toronto",
     "maproulette_project_id": 60735,
     "gbfs_api": "https://tor.publicbikesystem.net/ube/gbfs/v1/en/station_information.json",
-    "brand:wikidata": "Q17018523"
+    "brand:wikidata": "Q17018523",
+    "move_threshold_meters": 3.0,
+    "osm_comparison_threshold_meters": 30.0
   },
   {
     "id": 2,
@@ -13,7 +15,9 @@
     "city": "Montréal",
     "maproulette_project_id": 60735,
     "gbfs_api": "https://gbfs.velobixi.com/gbfs/2-2/en/station_information.json",
-    "brand:wikidata": "Q386"
+    "brand:wikidata": "Q386",
+    "move_threshold_meters": 3.0,
+    "osm_comparison_threshold_meters": 30.0
   },
   {
     "id": 3,
@@ -21,7 +25,9 @@
     "city": "la ville de Québec",
     "maproulette_project_id": 60735,
     "gbfs_api": "https://quebec.publicbikesystem.net/customer/ube/gbfs/v1/en/station_information",
-    "brand:wikidata": "Q131564019"
+    "brand:wikidata": "Q131564019",
+    "move_threshold_meters": 3.0,
+    "osm_comparison_threshold_meters": 30.0
   },
   {
     "id": 4,
@@ -30,6 +36,8 @@
     "maproulette_project_id": 60735,
     "gbfs_api": "https://gbfs.lyft.com/gbfs/2.3/bkn/en/station_information.json",
     "brand:wikidata": "Q2974438",
-    "station_name_prefix": "Citi Bike - "
+    "station_name_prefix": "Citi Bike - ",
+    "move_threshold_meters": 3.0,
+    "osm_comparison_threshold_meters": 30.0
   }
 ]

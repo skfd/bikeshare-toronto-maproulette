@@ -224,32 +224,70 @@ namespace prepareBikeParking
             }
 
             var challengeName = $"{challengeDescription}";
+            HttpResponseMessage? challengeResponse = null;
+            string errorContent = "";
+            int attempt = 0;
+            const int maxAttempts = 3;
 
-            // Create challenge
-            var challengeData = new
+            // Try to create challenge, handling duplicate name errors
+            while (attempt < maxAttempts)
             {
-                name = challengeName,
-                description = challengeDescription,
-                instruction = instruction,
-                checkinComment = $"{taskType} stations changeset for {challengeName}",
-                blurb = instruction,
-                enabled = true,
-                difficulty = taskType == "removed" ? 2 : (taskType == "added" ? 3 : 2),
-                requiresLocal = false,
-                parent = projectId
-            };
+                attempt++;
 
-            var challengeResponse = await client.PostAsync(
-                "https://maproulette.org/api/v2/challenge",
-                new StringContent(JsonSerializer.Serialize(challengeData), Encoding.UTF8, new System.Net.Http.Headers.MediaTypeHeaderValue("application/json"))
-            );
+                // Create challenge data with current name
+                var challengeData = new
+                {
+                    name = challengeName,
+                    description = challengeDescription,
+                    instruction = instruction,
+                    checkinComment = $"{taskType} stations changeset for {challengeName}",
+                    blurb = instruction,
+                    enabled = true,
+                    difficulty = taskType == "removed" ? 2 : (taskType == "added" ? 3 : 2),
+                    requiresLocal = false,
+                    parent = projectId
+                };
 
-            if (!challengeResponse.IsSuccessStatusCode)
+                challengeResponse = await client.PostAsync(
+                    "https://maproulette.org/api/v2/challenge",
+                    new StringContent(JsonSerializer.Serialize(challengeData), Encoding.UTF8, new System.Net.Http.Headers.MediaTypeHeaderValue("application/json"))
+                );
+
+                if (challengeResponse.IsSuccessStatusCode)
+                {
+                    // Success! Break out of retry loop
+                    goto ChallengeCreated;
+                }
+
+                errorContent = await challengeResponse.Content.ReadAsStringAsync();
+
+                // Check if it's a duplicate name error
+                if (challengeResponse.StatusCode == System.Net.HttpStatusCode.InternalServerError &&
+                    errorContent.Contains("already exists in the database"))
+                {
+                    if (attempt < maxAttempts)
+                    {
+                        // Append timestamp to make name unique
+                        challengeName = $"{challengeDescription} ({DateTime.Now:HH:mm:ss})";
+                        Serilog.Log.Information("Challenge name already exists, retrying with: {Name}", challengeName);
+                        continue;
+                    }
+                    else
+                    {
+                        Serilog.Log.Error("Failed to create {Type} challenge after {Attempts} attempts - name still conflicts", taskType, maxAttempts);
+                        throw new InvalidOperationException($"Failed to create {taskType} challenge: A challenge with a similar name already exists. Please delete the existing challenge or wait before retrying.");
+                    }
+                }
+
+                // For other errors, don't retry
+                break;
+            }
+
+            // Handle non-duplicate errors
+            if (challengeResponse != null)
             {
-                var errorContent = await challengeResponse.Content.ReadAsStringAsync();
                 Serilog.Log.Error("Failed to create {Type} challenge: {Error}", taskType, errorContent);
 
-                // Provide helpful error messages based on common issues
                 if (challengeResponse.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                 {
                     Serilog.Log.Information("Authorization failure likely due to invalid API key or insufficient permissions");
@@ -262,6 +300,17 @@ namespace prepareBikeParking
                 }
 
                 throw new InvalidOperationException($"Failed to create {taskType} challenge. HTTP Status: {challengeResponse.StatusCode}, Response: {errorContent}");
+            }
+            else
+            {
+                throw new InvalidOperationException($"Failed to create {taskType} challenge: Unknown error occurred");
+            }
+
+            ChallengeCreated:
+
+            if (challengeResponse == null)
+            {
+                throw new InvalidOperationException($"Failed to create {taskType} challenge: No response received");
             }
 
             var challengeResult = JsonSerializer.Deserialize<JsonElement>(await challengeResponse.Content.ReadAsStringAsync());

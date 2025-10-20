@@ -90,5 +90,18 @@ All GeoJSON lines are record‑separated with an initial `\u001e` control charac
 
 Full details: see `SETUP_NEW_SYSTEM.md` or `DEV_README.md`.
 
+## Configuration Options
+
+Each system in `bikeshare_systems.json` supports optional configuration fields. For complete details, see **[CONFIGURATION.md](CONFIGURATION.md)**.
+
+Key optional fields:
+- **`move_threshold_meters`** (default: 3.0): Distance threshold for detecting moved stations
+- **`osm_comparison_threshold_meters`** (default: 30.0): Distance threshold for OSM comparison
+- **`station_name_prefix`**: Prefix to add to station names (e.g., `"Citi Bike - "`)
+- **`brand:wikidata`**: Wikidata ID for the bike share brand
+- **`maproulette_project_id`**: MapRoulette project ID for task creation
+
+See `bikeshare_systems.example.json` for a complete configuration example.
+
 ## Need More Detail?
 See: `DEV_README.md` for architecture, development, logging, troubleshooting.
