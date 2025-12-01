@@ -64,7 +64,7 @@ try
     var systemIdArg = new Argument<int>("system-id") { Description = "Numeric system ID from bikeshare_systems.json" };
     var runCommand = new Command("run", "Run comparison for a system");
     runCommand.Arguments.Add(systemIdArg);
-    runCommand.SetAction(async (System.CommandLine.ParseResult parseResult) =>
+    runCommand.SetAction(async (ParseResult parseResult) =>
     {
         var id = parseResult.GetValue(systemIdArg);
         var verbose = parseResult.GetValue(verboseOption);
@@ -76,7 +76,7 @@ try
     });
 
     root.Arguments.Add(systemIdArg); // treat root invocation same as run
-    root.SetAction(async (System.CommandLine.ParseResult parseResult) =>
+    root.SetAction(async (ParseResult parseResult) =>
     {
         var id = parseResult.GetValue(systemIdArg);
         var verbose = parseResult.GetValue(verboseOption);
@@ -89,13 +89,13 @@ try
 
     // list systems
     var listCommand = new Command("list", "List available systems");
-    listCommand.SetAction(async (System.CommandLine.ParseResult parseResult) => await BikeShareSystemLoader.ListAvailableSystemsAsync());
+    listCommand.SetAction(async (ParseResult parseResult) => await BikeShareSystemLoader.ListAvailableSystemsAsync());
 
     // validate system setup
     var validateSystemIdArg = new Argument<int>("system-id") { Description = "System ID to validate" };
     var validateCommand = new Command("validate", "Validate system configuration & instructions");
     validateCommand.Arguments.Add(validateSystemIdArg);
-    validateCommand.SetAction(async (System.CommandLine.ParseResult parseResult) => 
+    validateCommand.SetAction(async (ParseResult parseResult) => 
     {
         var id = parseResult.GetValue(validateSystemIdArg);
         await provider.GetRequiredService<BikeShareFlows>().ValidateSystemAsync(id);
@@ -105,7 +105,7 @@ try
     var projectIdArg = new Argument<int>("project-id") { Description = "Maproulette project ID to test" };
     var testProjectCommand = new Command("test-project", "Validate Maproulette project accessibility");
     testProjectCommand.Arguments.Add(projectIdArg);
-    testProjectCommand.SetAction(async (System.CommandLine.ParseResult parseResult) => 
+    testProjectCommand.SetAction(async (ParseResult parseResult) => 
     {
         var pid = parseResult.GetValue(projectIdArg);
         await provider.GetRequiredService<BikeShareFlows>().TestProjectAsync(pid);
@@ -114,7 +114,7 @@ try
 
     // save-global-service command
     var saveGlobalServiceCommand = new Command("save-global-service", "Download and save the global GBFS service provider list");
-    saveGlobalServiceCommand.SetAction(async (System.CommandLine.ParseResult parseResult) =>
+    saveGlobalServiceCommand.SetAction(async (ParseResult parseResult) =>
     {
         var filePath = Path.Combine("data_results", "global_gbfs_services.csv");
         await GlobalGbfsServiceFetcher.SaveGlobalServiceListAsync(filePath);
@@ -122,10 +122,10 @@ try
     });
 
     // fetch-brand-tags command
-    var fetchBrandTagsSystemIdArg = new Argument<int?>("system-id") { Description = "System ID to fetch brand tags for (optional - fetches for all systems if not specified)", DefaultValueFactory = _ => null };
+    var fetchBrandTagsSystemIdArg = new Argument<int?>("system-id") { Description = "System ID to fetch brand tags for (optional - fetches for all systems if not specified)" };
     var fetchBrandTagsCommand = new Command("fetch-brand-tags", "Fetch OSM brand tags from Name Suggestion Index for bike share systems");
     fetchBrandTagsCommand.Arguments.Add(fetchBrandTagsSystemIdArg);
-    fetchBrandTagsCommand.SetAction(async (System.CommandLine.ParseResult parseResult) =>
+    fetchBrandTagsCommand.SetAction(async (ParseResult parseResult) =>
     {
         var systemId = parseResult.GetValue(fetchBrandTagsSystemIdArg);
         if (systemId.HasValue)
@@ -157,7 +157,7 @@ try
     var setupSystemIdArg = new Argument<int>("system-id") { Description = "Numeric system ID to scaffold (no data fetch)" };
     var setupCommand = new Command("setup", "Create instruction templates and overpass file for a system");
     setupCommand.Arguments.Add(setupSystemIdArg);
-    setupCommand.SetAction(async (System.CommandLine.ParseResult parseResult) => {
+    setupCommand.SetAction(async (ParseResult parseResult) => {
         var id = parseResult.GetValue(setupSystemIdArg);
         try
         {
