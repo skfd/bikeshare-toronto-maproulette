@@ -54,54 +54,67 @@ try
     var root = new RootCommand("Bike Share Location Comparison Tool");
 
     // Global options for verbosity
-    var verboseOption = new Option<bool>(
-        aliases: new[] { "--verbose", "-v" },
-        description: "Show detailed logging output");
-    var quietOption = new Option<bool>(
-        aliases: new[] { "--quiet", "-q" },
-        description: "Show minimal output (errors and summary only)");
+    var verboseOption = new Option<bool>("--verbose", "-v") { Description = "Show detailed logging output" };
+    var quietOption = new Option<bool>("--quiet", "-q") { Description = "Show minimal output (errors and summary only)" };
 
-    root.AddGlobalOption(verboseOption);
-    root.AddGlobalOption(quietOption);
+    root.Options.Add(verboseOption);
+    root.Options.Add(quietOption);
 
     // run command & root default
-    var systemIdArg = new Argument<int>("system-id", description: "Numeric system ID from bikeshare_systems.json");
-    var runCommand = new Command("run", "Run comparison for a system") { systemIdArg };
-    runCommand.SetHandler(async (int id, bool verbose, bool quiet) =>
+    var systemIdArg = new Argument<int>("system-id") { Description = "Numeric system ID from bikeshare_systems.json" };
+    var runCommand = new Command("run", "Run comparison for a system");
+    runCommand.Arguments.Add(systemIdArg);
+    runCommand.SetAction(async (ParseResult parseResult) =>
     {
+        var id = parseResult.GetValue(systemIdArg);
+        var verbose = parseResult.GetValue(verboseOption);
+        var quiet = parseResult.GetValue(quietOption);
         ConsoleUI.IsVerbose = verbose;
         ConsoleUI.IsQuiet = quiet;
         ConsoleUI.ConfigureLogging();
         await provider.GetRequiredService<BikeShareFlows>().RunSystemFlow(id);
-    }, systemIdArg, verboseOption, quietOption);
+    });
 
-    root.AddArgument(systemIdArg); // treat root invocation same as run
-    root.SetHandler(async (int id, bool verbose, bool quiet) =>
+    root.Arguments.Add(systemIdArg); // treat root invocation same as run
+    root.SetAction(async (ParseResult parseResult) =>
     {
+        var id = parseResult.GetValue(systemIdArg);
+        var verbose = parseResult.GetValue(verboseOption);
+        var quiet = parseResult.GetValue(quietOption);
         ConsoleUI.IsVerbose = verbose;
         ConsoleUI.IsQuiet = quiet;
         ConsoleUI.ConfigureLogging();
         await provider.GetRequiredService<BikeShareFlows>().RunSystemFlow(id);
-    }, systemIdArg, verboseOption, quietOption);
+    });
 
     // list systems
     var listCommand = new Command("list", "List available systems");
-    listCommand.SetHandler(async () => await BikeShareSystemLoader.ListAvailableSystemsAsync());
+    listCommand.SetAction(async (ParseResult parseResult) => await BikeShareSystemLoader.ListAvailableSystemsAsync());
 
     // validate system setup
-    var validateSystemIdArg = new Argument<int>("system-id", "System ID to validate");
-    var validateCommand = new Command("validate", "Validate system configuration & instructions") { validateSystemIdArg };
-    validateCommand.SetHandler(async (int id) => await provider.GetRequiredService<BikeShareFlows>().ValidateSystemAsync(id), validateSystemIdArg);
+    var validateSystemIdArg = new Argument<int>("system-id") { Description = "System ID to validate" };
+    var validateCommand = new Command("validate", "Validate system configuration & instructions");
+    validateCommand.Arguments.Add(validateSystemIdArg);
+    validateCommand.SetAction(async (ParseResult parseResult) => 
+    {
+        var id = parseResult.GetValue(validateSystemIdArg);
+        await provider.GetRequiredService<BikeShareFlows>().ValidateSystemAsync(id);
+    });
 
     // test maproulette project
-    var projectIdArg = new Argument<int>("project-id", "Maproulette project ID to test");
-    var testProjectCommand = new Command("test-project", "Validate Maproulette project accessibility") { projectIdArg };
-    testProjectCommand.SetHandler(async (int pid) => await provider.GetRequiredService<BikeShareFlows>().TestProjectAsync(pid), projectIdArg);
+    var projectIdArg = new Argument<int>("project-id") { Description = "Maproulette project ID to test" };
+    var testProjectCommand = new Command("test-project", "Validate Maproulette project accessibility");
+    testProjectCommand.Arguments.Add(projectIdArg);
+    testProjectCommand.SetAction(async (ParseResult parseResult) => 
+    {
+        var pid = parseResult.GetValue(projectIdArg);
+        await provider.GetRequiredService<BikeShareFlows>().TestProjectAsync(pid);
+    });
 
 
     // save-global-service command
     var saveGlobalServiceCommand = new Command("save-global-service", "Download and save the global GBFS service provider list");
-    saveGlobalServiceCommand.SetHandler(async () =>
+    saveGlobalServiceCommand.SetAction(async (ParseResult parseResult) =>
     {
         var filePath = Path.Combine("data_results", "global_gbfs_services.csv");
         await GlobalGbfsServiceFetcher.SaveGlobalServiceListAsync(filePath);
@@ -109,10 +122,12 @@ try
     });
 
     // fetch-brand-tags command
-    var fetchBrandTagsSystemIdArg = new Argument<int?>("system-id", () => null, "System ID to fetch brand tags for (optional - fetches for all systems if not specified)");
-    var fetchBrandTagsCommand = new Command("fetch-brand-tags", "Fetch OSM brand tags from Name Suggestion Index for bike share systems") { fetchBrandTagsSystemIdArg };
-    fetchBrandTagsCommand.SetHandler(async (int? systemId) =>
+    var fetchBrandTagsSystemIdArg = new Argument<int?>("system-id") { Description = "System ID to fetch brand tags for (optional - fetches for all systems if not specified)" };
+    var fetchBrandTagsCommand = new Command("fetch-brand-tags", "Fetch OSM brand tags from Name Suggestion Index for bike share systems");
+    fetchBrandTagsCommand.Arguments.Add(fetchBrandTagsSystemIdArg);
+    fetchBrandTagsCommand.SetAction(async (ParseResult parseResult) =>
     {
+        var systemId = parseResult.GetValue(fetchBrandTagsSystemIdArg);
         if (systemId.HasValue)
         {
             // Fetch for specific system
@@ -129,19 +144,21 @@ try
             var successCount = await NameSuggestionIndexFetcher.FetchAndSaveOsmTagsForAllSystemsAsync();
             Log.Information("Brand tags fetch completed for {Success} systems", successCount);
         }
-    }, fetchBrandTagsSystemIdArg);
+    });
 
-    root.AddCommand(runCommand);
-    root.AddCommand(listCommand);
-    root.AddCommand(validateCommand);
-    root.AddCommand(testProjectCommand);
-    root.AddCommand(saveGlobalServiceCommand);
-    root.AddCommand(fetchBrandTagsCommand);
+    root.Subcommands.Add(runCommand);
+    root.Subcommands.Add(listCommand);
+    root.Subcommands.Add(validateCommand);
+    root.Subcommands.Add(testProjectCommand);
+    root.Subcommands.Add(saveGlobalServiceCommand);
+    root.Subcommands.Add(fetchBrandTagsCommand);
 
     // setup-system command (scaffolds only and exits)
-    var setupSystemIdArg = new Argument<int>("system-id", description: "Numeric system ID to scaffold (no data fetch)");
-    var setupCommand = new Command("setup", "Create instruction templates and overpass file for a system") { setupSystemIdArg };
-    setupCommand.SetHandler(async (int id) => {
+    var setupSystemIdArg = new Argument<int>("system-id") { Description = "Numeric system ID to scaffold (no data fetch)" };
+    var setupCommand = new Command("setup", "Create instruction templates and overpass file for a system");
+    setupCommand.Arguments.Add(setupSystemIdArg);
+    setupCommand.SetAction(async (ParseResult parseResult) => {
+        var id = parseResult.GetValue(setupSystemIdArg);
         try
         {
             var sys = await provider.GetRequiredService<IBikeShareSystemLoader>().LoadByIdAsync(id);
@@ -155,10 +172,10 @@ try
         {
             Log.Error(ex, "Setup failed for system {Id}", id);
         }
-    }, setupSystemIdArg);
-    root.AddCommand(setupCommand);
+    });
+    root.Subcommands.Add(setupCommand);
 
-    var exitCode = await root.InvokeAsync(args);
+    var exitCode = await root.Parse(args).InvokeAsync();
     Log.Information("Exiting with code {Code}", exitCode);
     return exitCode;
 }
