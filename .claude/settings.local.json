@@ -12,7 +12,9 @@
       "Bash(dotnet build --configuration Release)",
       "Bash(dotnet test --configuration Release --verbosity normal)",
       "Bash(dotnet add package Spectre.Console)",
-      "Bash(dotnet test --configuration Release --verbosity quiet)"
+      "Bash(dotnet test --configuration Release --verbosity quiet)",
+      "Bash(dotnet build:*)",
+      "Bash(dotnet test:*)"
     ],
     "deny": [],
     "ask": []
