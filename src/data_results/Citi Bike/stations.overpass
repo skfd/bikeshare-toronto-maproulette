@@ -1,7 +1,7 @@
 ﻿[out:json];
 
 (
-  area[name="City of New York"][border_type=city];
+  area[name="New York"][border_type=city];
   area[name="Jersey City"][border_type=city];
   area[wikidata="Q138578"][border_type=city];
 )->.city;
