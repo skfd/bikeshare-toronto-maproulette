@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using Serilog;
 using Serilog.Events;
 using Spectre.Console;
@@ -99,5 +101,22 @@ public static class ConsoleUI
     {
         if (IsQuiet) return;
         AnsiConsole.MarkupLine($"[grey]{Markup.Escape(message)}[/]");
+    }
+
+    /// <summary>
+    /// Operator checklist printed at the end of a run. Each item is an action
+    /// the operator still needs to take. Always shown (even in quiet mode) so
+    /// nothing slips through.
+    /// </summary>
+    public static void PrintChecklist(string title, IEnumerable<string> items)
+    {
+        var list = items.ToList();
+        if (list.Count == 0) return;
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine($"[bold magenta]{Markup.Escape(title)}[/]");
+        foreach (var item in list)
+        {
+            AnsiConsole.MarkupLine($"  [magenta][[ ]][/] {Markup.Escape(item)}");
+        }
     }
 }

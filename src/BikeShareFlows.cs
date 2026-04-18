@@ -200,6 +200,8 @@ public class BikeShareFlows
 
     private async Task RunBikeShareLocationComparison(BikeShareSystem system, bool projectValidForTasks)
     {
+        var summary = new FlowSummary();
+
         bool newlyCreated = false;
         try
         {
@@ -259,8 +261,8 @@ public class BikeShareFlows
         }
 
         await _geoWriter.WriteMainAsync(locationsList, system.Name);
-        await CompareAndGenerateDiffFiles(locationsList, system, isNewSystem);
-        var osmOk = await CompareWithOSMData(locationsList, system);
+        await CompareAndGenerateDiffFiles(locationsList, system, isNewSystem, summary);
+        var osmOk = await CompareWithOSMData(locationsList, system, summary);
         if (!osmOk)
         {
             return;
@@ -268,7 +270,8 @@ public class BikeShareFlows
 
         // Check for duplicate ref values and prompt to create tasks
         var duplicatesFile = _paths.GetSystemFullPath(system.Name, "bikeshare_osm_duplicates.geojson");
-        if (File.Exists(duplicatesFile) && system.MaprouletteProjectId > 0 && projectValidForTasks)
+        summary.DuplicatesFileExists = File.Exists(duplicatesFile);
+        if (summary.DuplicatesFileExists && system.MaprouletteProjectId > 0 && projectValidForTasks)
         {
             var confirmDuplicates = _prompt.ReadConfirmation("Duplicate ref values found in OSM. Create MapRoulette tasks to fix them?", 'n');
             if (confirmDuplicates.ToString().ToLower() == "y")
@@ -281,6 +284,7 @@ public class BikeShareFlows
                     await _maproulette.CreateDuplicateTasksAsync(system.MaprouletteProjectId, system.Name);
                     Log.Information("Duplicate detection tasks created successfully");
                     ConsoleUI.PrintSuccess("Duplicate detection tasks created.");
+                    summary.DuplicateTasksCreated = true;
                 }
                 catch (Exception ex)
                 {
@@ -300,6 +304,7 @@ public class BikeShareFlows
         {
             Log.Warning("Skipping Maproulette task creation for {Name} (no valid project).", system.Name);
             ConsoleUI.PrintWarning($"Skipping MapRoulette task creation for {system.Name} (no valid project).");
+            PrintOperatorChecklist(system, summary);
             return;
         }
 
@@ -308,6 +313,7 @@ public class BikeShareFlows
         {
             Log.Information("User declined task creation.");
             ConsoleUI.PrintInfo("Task creation skipped.");
+            PrintOperatorChecklist(system, summary);
             return;
         }
 
@@ -315,6 +321,7 @@ public class BikeShareFlows
         {
             _systemSetup.ValidateInstructionFiles(system.Name);
             await _maproulette.CreateTasksAsync(system.MaprouletteProjectId, lastSyncDate ?? DateTime.UtcNow, system.Name, isNewSystem);
+            summary.NewLocationTasksCreated = true;
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("instruction files"))
         {
@@ -328,9 +335,11 @@ public class BikeShareFlows
             ConsoleUI.PrintError($"Error creating MapRoulette tasks for {system.Name}: {ex.Message}");
             throw;
         }
+
+        PrintOperatorChecklist(system, summary);
     }
 
-    private async Task CompareAndGenerateDiffFiles(List<GeoPoint> currentPoints, BikeShareSystem system, bool isNewSystem = false)
+    private async Task CompareAndGenerateDiffFiles(List<GeoPoint> currentPoints, BikeShareSystem system, bool isNewSystem, FlowSummary summary)
     {
         ConsoleUI.PrintStep($"Comparing with last committed version of {system.Name}");
         Log.Information("Comparing current data with last committed version for {Name}", system.Name);
@@ -354,31 +363,37 @@ public class BikeShareFlows
             ConsoleUI.PrintStat("removed", removedPoints.Count);
             ConsoleUI.PrintStat("moved", movedPoints.Count);
             ConsoleUI.PrintStat("renamed", renamedPoints.Count);
+
+            summary.GbfsAddedVsGit = addedPoints.Count;
+            summary.GbfsRemovedVsGit = removedPoints.Count;
+            summary.GbfsMovedVsGit = movedPoints.Count;
+            summary.GbfsRenamedVsGit = renamedPoints.Count;
         }
         catch (FileNotFoundException ex) when (ex.Message.Contains("not found in git repository"))
         {
             Log.Warning("No previous version in git for {Name}; treating all stations as added.", system.Name);
             ConsoleUI.PrintWarning($"No previous version in git for {system.Name}; treating all stations as added.");
-            await GenerateNewSystemDiffFiles(currentPoints, system);
+            await GenerateNewSystemDiffFiles(currentPoints, system, summary);
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Git comparison failed for {Name}; treating all stations as added.", system.Name);
             ConsoleUI.PrintError($"Git comparison failed ({ex.Message}); treating all stations as added.");
-            await GenerateNewSystemDiffFiles(currentPoints, system);
+            await GenerateNewSystemDiffFiles(currentPoints, system, summary);
         }
     }
 
-    private async Task GenerateNewSystemDiffFiles(List<GeoPoint> currentPoints, BikeShareSystem system)
+    private async Task GenerateNewSystemDiffFiles(List<GeoPoint> currentPoints, BikeShareSystem system, FlowSummary summary)
     {
         var emptyList = new List<GeoPoint>();
         var emptyTupleList = new List<(GeoPoint current, GeoPoint old)>();
         await _geoWriter.WriteDiffAsync(currentPoints, emptyList, emptyList, emptyTupleList, system.Name);
         Log.Information("Generated diff files for new system {Name}: {Count} added", system.Name, currentPoints.Count);
         ConsoleUI.PrintSuccess($"New system {system.Name}: {currentPoints.Count} stations recorded as added.");
+        summary.GbfsAddedVsGit = currentPoints.Count;
     }
 
-    private async Task<bool> CompareWithOSMData(List<GeoPoint> bikeshareApiPoints, BikeShareSystem system)
+    private async Task<bool> CompareWithOSMData(List<GeoPoint> bikeshareApiPoints, BikeShareSystem system, FlowSummary summary)
     {
         ConsoleUI.PrintStep($"Fetching OSM stations for {system.Name}");
         Log.Information("Fetching OSM stations for {Name}", system.Name);
@@ -413,6 +428,79 @@ public class BikeShareFlows
         ConsoleUI.PrintStat("extra in OSM", extraInOSM.Count);
         ConsoleUI.PrintStat("moved", differentInOSM.Count);
         ConsoleUI.PrintStat("renamed", renamedInOSM.Count);
+
+        summary.MissingInOsm = missingInOSM.Count;
+        summary.ExtraInOsm = extraInOSM.Count;
+        summary.MovedInOsm = differentInOSM.Count;
+        summary.RenamedInOsm = renamedInOSM.Count;
         return true;
+    }
+
+    private static void PrintOperatorChecklist(BikeShareSystem system, FlowSummary summary)
+    {
+        var items = new List<string>();
+
+        if (summary.RenamedInOsm > 0)
+        {
+            items.Add($"Load data_results/{system.Name}/bikeshare_renames.osc in JOSM, verify, and upload — {summary.RenamedInOsm} rename(s) pending.");
+        }
+
+        if (summary.DuplicatesFileExists)
+        {
+            if (summary.DuplicateTasksCreated)
+            {
+                items.Add($"Complete the MapRoulette duplicate-ref tasks created for {system.Name}.");
+            }
+            else
+            {
+                items.Add($"Review data_results/{system.Name}/bikeshare_osm_duplicates.geojson and resolve duplicate ref values in OSM.");
+            }
+        }
+
+        if (summary.MissingInOsm > 0)
+        {
+            if (summary.NewLocationTasksCreated)
+            {
+                items.Add($"Complete MapRoulette tasks for {summary.MissingInOsm} station(s) missing in OSM.");
+            }
+            else
+            {
+                items.Add($"Add {summary.MissingInOsm} station(s) missing in OSM (see bikeshare_missing_in_osm.geojson) — no MapRoulette tasks were created.");
+            }
+        }
+
+        if (summary.ExtraInOsm > 0)
+        {
+            items.Add($"Review bikeshare_extra_in_osm.geojson — {summary.ExtraInOsm} OSM station(s) not present in GBFS.");
+        }
+
+        if (summary.MovedInOsm > 0)
+        {
+            items.Add($"Review bikeshare_moved_in_osm.geojson — {summary.MovedInOsm} station(s) moved vs OSM.");
+        }
+
+        if (summary.HasGbfsDiff)
+        {
+            items.Add($"Commit updated data_results/{system.Name}/bikeshare.geojson as the next baseline.");
+        }
+
+        ConsoleUI.PrintChecklist($"Next steps for {system.Name}:", items);
+    }
+
+    private sealed class FlowSummary
+    {
+        public int GbfsAddedVsGit { get; set; }
+        public int GbfsRemovedVsGit { get; set; }
+        public int GbfsMovedVsGit { get; set; }
+        public int GbfsRenamedVsGit { get; set; }
+        public int MissingInOsm { get; set; }
+        public int ExtraInOsm { get; set; }
+        public int MovedInOsm { get; set; }
+        public int RenamedInOsm { get; set; }
+        public bool DuplicatesFileExists { get; set; }
+        public bool DuplicateTasksCreated { get; set; }
+        public bool NewLocationTasksCreated { get; set; }
+
+        public bool HasGbfsDiff => GbfsAddedVsGit + GbfsRemovedVsGit + GbfsMovedVsGit + GbfsRenamedVsGit > 0;
     }
 }
