@@ -1,0 +1,1 @@
+﻿{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[-79.2,43.1]},"properties":{"address":"R3","latitude":"43.1","longitude":"-79.2","name":"Failover","capacity":"0","operator":"TestFailover"}}]}

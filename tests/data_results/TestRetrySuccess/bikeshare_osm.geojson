@@ -1,0 +1,1 @@
+﻿{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[-79.2,43.1]},"properties":{"address":"R1","latitude":"43.1","longitude":"-79.2","name":"Retry","capacity":"0","operator":"TestRetrySuccess"}}]}
