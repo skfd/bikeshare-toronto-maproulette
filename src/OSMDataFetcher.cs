@@ -474,7 +474,7 @@ out meta;
         /// <summary>
         /// Processes a way element and adds it to the geoPoints list
         /// </summary>
-    private static void ProcessWayElement(JsonElement element, JsonElement tags, JsonElement nodeElement, List<GeoPoint> geoPoints, bool isDisused = false)
+    private static void ProcessWayElement(JsonElement element, JsonElement tags, JsonElement nodeElement, List<GeoPoint> geoPoints, bool isDisused)
         {
             var geoPoint = new GeoPoint
             {
