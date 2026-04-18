@@ -115,9 +115,6 @@ namespace prepareBikeParking
                   node(area.city)[bicycle_rental=docking_station];
                   way(area.city)[bicycle_rental=docking_station];
                   relation(area.city)[bicycle_rental=docking_station];
-                  node(area.city)[""disused:amenity""=bicycle_rental];
-                  way(area.city)[""disused:amenity""=bicycle_rental];
-                  relation(area.city)[""disused:amenity""=bicycle_rental];
                 );
 
                 out meta;
@@ -140,9 +137,6 @@ area[name=""{cityName}""]->.city;
     node(area.city)[bicycle_rental=docking_station];
     way(area.city)[bicycle_rental=docking_station];
     relation(area.city)[bicycle_rental=docking_station];
-    node(area.city)[""disused:amenity""=bicycle_rental];
-    way(area.city)[""disused:amenity""=bicycle_rental];
-    relation(area.city)[""disused:amenity""=bicycle_rental];
 );
 
 out meta;
