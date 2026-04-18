@@ -101,9 +101,19 @@ dotnet clean
 3. Git diff computed against last committed version
 4. OSM data fetched using system-specific Overpass query
 5. **OSM data validated** for duplicate ref values (generates `bikeshare_osm_duplicates.geojson` if issues found)
-6. Comparison generates multiple GeoJSON outputs (diff and OSM comparison files)
-7. Optional MapRoulette challenge creation
-8. OSC file generated for bulk renames
+6. **Temporarily disused stations** (tagged `disused:amenity=bicycle_rental`) are detected and excluded from the "extra in OSM" removal list
+7. Comparison generates multiple GeoJSON outputs (diff and OSM comparison files)
+8. Optional MapRoulette challenge creation
+9. OSC file generated for bulk renames
+
+## Disused Station Handling
+Stations tagged with `disused:amenity=bicycle_rental` in OSM are considered temporarily closed. These are:
+- Parsed from Overpass results (whether they also have `bicycle_rental=docking_station` or not)
+- Marked with `IsDisused = true` on the `GeoPoint` model
+- **Excluded from `bikeshare_extra_in_osm.geojson`** to prevent creating removal tasks for temporarily closed stations
+- Logged with a warning listing each skipped station's ID, name, and OSM element
+
+Custom `stations.overpass` files should include `["disused:amenity"=bicycle_rental]` queries to detect these stations. Default generated queries include them automatically.
 
 ## Testing Strategy
 - Unit tests for all core services

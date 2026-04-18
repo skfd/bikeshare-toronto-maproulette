@@ -133,6 +133,22 @@ instructions/*.md                     # MapRoulette task templates
 ```
 All GeoJSON lines are record‑separated with an initial `\u001e` control character. Keep this format.
 
+## Temporarily Disused Stations
+
+OSM stations tagged with `disused:amenity=bicycle_rental` are treated as **temporarily disused** and are automatically excluded from the "extra in OSM" removal list (`bikeshare_extra_in_osm.geojson`). This prevents creating MapRoulette tasks that would suggest removing stations that are only temporarily closed.
+
+When disused stations are detected, the tool:
+- Logs a warning listing each skipped station (ID, name, OSM type/ID)
+- Displays a console warning with the count of skipped stations
+- Excludes them from `bikeshare_extra_in_osm.geojson`
+
+**Note for custom Overpass queries:** If you maintain a custom `stations.overpass` file, add queries for `disused:amenity=bicycle_rental` to ensure these stations are detected:
+```
+node(area.city)["disused:amenity"=bicycle_rental];
+way(area.city)["disused:amenity"=bicycle_rental];
+```
+Newly generated default queries include these automatically.
+
 ## Adding A System (Summary)
 1. Add entry to `bikeshare_systems.json`
 2. Run `dotnet run -- <id>` (scaffolds folders + templates)
