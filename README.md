@@ -51,10 +51,32 @@ dotnet run -- 1 -q      # run with quiet output
 8. Separately apply rename changes using generated `bikeshare_renames.osc` in JOSM
 
 ## Required To Create Tasks
-Set environment variable before running:
+Set `MAPROULETTE_API_KEY` before running. Pick whichever matches your shell:
+
 ```bash
+# Git Bash / WSL / macOS / Linux (current shell only)
 export MAPROULETTE_API_KEY="<your key>"
+
+# PowerShell (current shell only)
+$env:MAPROULETTE_API_KEY = "<your key>"
+
+# PowerShell (persistent, user-level)
+[Environment]::SetEnvironmentVariable("MAPROULETTE_API_KEY", "<your key>", "User")
+
+# cmd.exe (current shell only)
+set MAPROULETTE_API_KEY=<your key>
+
+# cmd.exe (persistent, user-level)
+setx MAPROULETTE_API_KEY "<your key>"
 ```
+
+Verify it's set:
+```bash
+echo "$MAPROULETTE_API_KEY"          # bash
+echo $env:MAPROULETTE_API_KEY        # PowerShell
+echo %MAPROULETTE_API_KEY%           # cmd
+```
+
 Ensure system entry has `"maproulette_project_id": <id>`.
 
 ## Operator Responsibilities
