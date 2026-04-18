@@ -1,4 +1,5 @@
 ﻿using System.CommandLine;
+using System.Diagnostics;
 using Serilog;
 using Serilog.Events;
 using prepareBikeParking;
@@ -174,6 +175,107 @@ try
         }
     });
     root.Subcommands.Add(setupCommand);
+
+    // reset command (restores tracked output files, deletes untracked ones)
+    var resetSystemIdArg = new Argument<int>("system-id") { Description = "System ID to reset generated data for" };
+    var resetCommand = new Command("reset", "Reset generated output files for a system (preserves config and instructions)");
+    resetCommand.Arguments.Add(resetSystemIdArg);
+    resetCommand.SetAction(async (ParseResult parseResult) =>
+    {
+        var id = parseResult.GetValue(resetSystemIdArg);
+        try
+        {
+            var sys = await provider.GetRequiredService<IBikeShareSystemLoader>().LoadByIdAsync(id);
+            var systemDir = Path.GetDirectoryName(FileManager.GetSystemFullPath(sys.Name, "x"));
+            if (systemDir == null || !Directory.Exists(systemDir))
+            {
+                Log.Warning("No data directory found for {System}", sys.Name);
+                return;
+            }
+
+            // Collect all generated output files (.geojson, .osc)
+            var outputFiles = new List<string>();
+            foreach (var pattern in new[] { "*.geojson", "*.osc" })
+                outputFiles.AddRange(Directory.GetFiles(systemDir, pattern));
+
+            if (outputFiles.Count == 0)
+            {
+                Log.Information("No generated files to reset for {System}", sys.Name);
+                return;
+            }
+
+            // Ask git which files in this directory are tracked
+            var psi = new ProcessStartInfo
+            {
+                FileName = "git",
+                Arguments = $"ls-files \"{systemDir.Replace('\\', '/')}\"",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            var trackedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            using (var proc = Process.Start(psi))
+            {
+                if (proc != null)
+                {
+                    string? line;
+                    while ((line = proc.StandardOutput.ReadLine()) != null)
+                    {
+                        if (!string.IsNullOrWhiteSpace(line))
+                            trackedPaths.Add(Path.GetFullPath(line.Trim()));
+                    }
+                    proc.WaitForExit();
+                }
+            }
+
+            var tracked = new List<string>();
+            var untracked = new List<string>();
+            foreach (var file in outputFiles)
+            {
+                if (trackedPaths.Contains(Path.GetFullPath(file)))
+                    tracked.Add(file);
+                else
+                    untracked.Add(file);
+            }
+
+            // Restore tracked files to their last committed state
+            if (tracked.Count > 0)
+            {
+                var checkoutArgs = "checkout HEAD -- " + string.Join(" ",
+                    tracked.Select(f => $"\"{f.Replace('\\', '/')}\""));
+                var checkoutPsi = new ProcessStartInfo
+                {
+                    FileName = "git",
+                    Arguments = checkoutArgs,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                using var proc = Process.Start(checkoutPsi);
+                if (proc != null)
+                {
+                    proc.WaitForExit();
+                    if (proc.ExitCode != 0)
+                    {
+                        var err = proc.StandardError.ReadToEnd();
+                        Log.Warning("git checkout failed: {Error}", err);
+                    }
+                }
+            }
+
+            // Delete untracked files
+            foreach (var file in untracked)
+                File.Delete(file);
+
+            Log.Information("Reset {System}: restored {Tracked} tracked files, deleted {Untracked} untracked files",
+                sys.Name, tracked.Count, untracked.Count);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Reset failed for system {Id}", id);
+        }
+    });
+    root.Subcommands.Add(resetCommand);
 
     var exitCode = await root.Parse(args).InvokeAsync();
     Log.Information("Exiting with code {Code}", exitCode);
