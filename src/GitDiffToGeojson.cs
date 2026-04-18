@@ -16,7 +16,8 @@ namespace prepareBikeParking
 
         public static string GetLastCommittedVersion(string filePath)
         {
-            string command = $"show HEAD:\"{filePath.Replace('\\','/')}\"";
+            var gitPath = ToRepoRelativePath(filePath);
+            string command = $"show HEAD:\"{gitPath}\"";
             string arguments = "";
 
             ProcessStartInfo startInfo = new ProcessStartInfo
@@ -72,6 +73,42 @@ namespace prepareBikeParking
             }
 
             return output.ToString();
+        }
+
+        private static string ToRepoRelativePath(string filePath)
+        {
+            if (!Path.IsPathRooted(filePath))
+            {
+                return filePath.Replace('\\', '/');
+            }
+
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "git",
+                Arguments = "rev-parse --show-toplevel",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8
+            };
+
+            using var process = Process.Start(startInfo);
+            if (process == null)
+            {
+                return filePath.Replace('\\', '/');
+            }
+
+            var repoRoot = process.StandardOutput.ReadToEnd().Trim();
+            process.WaitForExit();
+            if (process.ExitCode != 0 || string.IsNullOrEmpty(repoRoot))
+            {
+                return filePath.Replace('\\', '/');
+            }
+
+            var relative = Path.GetRelativePath(repoRoot, filePath);
+            return relative.Replace('\\', '/');
         }
 
         public static (List<string>, List<string>) Compare(string @new = "HEAD", string old = "", string? filePath = null)
