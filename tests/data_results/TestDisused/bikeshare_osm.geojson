@@ -1,0 +1,1 @@
+﻿{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[-79.5,43.5]},"properties":{"address":"D1","latitude":"43.5","longitude":"-79.5","name":"Disused Station","capacity":"0","operator":"TestDisused"}}]}

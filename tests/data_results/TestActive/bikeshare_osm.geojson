@@ -1,0 +1,1 @@
+﻿{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[-79.7,43.7]},"properties":{"address":"A1","latitude":"43.7","longitude":"-79.7","name":"Active Station","capacity":"0","operator":"TestActive"}}]}
