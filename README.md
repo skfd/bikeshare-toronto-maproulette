@@ -87,6 +87,35 @@ Ensure system entry has `"maproulette_project_id": <id>`.
 - Load `bikeshare_renames.osc` in JOSM and upload after verifying on imagery / ground truth
 - Commit updated `bikeshare.geojson` so next run has a baseline
 
+## MapRoulette Workflow
+
+The per-task loop we use when resolving challenges. Keep JOSM open in the background with **Remote Control** enabled (*JOSM → Preferences → Remote Control → Enable remote control*) so MapRoulette can hand tasks off to it.
+
+### The loop
+Repeat for each task:
+
+1. **In MapRoulette** — click the task's suggested tags to copy them to the clipboard, then press **`R`** to send the feature to JOSM.
+2. **`Alt+Tab`** to JOSM.
+3. Make the edit (move the node, paste tags, rename, etc.).
+4. **`Ctrl+Shift+↑`** — open the upload dialog.
+5. **`Ctrl+Enter`** — confirm the upload.
+6. **`Alt+Tab`** back to MapRoulette.
+7. **`F`** — mark the task as *Fixed*.
+8. **`Shift+Tab`** — advance to the next task.
+
+### Other MapRoulette completion keys
+Use instead of `F` when the situation calls for it:
+
+| Key | Status              | When to use                                  |
+|-----|---------------------|----------------------------------------------|
+| `F` | Fixed               | You made the edit in JOSM.                   |
+| `X` | Already Fixed       | Someone already resolved it; no edit needed. |
+| `Q` | Not an Issue        | The task is a false positive.                |
+| `D` | Too Difficult       | Can't verify from imagery / ground truth.    |
+| `W` | Skip                | Come back to it later.                       |
+
+References: [MapRoulette keyboard shortcuts](https://learn.maproulette.org/en-US/documentation/using-keyboard-shortcuts/) · [JOSM shortcuts](https://josm.openstreetmap.de/wiki/Shortcuts).
+
 ## Key Files (per system)
 ```
 bikeshare.geojson                     # Current GBFS data

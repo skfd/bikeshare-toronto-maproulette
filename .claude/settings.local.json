@@ -19,7 +19,9 @@
       "Bash(git commit -m ' *)",
       "Bash(git push *)",
       "WebSearch",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "WebFetch(domain:learn.maproulette.org)",
+      "WebFetch(domain:josm.openstreetmap.de)"
     ],
     "deny": [],
     "ask": []
