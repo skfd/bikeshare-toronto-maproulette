@@ -194,7 +194,7 @@ out meta;
 
             // First pass: collect all missing node IDs for batch retrieval
             var missingNodeIds = new HashSet<long>();
-            var wayElements = new List<(JsonElement element, JsonElement tags, long firstNodeId)>();
+            var wayElements = new List<(JsonElement element, JsonElement tags, long firstNodeId, bool isDisused)>();
 
             foreach (var element in elements.EnumerateArray())
             {
@@ -209,9 +209,12 @@ out meta;
 
                 if (type == "node")
                 {
-                    // Check if it's a bikeshare station
-                    if (tags.TryGetProperty("bicycle_rental", out var rentalProp) &&
-                        rentalProp.GetString() == "docking_station")
+                    // Check if it's a bikeshare station (active or disused)
+                    var isDockingStation = tags.TryGetProperty("bicycle_rental", out var rentalProp) &&
+                        rentalProp.GetString() == "docking_station";
+                    var isDisused = IsDisusedStation(tags);
+
+                    if (isDockingStation || isDisused)
                     {
                         var geoPoint = new GeoPoint
                         {
@@ -219,6 +222,7 @@ out meta;
                             name = string.Empty,
                             lat = "0",
                             lon = "0",
+                            IsDisused = isDisused,
                             osmId = element.GetProperty("id").GetInt64().ToString(),
                             osmType = type,
                             osmVersion = element.GetProperty("version").GetInt32(),
@@ -273,9 +277,12 @@ out meta;
                 }
                 else if (type == "way")
                 {
-                    // Check if it's a bikeshare station
-                    if (tags.TryGetProperty("bicycle_rental", out var rentalProp) &&
-                        rentalProp.GetString() == "docking_station")
+                    // Check if it's a bikeshare station (active or disused)
+                    var isDockingStation = tags.TryGetProperty("bicycle_rental", out var rentalProp) &&
+                        rentalProp.GetString() == "docking_station";
+                    var isDisused = IsDisusedStation(tags);
+
+                    if (isDockingStation || isDisused)
                     {
                         // Get the nodes array from the way
                         if (element.TryGetProperty("nodes", out var nodesProperty) &&
@@ -292,13 +299,13 @@ out meta;
                                 if (nodeElement.HasValue)
                                 {
                                     // Process immediately if node is found
-                                    ProcessWayElement(element, tags, nodeElement.Value, geoPoints);
+                                    ProcessWayElement(element, tags, nodeElement.Value, geoPoints, isDisused);
                                 }
                                 else
                                 {
                                     // Store for batch retrieval
                                     missingNodeIds.Add(firstNodeId);
-                                    wayElements.Add((element, tags, firstNodeId));
+                                    wayElements.Add((element, tags, firstNodeId, isDisused));
                                 }
                             }
                         }
@@ -316,11 +323,11 @@ out meta;
             }
 
             // Second pass: process way elements with fetched nodes
-            foreach (var (element, tags, firstNodeId) in wayElements)
+            foreach (var (element, tags, firstNodeId, isDisused) in wayElements)
             {
                 if (fetchedNodes.TryGetValue(firstNodeId, out var nodeElement))
                 {
-                    ProcessWayElement(element, tags, nodeElement, geoPoints);
+                    ProcessWayElement(element, tags, nodeElement, geoPoints, isDisused);
                 }
                 else
                 {
@@ -491,7 +498,7 @@ out meta;
         /// <summary>
         /// Processes a way element and adds it to the geoPoints list
         /// </summary>
-    private static void ProcessWayElement(JsonElement element, JsonElement tags, JsonElement nodeElement, List<GeoPoint> geoPoints)
+    private static void ProcessWayElement(JsonElement element, JsonElement tags, JsonElement nodeElement, List<GeoPoint> geoPoints, bool isDisused)
         {
             var geoPoint = new GeoPoint
             {
@@ -499,6 +506,7 @@ out meta;
                 name = string.Empty,
                 lat = "0",
                 lon = "0",
+                IsDisused = isDisused,
                 osmId = element.GetProperty("id").GetInt64().ToString(),
                 osmType = "way",
                 osmVersion = element.GetProperty("version").GetInt32(),
@@ -549,6 +557,16 @@ out meta;
             {
                 geoPoints.Add(geoPoint);
             }
+        }
+
+        /// <summary>
+        /// Checks if an OSM element's tags indicate a temporarily disused station.
+        /// A station is considered disused if it has the tag disused:amenity=bicycle_rental.
+        /// </summary>
+        private static bool IsDisusedStation(JsonElement tags)
+        {
+            return tags.TryGetProperty("disused:amenity", out var disusedProp) &&
+                   disusedProp.GetString() == "bicycle_rental";
         }
 
         /// <summary>

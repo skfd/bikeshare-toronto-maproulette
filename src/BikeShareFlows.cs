@@ -420,12 +420,31 @@ public class BikeShareFlows
         var osmComparisonThreshold = system.GetOsmComparisonThresholdMeters();
         Log.Debug("Using OSM comparison threshold: {Threshold}m for {Name}", osmComparisonThreshold, system.Name);
         var (missingInOSM, extraInOSM, differentInOSM, renamedInOSM) = _comparer.Compare(bikeshareApiPoints, osmPoints, osmComparisonThreshold);
-        await _geoWriter.WriteOsmCompareAsync(missingInOSM, extraInOSM, differentInOSM, renamedInOSM, system.Name);
+
+        // Separate temporarily disused stations from the extra-in-OSM list
+        var disusedStations = extraInOSM.Where(p => p.IsDisused).ToList();
+        var activeExtraInOSM = extraInOSM.Where(p => !p.IsDisused).ToList();
+
+        if (disusedStations.Count > 0)
+        {
+            Log.Warning("Skipped {Count} temporarily disused station(s) in OSM for {Name} (tagged disused:amenity=bicycle_rental). " +
+                        "These are excluded from the extra-in-OSM removal list.",
+                        disusedStations.Count, system.Name);
+            foreach (var station in disusedStations)
+            {
+                Log.Warning("  Disused station skipped: {Id} \"{StationName}\" (OSM {OsmType}/{OsmId})",
+                    station.id, station.name, station.osmType ?? "unknown", station.osmId ?? "unknown");
+            }
+            ConsoleUI.PrintWarning($"Skipped {disusedStations.Count} temporarily disused station(s) from extra-in-OSM (disused:amenity=bicycle_rental).");
+        }
+
+        await _geoWriter.WriteOsmCompareAsync(missingInOSM, activeExtraInOSM, differentInOSM, renamedInOSM, system.Name);
         await _osmChangeWriter.WriteRenameChangesAsync(renamedInOSM, system.Name);
-        Log.Information("OSM comparison for {Name}: Missing={Missing} Extra={Extra} Moved={Moved} Renamed={Renamed}", system.Name, missingInOSM.Count, extraInOSM.Count, differentInOSM.Count, renamedInOSM.Count);
+        Log.Information("OSM comparison for {Name}: Missing={Missing} Extra={Extra} Moved={Moved} Renamed={Renamed} DisusedSkipped={Disused}",
+            system.Name, missingInOSM.Count, activeExtraInOSM.Count, differentInOSM.Count, renamedInOSM.Count, disusedStations.Count);
         ConsoleUI.PrintSuccess("GBFS vs OSM comparison:");
         ConsoleUI.PrintStat("missing in OSM", missingInOSM.Count);
-        ConsoleUI.PrintStat("extra in OSM", extraInOSM.Count);
+        ConsoleUI.PrintStat("extra in OSM", activeExtraInOSM.Count);
         ConsoleUI.PrintStat("moved", differentInOSM.Count);
         ConsoleUI.PrintStat("renamed", renamedInOSM.Count);
 

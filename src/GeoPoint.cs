@@ -18,6 +18,7 @@ public class GeoPoint
     public int capacity { get; set; }
     public required string lat { get; set; }
     public required string lon { get; set; }
+    public bool IsDisused { get; set; }
     public string? osmId { get; set; }
     public string? osmType { get; internal set; }
     public int osmVersion { get; internal set; }

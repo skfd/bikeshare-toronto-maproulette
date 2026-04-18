@@ -309,4 +309,52 @@ public class OSMDataFetcherTests
         // No duplicate report should be created for auto-generated IDs
         Assert.That(System.IO.File.Exists(duplicateReportPath), Is.False, "Auto-generated osm_ IDs should not trigger duplicate validation");
     }
+
+    [Test]
+    public async Task Parse_DisusedStation_MarkedAsDisused()
+    {
+        // Station with disused:amenity=bicycle_rental AND bicycle_rental=docking_station
+        var node = new Dictionary<string, object>
+        {
+            { "type", "node" }, { "id", 5001 }, { "version", 1 }, { "lat", 43.5 }, { "lon", -79.5 },
+            { "tags", new Dictionary<string, string>
+                { { "bicycle_rental", "docking_station" }, { "name", "Disused Station" }, { "ref", "D1" }, { "disused:amenity", "bicycle_rental" } }
+            }
+        };
+        var json = WrapElements(node);
+        var fetcher = new OSMDataFetcher(new Factory(new StubHandler(new[]{(HttpStatusCode.OK, json)})));
+        var result = await fetcher.FetchFromOverpassApiAsync("TestDisused");
+        Assert.That(result.Count, Is.EqualTo(1));
+        Assert.That(result[0].id, Is.EqualTo("D1"));
+        Assert.That(result[0].IsDisused, Is.True, "Station with disused:amenity=bicycle_rental should be marked as disused");
+    }
+
+    [Test]
+    public async Task Parse_DisusedOnlyStation_Parsed()
+    {
+        // Station with only disused:amenity=bicycle_rental (no bicycle_rental=docking_station)
+        var node = new Dictionary<string, object>
+        {
+            { "type", "node" }, { "id", 5002 }, { "version", 1 }, { "lat", 43.6 }, { "lon", -79.6 },
+            { "tags", new Dictionary<string, string>
+                { { "name", "Disused Only" }, { "ref", "D2" }, { "disused:amenity", "bicycle_rental" } }
+            }
+        };
+        var json = WrapElements(node);
+        var fetcher = new OSMDataFetcher(new Factory(new StubHandler(new[]{(HttpStatusCode.OK, json)})));
+        var result = await fetcher.FetchFromOverpassApiAsync("TestDisusedOnly");
+        Assert.That(result.Count, Is.EqualTo(1));
+        Assert.That(result[0].id, Is.EqualTo("D2"));
+        Assert.That(result[0].IsDisused, Is.True, "Station with only disused:amenity should be parsed and marked as disused");
+    }
+
+    [Test]
+    public async Task Parse_ActiveStation_NotMarkedAsDisused()
+    {
+        var node = new { type="node", id=5003, version=1, lat=43.7, lon=-79.7, tags=new { bicycle_rental="docking_station", name="Active Station", @ref="A1" } };
+        var fetcher = new OSMDataFetcher(new Factory(new StubHandler(new[]{(HttpStatusCode.OK, WrapElements(node))})));
+        var result = await fetcher.FetchFromOverpassApiAsync("TestActive");
+        Assert.That(result.Count, Is.EqualTo(1));
+        Assert.That(result[0].IsDisused, Is.False, "Active station should not be marked as disused");
+    }
 }
