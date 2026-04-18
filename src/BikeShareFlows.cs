@@ -74,26 +74,31 @@ public class BikeShareFlows
         var projectValidForTasks = false;
         if (system.MaprouletteProjectId > 0)
         {
+            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("MAPROULETTE_API_KEY")))
+            {
+                systemLogger.Error("MAPROULETTE_API_KEY environment variable is not set. Set it before running, or set MaprouletteProjectId to 0 in bikeshare_systems.json to skip task creation. Aborting.");
+                return;
+            }
+
             systemLogger.Information("Validating Maproulette project. ProjectId: {ProjectId}", system.MaprouletteProjectId);
             try
             {
                 var projectValid = await _maproulette.ValidateProjectAsync(system.MaprouletteProjectId);
                 if (!projectValid)
                 {
-                    systemLogger.Warning("Maproulette project validation failed. ProjectId: {ProjectId}, Action: SkippingTaskCreation",
+                    systemLogger.Error("Maproulette project validation failed. ProjectId: {ProjectId}. Aborting.",
                         system.MaprouletteProjectId);
+                    return;
                 }
-                else
-                {
-                    systemLogger.Information("Maproulette project validated successfully. ProjectId: {ProjectId}",
-                        system.MaprouletteProjectId);
-                    projectValidForTasks = true;
-                }
+                systemLogger.Information("Maproulette project validated successfully. ProjectId: {ProjectId}",
+                    system.MaprouletteProjectId);
+                projectValidForTasks = true;
             }
             catch (Exception ex)
             {
-                systemLogger.Error(ex, "Maproulette project validation error. ProjectId: {ProjectId}, Action: ContinuingWithoutTasks",
+                systemLogger.Error(ex, "Maproulette project validation error. ProjectId: {ProjectId}. Aborting.",
                     system.MaprouletteProjectId);
+                return;
             }
         }
         else

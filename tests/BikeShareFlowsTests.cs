@@ -12,9 +12,24 @@ public class BikeShareFlowsTests
 {
     private GeoPoint Pt(string id, string name) => new GeoPoint{ id=id, name=name, capacity=0, lat="43.0", lon="-79.0"};
 
+    private static IDisposable SetApiKey(string value)
+    {
+        var prev = Environment.GetEnvironmentVariable("MAPROULETTE_API_KEY");
+        Environment.SetEnvironmentVariable("MAPROULETTE_API_KEY", value);
+        return new EnvRestore("MAPROULETTE_API_KEY", prev);
+    }
+
+    private sealed class EnvRestore : IDisposable
+    {
+        private readonly string _name; private readonly string? _prev;
+        public EnvRestore(string name, string? prev){ _name=name; _prev=prev; }
+        public void Dispose(){ Environment.SetEnvironmentVariable(_name, _prev); }
+    }
+
     [Test]
     public async Task RunSystemFlow_ExistingSystem_GeneratesMainDiffAndOsmCompare_NoTasksWhenDeclined()
     {
+        using var _env = SetApiKey("test-key");
         var system = new BikeShareSystem { Id=1, Name="TestSys", City="CityX", GbfsApi="https://example", MaprouletteProjectId=123 };
         var currentPoints = new List<GeoPoint>{ Pt("1","Old"), Pt("2","New") };
         var previousPoints = new List<GeoPoint>{ Pt("1","Old") };
@@ -143,6 +158,7 @@ public class BikeShareFlowsTests
     [Test]
     public async Task RunSystemFlow_ProjectValidationFails_TasksNotCreated()
     {
+        using var _env = SetApiKey("test-key");
         var system = new BikeShareSystem { Id=3, Name="ValFail", City="CityZ", GbfsApi="https://example", MaprouletteProjectId=999 };
         var currentPoints = new List<GeoPoint>{ Pt("1","A") };
 
@@ -194,9 +210,10 @@ public class BikeShareFlowsTests
 
         var flows = new BikeShareFlows(fetcher.Object, osmFetcher.Object, geoWriter.Object, comparer.Object, git.Object, maproulette.Object, setupSvc.Object, paths.Object, prompt.Object, loader.Object, osmChangeWriter.Object);
         await flows.RunSystemFlow(system.Id);
-        // Should not attempt task creation, but still write main output
+        // Validation failure aborts the run — no fetch, no writes, no task creation
         maproulette.Verify(m => m.CreateTasksAsync(It.IsAny<int>(), It.IsAny<DateTime>(), system.Name, It.IsAny<bool>()), Times.Never);
-        geoWriter.Verify(w => w.WriteMainAsync(currentPoints, system.Name), Times.Once);
+        geoWriter.Verify(w => w.WriteMainAsync(It.IsAny<List<GeoPoint>>(), It.IsAny<string>()), Times.Never);
+        fetcher.Verify(f => f.FetchStationsAsync(It.IsAny<string>()), Times.Never);
     }
 
     [Test]
