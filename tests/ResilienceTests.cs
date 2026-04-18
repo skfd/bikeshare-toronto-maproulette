@@ -39,13 +39,4 @@ public class ResilienceTests
         }
     }
 
-    [Test]
-    public void OverpassFailureInFlow_LogsAndDoesNotThrow()
-    {
-        // Simulate Overpass failure by using OSMDataFetcher with handler that always fails
-        var fetcher = new prepareBikeParking.OSMDataFetcher(new prepareBikeParking.Tests.OSMDataFetcherTests.Factory(new System.Net.Http.HttpClientHandler()));
-        // The handler will not be used in flow, but this test is a placeholder for integration
-        // Actual flow test would require orchestration mock
-        Assert.Pass("Integration test for flow error resilience would require orchestration mock");
-    }
 }

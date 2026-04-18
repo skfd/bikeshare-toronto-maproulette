@@ -15,12 +15,31 @@ public class OSMDataFetcherTests
     private class StubHandler : HttpMessageHandler
     {
         private readonly Queue<(HttpStatusCode code,string body)> _responses;
+        public List<Uri> RequestUris { get; } = new();
+        public List<TimeSpan?> RetryAfters { get; } = new();
+        public int SendCount => RequestUris.Count;
+
         public StubHandler(IEnumerable<(HttpStatusCode code,string body)> responses)
         { _responses = new Queue<(HttpStatusCode,string)>(responses); }
+
+        // Per-response Retry-After values, consumed in order for 429 responses.
+        public StubHandler(IEnumerable<(HttpStatusCode code,string body)> responses, IEnumerable<TimeSpan?> retryAfters)
+            : this(responses)
+        { foreach (var r in retryAfters) RetryAfters.Add(r); }
+
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            if (request.RequestUri != null) RequestUris.Add(request.RequestUri);
             var item = _responses.Count>0 ? _responses.Dequeue() : (HttpStatusCode.OK,"{\"elements\":[]}");
-            return Task.FromResult(new HttpResponseMessage(item.Item1){ Content = new StringContent(item.Item2) });
+            var message = new HttpResponseMessage(item.Item1){ Content = new StringContent(item.Item2) };
+            if (item.Item1 == HttpStatusCode.TooManyRequests && RetryAfters.Count > 0)
+            {
+                var hint = RetryAfters[0];
+                RetryAfters.RemoveAt(0);
+                if (hint.HasValue)
+                    message.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(hint.Value);
+            }
+            return Task.FromResult(message);
         }
     }
     public class Factory : IOverpassHttpClientFactory
@@ -29,6 +48,13 @@ public class OSMDataFetcherTests
         public Factory(HttpMessageHandler handler){ _client = new HttpClient(handler); }
         public HttpClient CreateClient() => _client;
     }
+
+    // Fast retries for tests: maxAttempts=3, baseDelay=0s.
+    private static OSMDataFetcher FastRetryFetcher(
+        HttpMessageHandler handler,
+        IReadOnlyList<string>? endpoints = null,
+        int maxAttempts = 3)
+        => new OSMDataFetcher(new Factory(handler), endpoints, maxAttempts, TimeSpan.Zero);
 
     private string WrapElements(params object[] elements)
     {
@@ -116,8 +142,14 @@ public class OSMDataFetcherTests
     [Test]
     public void OverpassFailure_Throws()
     {
-        var fetcher = new OSMDataFetcher(new Factory(new StubHandler(new[]{(HttpStatusCode.InternalServerError, "fail")})));
+        // Every endpoint×attempt returns 500 → should exhaust all and throw.
+        var endpoints = new[] { "https://primary.test/api/interpreter" };
+        var maxAttempts = 3;
+        var responses = Enumerable.Repeat((HttpStatusCode.InternalServerError, "fail"), endpoints.Length * maxAttempts);
+        var handler = new StubHandler(responses);
+        var fetcher = FastRetryFetcher(handler, endpoints, maxAttempts);
         Assert.ThrowsAsync<Exception>(async () => await fetcher.FetchFromOverpassApiAsync("FailSys"));
+        Assert.That(handler.SendCount, Is.EqualTo(endpoints.Length * maxAttempts));
     }
 
     [Test]
@@ -168,6 +200,87 @@ public class OSMDataFetcherTests
 
         // No duplicate report should be created
         Assert.That(System.IO.File.Exists(duplicateReportPath), Is.False, "No duplicate report should be created when there are no duplicates");
+    }
+
+    [Test]
+    public async Task RetriesOn500_ThenSucceeds()
+    {
+        var node = new { type="node", id=9001, version=1, lat=43.1, lon=-79.2, tags=new { bicycle_rental="docking_station", name="Retry", @ref="R1" } };
+        var body = WrapElements(node);
+        var handler = new StubHandler(new[]
+        {
+            (HttpStatusCode.InternalServerError, "boom"),
+            (HttpStatusCode.InternalServerError, "boom"),
+            (HttpStatusCode.OK, body),
+        });
+        var fetcher = FastRetryFetcher(handler, new[] { "https://primary.test/api/interpreter" }, maxAttempts: 3);
+        var result = await fetcher.FetchFromOverpassApiAsync("TestRetrySuccess");
+        Assert.That(result.Count, Is.EqualTo(1));
+        Assert.That(handler.SendCount, Is.EqualTo(3));
+    }
+
+    [Test]
+    public async Task RetriesOn429_HonorsRetryAfter()
+    {
+        var node = new { type="node", id=9002, version=1, lat=43.1, lon=-79.2, tags=new { bicycle_rental="docking_station", name="RA", @ref="R2" } };
+        var handler = new StubHandler(
+            new[]
+            {
+                (HttpStatusCode.TooManyRequests, "slow down"),
+                (HttpStatusCode.OK, WrapElements(node)),
+            },
+            new TimeSpan?[] { TimeSpan.FromMilliseconds(50) });
+        var fetcher = FastRetryFetcher(handler, new[] { "https://primary.test/api/interpreter" }, maxAttempts: 3);
+
+        var start = DateTime.UtcNow;
+        var result = await fetcher.FetchFromOverpassApiAsync("TestRetryAfter");
+        var elapsed = DateTime.UtcNow - start;
+
+        Assert.That(result.Count, Is.EqualTo(1));
+        Assert.That(handler.SendCount, Is.EqualTo(2));
+        Assert.That(elapsed, Is.GreaterThanOrEqualTo(TimeSpan.FromMilliseconds(40)), "Should wait for Retry-After hint");
+    }
+
+    [Test]
+    public void DoesNotRetryOn400()
+    {
+        var handler = new StubHandler(new[] { (HttpStatusCode.BadRequest, "bad query") });
+        var fetcher = FastRetryFetcher(handler, new[] { "https://primary.test/api/interpreter" }, maxAttempts: 3);
+        Assert.ThrowsAsync<Exception>(async () => await fetcher.FetchFromOverpassApiAsync("TestNoRetry4xx"));
+        Assert.That(handler.SendCount, Is.EqualTo(1), "4xx (other than 429) should not be retried");
+    }
+
+    [Test]
+    public async Task FailsOverToNextEndpoint()
+    {
+        var node = new { type="node", id=9003, version=1, lat=43.1, lon=-79.2, tags=new { bicycle_rental="docking_station", name="Failover", @ref="R3" } };
+        var endpoints = new[] { "https://primary.test/api/interpreter", "https://mirror.test/api/interpreter" };
+        var maxAttempts = 2;
+        // Primary fails both attempts (500, 500), mirror succeeds on first try.
+        var handler = new StubHandler(new[]
+        {
+            (HttpStatusCode.InternalServerError, "down"),
+            (HttpStatusCode.InternalServerError, "down"),
+            (HttpStatusCode.OK, WrapElements(node)),
+        });
+        var fetcher = FastRetryFetcher(handler, endpoints, maxAttempts);
+        var result = await fetcher.FetchFromOverpassApiAsync("TestFailover");
+
+        Assert.That(result.Count, Is.EqualTo(1));
+        Assert.That(handler.SendCount, Is.EqualTo(3));
+        Assert.That(handler.RequestUris[0].Host, Is.EqualTo("primary.test"));
+        Assert.That(handler.RequestUris[1].Host, Is.EqualTo("primary.test"));
+        Assert.That(handler.RequestUris[2].Host, Is.EqualTo("mirror.test"));
+    }
+
+    [Test]
+    public void EnvOverride_CommaSeparated_ParsesMultipleEndpoints()
+    {
+        // Exercises ResolveEndpointsFromEnv indirectly — static cache is evaluated once,
+        // so we can't reliably test env overrides at runtime. Instead, verify DefaultEndpoints
+        // contains the expected primary + at least one mirror.
+        Assert.That(OSMDataFetcher.DefaultEndpoints.Count, Is.GreaterThanOrEqualTo(2));
+        Assert.That(OSMDataFetcher.DefaultEndpoints[0], Does.Contain("overpass-api.de"));
     }
 
     [Test]

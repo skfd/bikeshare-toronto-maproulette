@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Net;
+using System.Text.Json;
 using Serilog;
 
 namespace prepareBikeParking
@@ -10,14 +11,60 @@ namespace prepareBikeParking
 
     public class DefaultOverpassHttpClientFactory : IOverpassHttpClientFactory
     {
-        public HttpClient CreateClient() => new HttpClient();
+        private static readonly HttpClient _shared = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(180)
+        };
+        public HttpClient CreateClient() => _shared;
     }
 
     public class OSMDataFetcher
     {
+        // Default community-known Overpass mirrors, in priority order.
+        public static readonly IReadOnlyList<string> DefaultEndpoints = new[]
+        {
+            "https://overpass-api.de/api/interpreter",
+            "https://overpass.kumi.systems/api/interpreter",
+            "https://overpass.private.coffee/api/interpreter",
+            "https://overpass.osm.ch/api/interpreter",
+        };
+
+        private static readonly Lazy<IReadOnlyList<string>> _resolvedEndpoints =
+            new(ResolveEndpointsFromEnv);
+
+        private static IReadOnlyList<string> ResolveEndpointsFromEnv()
+        {
+            var env = Environment.GetEnvironmentVariable("OVERPASS_API_URL");
+            if (string.IsNullOrWhiteSpace(env)) return DefaultEndpoints;
+            var parts = env.Split(',')
+                .Select(s => s.Trim())
+                .Where(s => !string.IsNullOrEmpty(s))
+                .ToList();
+            return parts.Count == 0 ? DefaultEndpoints : parts;
+        }
+
         private readonly IOverpassHttpClientFactory _clientFactory;
+        private readonly IReadOnlyList<string> _endpoints;
+        private readonly int _maxAttempts;
+        private readonly TimeSpan _baseRetryDelay;
+        private readonly TimeSpan _maxRetryDelay;
+        private readonly Random _rng = new Random();
+
         public OSMDataFetcher() : this(new DefaultOverpassHttpClientFactory()) {}
-        public OSMDataFetcher(IOverpassHttpClientFactory clientFactory) { _clientFactory = clientFactory; }
+        public OSMDataFetcher(IOverpassHttpClientFactory clientFactory)
+            : this(clientFactory, endpoints: null, maxAttempts: 4, baseRetryDelay: TimeSpan.FromSeconds(2)) {}
+        public OSMDataFetcher(
+            IOverpassHttpClientFactory clientFactory,
+            IReadOnlyList<string>? endpoints,
+            int maxAttempts,
+            TimeSpan baseRetryDelay)
+        {
+            _clientFactory = clientFactory;
+            _endpoints = endpoints ?? _resolvedEndpoints.Value;
+            _maxAttempts = Math.Max(1, maxAttempts);
+            _baseRetryDelay = baseRetryDelay;
+            _maxRetryDelay = TimeSpan.FromSeconds(30);
+        }
         /// <summary>
         /// Fetches bikeshare station data from OpenStreetMap using system-specific Overpass query file
         /// </summary>
@@ -41,24 +88,7 @@ namespace prepareBikeParking
                 overpassQuery = GenerateDefaultOverpassQuery(systemName);
             }
 
-            var url = "https://overpass-api.de/api/interpreter";
-            var client = _clientFactory.CreateClient();
-
-            var formData = new List<KeyValuePair<string, string>>
-            {
-                new KeyValuePair<string, string>("data", overpassQuery)
-            };
-
-            var formContent = new FormUrlEncodedContent(formData);
-
-            var response = await client.PostAsync(url, formContent);
-            var responseText = await response.Content.ReadAsStringAsync();
-
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new Exception($"Overpass API request failed: {response.StatusCode} - {responseText}");
-            }
-
+            var responseText = await PostOverpassQueryWithRetryAsync(overpassQuery);
             var osmData = await ParseOverpassResponseAsync(responseText, systemName);
 
             // Save the OSM data to bikeshare_osm.geojson file
@@ -559,23 +589,7 @@ out meta;
                 out geom;
             ";
 
-            var client = _clientFactory.CreateClient();
-            var url = "https://overpass-api.de/api/interpreter";
-
-            var formData = new List<KeyValuePair<string, string>>
-            {
-                new KeyValuePair<string, string>("data", overpassQuery)
-            };
-
-            var formContent = new FormUrlEncodedContent(formData);
-            var response = await client.PostAsync(url, formContent);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new Exception($"Overpass batch node fetch failed: {response.StatusCode}");
-            }
-
-            var responseText = await response.Content.ReadAsStringAsync();
+            var responseText = await PostOverpassQueryWithRetryAsync(overpassQuery);
             var jsonDoc = JsonSerializer.Deserialize<JsonElement>(responseText);
 
             if (jsonDoc.TryGetProperty("elements", out var elements))
@@ -602,6 +616,151 @@ out meta;
         private static JsonElement? FindNodeById(JsonElement elements, long nodeId)
         {
             return FindNodeInElements(elements, nodeId);
+        }
+
+        /// <summary>
+        /// POSTs an Overpass query, retrying transient failures with exponential backoff
+        /// and failing over across the configured endpoint list.
+        /// </summary>
+        private async Task<string> PostOverpassQueryWithRetryAsync(string overpassQuery)
+        {
+            var client = _clientFactory.CreateClient();
+            Exception? lastError = null;
+
+            for (int epIdx = 0; epIdx < _endpoints.Count; epIdx++)
+            {
+                var endpoint = _endpoints[epIdx];
+                var host = SafeHost(endpoint);
+
+                for (int attempt = 1; attempt <= _maxAttempts; attempt++)
+                {
+                    HttpResponseMessage? response = null;
+                    try
+                    {
+                        var formContent = new FormUrlEncodedContent(new[]
+                        {
+                            new KeyValuePair<string, string>("data", overpassQuery)
+                        });
+                        response = await client.PostAsync(endpoint, formContent);
+
+                        if (response.IsSuccessStatusCode)
+                        {
+                            if (attempt > 1 || epIdx > 0)
+                            {
+                                Log.Information("Overpass request succeeded at {Endpoint} on attempt {Attempt}", endpoint, attempt);
+                            }
+                            return await response.Content.ReadAsStringAsync();
+                        }
+
+                        var status = (int)response.StatusCode;
+                        if (status == 429)
+                        {
+                            var delay = ComputeRetryAfterDelay(response.Headers.RetryAfter, attempt);
+                            var body = await SafeReadAsync(response);
+                            lastError = new Exception($"Overpass API rate-limited at {endpoint} (429): {Truncate(body, 200)}");
+                            if (attempt < _maxAttempts)
+                            {
+                                Log.Warning("Overpass {Host} returned 429 (attempt {Attempt}/{Max}); waiting {Delay}s before retry",
+                                    host, attempt, _maxAttempts, delay.TotalSeconds);
+                                ConsoleUI.PrintWarning($"Overpass {host}: rate-limited (429). Retrying in {delay.TotalSeconds:F0}s (attempt {attempt}/{_maxAttempts}).");
+                                await Task.Delay(delay);
+                                continue;
+                            }
+                        }
+                        else if (status >= 500 && status <= 599)
+                        {
+                            var delay = BackoffDelay(attempt);
+                            var body = await SafeReadAsync(response);
+                            lastError = new Exception($"Overpass API failed at {endpoint}: {response.StatusCode} - {Truncate(body, 200)}");
+                            if (attempt < _maxAttempts)
+                            {
+                                Log.Warning("Overpass {Host} returned {Status} (attempt {Attempt}/{Max}); waiting {Delay}s before retry. Body: {Body}",
+                                    host, status, attempt, _maxAttempts, delay.TotalSeconds, Truncate(body, 200));
+                                ConsoleUI.PrintWarning($"Overpass {host}: server error {status}. Retrying in {delay.TotalSeconds:F0}s (attempt {attempt}/{_maxAttempts}).");
+                                await Task.Delay(delay);
+                                continue;
+                            }
+                        }
+                        else
+                        {
+                            // 4xx other than 429 — treat as a query-level error and fail fast.
+                            var body = await SafeReadAsync(response);
+                            throw new Exception($"Overpass API request failed: {response.StatusCode} - {body}");
+                        }
+                    }
+                    catch (HttpRequestException ex)
+                    {
+                        lastError = ex;
+                        var delay = BackoffDelay(attempt);
+                        if (attempt < _maxAttempts)
+                        {
+                            Log.Warning(ex, "Overpass {Host} network error (attempt {Attempt}/{Max}); waiting {Delay}s before retry",
+                                host, attempt, _maxAttempts, delay.TotalSeconds);
+                            ConsoleUI.PrintWarning($"Overpass {host}: network error. Retrying in {delay.TotalSeconds:F0}s (attempt {attempt}/{_maxAttempts}).");
+                            await Task.Delay(delay);
+                        }
+                    }
+                    catch (TaskCanceledException ex)
+                    {
+                        lastError = ex;
+                        var delay = BackoffDelay(attempt);
+                        if (attempt < _maxAttempts)
+                        {
+                            Log.Warning(ex, "Overpass {Host} timed out (attempt {Attempt}/{Max}); waiting {Delay}s before retry",
+                                host, attempt, _maxAttempts, delay.TotalSeconds);
+                            ConsoleUI.PrintWarning($"Overpass {host}: timed out. Retrying in {delay.TotalSeconds:F0}s (attempt {attempt}/{_maxAttempts}).");
+                            await Task.Delay(delay);
+                        }
+                    }
+                    finally
+                    {
+                        response?.Dispose();
+                    }
+                }
+
+                if (epIdx + 1 < _endpoints.Count)
+                {
+                    Log.Warning("Overpass endpoint {Host} exhausted after {Max} attempts; trying next endpoint", host, _maxAttempts);
+                    ConsoleUI.PrintWarning($"Overpass {host} exhausted; trying next endpoint.");
+                }
+            }
+
+            throw lastError ?? new Exception("All Overpass endpoints exhausted");
+        }
+
+        private TimeSpan BackoffDelay(int attempt)
+        {
+            // Exponential backoff with ±20% jitter, capped at _maxRetryDelay.
+            var raw = _baseRetryDelay.TotalMilliseconds * Math.Pow(2, attempt - 1);
+            var capped = Math.Min(raw, _maxRetryDelay.TotalMilliseconds);
+            var jitterFactor = 1.0 + ((_rng.NextDouble() * 0.4) - 0.2);
+            return TimeSpan.FromMilliseconds(capped * jitterFactor);
+        }
+
+        private TimeSpan ComputeRetryAfterDelay(System.Net.Http.Headers.RetryConditionHeaderValue? retryAfter, int attempt)
+        {
+            var backoff = BackoffDelay(attempt);
+            if (retryAfter == null) return backoff;
+            TimeSpan? hinted = retryAfter.Delta
+                ?? (retryAfter.Date.HasValue ? retryAfter.Date.Value - DateTimeOffset.UtcNow : (TimeSpan?)null);
+            if (hinted == null || hinted.Value <= TimeSpan.Zero) return backoff;
+            var clamped = hinted.Value > _maxRetryDelay ? _maxRetryDelay : hinted.Value;
+            return clamped > backoff ? clamped : backoff;
+        }
+
+        private static async Task<string> SafeReadAsync(HttpResponseMessage response)
+        {
+            try { return await response.Content.ReadAsStringAsync(); }
+            catch { return string.Empty; }
+        }
+
+        private static string Truncate(string s, int max) =>
+            string.IsNullOrEmpty(s) || s.Length <= max ? s : s.Substring(0, max) + "…";
+
+        private static string SafeHost(string url)
+        {
+            try { return new Uri(url).Host; }
+            catch { return url; }
         }
     }
 }

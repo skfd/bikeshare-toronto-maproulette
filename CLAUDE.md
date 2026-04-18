@@ -84,7 +84,7 @@ dotnet clean
 
 ## Environment Variables
 - `MAPROULETTE_API_KEY`: Required for creating MapRoulette challenges
-- `OVERPASS_API_URL`: Optional, defaults to public Overpass API
+- `OVERPASS_API_URL`: Optional comma-separated list of Overpass endpoints in priority order. Defaults to overpass-api.de + public mirrors. Requests retry each endpoint with exponential backoff before failing over to the next.
 
 ## Configuration Files
 - `bikeshare_systems.json`: System configurations with GBFS URLs, MapRoulette project IDs, and optional thresholds
