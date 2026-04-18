@@ -543,59 +543,50 @@ out meta;
             if (nodeIds.Count == 0)
                 return result;
 
-            try
+            // Create Overpass query for batch node retrieval
+            var nodeIdsList = string.Join(",", nodeIds);
+            var overpassQuery = $@"
+                [out:json];
+                (
+                  node(id:{nodeIdsList});
+                );
+                out geom;
+            ";
+
+            var client = _clientFactory.CreateClient();
+            var url = "https://overpass-api.de/api/interpreter";
+
+            var formData = new List<KeyValuePair<string, string>>
             {
-                // Create Overpass query for batch node retrieval
-                var nodeIdsList = string.Join(",", nodeIds);
-                var overpassQuery = $@"
-                    [out:json];
-                    (
-                      node(id:{nodeIdsList});
-                    );
-                    out geom;
-                ";
+                new KeyValuePair<string, string>("data", overpassQuery)
+            };
 
-                var client = _clientFactory.CreateClient();
-                var url = "https://overpass-api.de/api/interpreter";
+            var formContent = new FormUrlEncodedContent(formData);
+            var response = await client.PostAsync(url, formContent);
 
-                var formData = new List<KeyValuePair<string, string>>
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new Exception($"Overpass batch node fetch failed: {response.StatusCode}");
+            }
+
+            var responseText = await response.Content.ReadAsStringAsync();
+            var jsonDoc = JsonSerializer.Deserialize<JsonElement>(responseText);
+
+            if (jsonDoc.TryGetProperty("elements", out var elements))
+            {
+                foreach (var element in elements.EnumerateArray())
                 {
-                    new KeyValuePair<string, string>("data", overpassQuery)
-                };
-
-                var formContent = new FormUrlEncodedContent(formData);
-                var response = await client.PostAsync(url, formContent);
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    Log.Warning("Batch node fetch failed with status {Status}", response.StatusCode);
-                    return result;
-                }
-
-                var responseText = await response.Content.ReadAsStringAsync();
-                var jsonDoc = JsonSerializer.Deserialize<JsonElement>(responseText);
-
-                if (jsonDoc.TryGetProperty("elements", out var elements))
-                {
-                    foreach (var element in elements.EnumerateArray())
+                    if (element.TryGetProperty("type", out var typeProperty) &&
+                        typeProperty.GetString() == "node" &&
+                        element.TryGetProperty("id", out var idProperty))
                     {
-                        if (element.TryGetProperty("type", out var typeProperty) &&
-                            typeProperty.GetString() == "node" &&
-                            element.TryGetProperty("id", out var idProperty))
-                        {
-                            var nodeId = idProperty.GetInt64();
-                            result[nodeId] = element;
-                        }
+                        var nodeId = idProperty.GetInt64();
+                        result[nodeId] = element;
                     }
                 }
-
-                Log.Debug("Fetched {Fetched}/{Requested} nodes in batch", result.Count, nodeIds.Count);
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "Error in batch node fetch");
             }
 
+            Log.Debug("Fetched {Fetched}/{Requested} nodes in batch", result.Count, nodeIds.Count);
             return result;
         }
 

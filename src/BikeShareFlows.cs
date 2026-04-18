@@ -221,7 +221,11 @@ public class BikeShareFlows
 
         await _geoWriter.WriteMainAsync(locationsList, system.Name);
         await CompareAndGenerateDiffFiles(locationsList, system, isNewSystem);
-        await CompareWithOSMData(locationsList, system);
+        var osmOk = await CompareWithOSMData(locationsList, system);
+        if (!osmOk)
+        {
+            return;
+        }
 
         // Check for duplicate ref values and prompt to create tasks
         var duplicatesFile = _paths.GetSystemFullPath(system.Name, "bikeshare_osm_duplicates.geojson");
@@ -319,28 +323,32 @@ public class BikeShareFlows
         Log.Information("Generated diff files for new system {Name}: {Count} added", system.Name, currentPoints.Count);
     }
 
-    private async Task CompareWithOSMData(List<GeoPoint> bikeshareApiPoints, BikeShareSystem system)
+    private async Task<bool> CompareWithOSMData(List<GeoPoint> bikeshareApiPoints, BikeShareSystem system)
     {
+        Log.Information("Fetching OSM stations for {Name}", system.Name);
+        List<GeoPoint> osmPoints;
         try
         {
-            Log.Information("Fetching OSM stations for {Name}", system.Name);
             await _osmFetcher.EnsureStationsFileAsync(system.Name, system.City);
-            var osmPoints = await _osmFetcher.FetchOsmStationsAsync(system.Name, system.City);
-            Log.Information("Fetched {Count} OSM stations for {Name}", osmPoints.Count, system.Name);
-
-            // Generate enhanced duplicate report with GBFS data for comparison
-            await OSMDataFetcher.GenerateEnhancedDuplicateReportAsync(osmPoints, bikeshareApiPoints, system.Name);
-
-            var osmComparisonThreshold = system.GetOsmComparisonThresholdMeters();
-            Log.Debug("Using OSM comparison threshold: {Threshold}m for {Name}", osmComparisonThreshold, system.Name);
-            var (missingInOSM, extraInOSM, differentInOSM, renamedInOSM) = _comparer.Compare(bikeshareApiPoints, osmPoints, osmComparisonThreshold);
-            await _geoWriter.WriteOsmCompareAsync(missingInOSM, extraInOSM, differentInOSM, renamedInOSM, system.Name);
-            await _osmChangeWriter.WriteRenameChangesAsync(renamedInOSM, system.Name);
-            Log.Information("OSM comparison for {Name}: Missing={Missing} Extra={Extra} Moved={Moved} Renamed={Renamed}", system.Name, missingInOSM.Count, extraInOSM.Count, differentInOSM.Count, renamedInOSM.Count);
+            osmPoints = await _osmFetcher.FetchOsmStationsAsync(system.Name, system.City);
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "OSM comparison failed for {Name} - continuing", system.Name);
+            Log.Error(ex, "OSM API fetch failed for {Name}. bikeshare.geojson has already been overwritten; run 'dotnet run -- reset {SystemId}' to restore the previous state before retrying.",
+                system.Name, system.Id);
+            return false;
         }
+        Log.Information("Fetched {Count} OSM stations for {Name}", osmPoints.Count, system.Name);
+
+        // Generate enhanced duplicate report with GBFS data for comparison
+        await OSMDataFetcher.GenerateEnhancedDuplicateReportAsync(osmPoints, bikeshareApiPoints, system.Name);
+
+        var osmComparisonThreshold = system.GetOsmComparisonThresholdMeters();
+        Log.Debug("Using OSM comparison threshold: {Threshold}m for {Name}", osmComparisonThreshold, system.Name);
+        var (missingInOSM, extraInOSM, differentInOSM, renamedInOSM) = _comparer.Compare(bikeshareApiPoints, osmPoints, osmComparisonThreshold);
+        await _geoWriter.WriteOsmCompareAsync(missingInOSM, extraInOSM, differentInOSM, renamedInOSM, system.Name);
+        await _osmChangeWriter.WriteRenameChangesAsync(renamedInOSM, system.Name);
+        Log.Information("OSM comparison for {Name}: Missing={Missing} Extra={Extra} Moved={Moved} Renamed={Renamed}", system.Name, missingInOSM.Count, extraInOSM.Count, differentInOSM.Count, renamedInOSM.Count);
+        return true;
     }
 }
