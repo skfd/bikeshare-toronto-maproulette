@@ -308,6 +308,15 @@ public class BikeShareFlows
             return;
         }
 
+        bool hasNewLocationTasks = summary.MissingInOsm > 0 || (!isNewSystem && summary.ExtraInOsm > 0);
+        if (!hasNewLocationTasks)
+        {
+            Log.Information("No added/removed stations vs OSM for {Name}; skipping task creation prompt.", system.Name);
+            ConsoleUI.PrintInfo("No added or removed stations vs OSM; no MapRoulette tasks to create.");
+            PrintOperatorChecklist(system, summary);
+            return;
+        }
+
         var confirm = _prompt.ReadConfirmation("Create Maproulette tasks for new locations?", 'n');
         if (confirm.ToString().ToLower() != "y")
         {
@@ -449,7 +458,7 @@ public class BikeShareFlows
         ConsoleUI.PrintStat("renamed", renamedInOSM.Count);
 
         summary.MissingInOsm = missingInOSM.Count;
-        summary.ExtraInOsm = extraInOSM.Count;
+        summary.ExtraInOsm = activeExtraInOSM.Count;
         summary.MovedInOsm = differentInOSM.Count;
         summary.RenamedInOsm = renamedInOSM.Count;
         return true;
