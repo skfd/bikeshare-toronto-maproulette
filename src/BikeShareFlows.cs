@@ -57,13 +57,17 @@ public class BikeShareFlows
         catch (FileNotFoundException ex)
         {
             Log.Error(ex, "Configuration file missing or invalid. SystemId: {SystemId}", systemId);
+            ConsoleUI.PrintError($"Configuration file missing or invalid (system id {systemId}): {ex.Message}");
             return;
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Failed loading system configuration. SystemId: {SystemId}", systemId);
+            ConsoleUI.PrintError($"Failed loading system configuration for id {systemId}: {ex.Message}");
             return;
         }
+
+        ConsoleUI.PrintHeader($"Sync: {system.Name} ({system.City})");
 
         var systemLogger = Log.Logger.ForBikeShareSystem(system.Name, system.Id);
         systemLogger.Information("Starting comparison run. City: {City}, MaprouletteProject: {ProjectId}",
@@ -76,10 +80,13 @@ public class BikeShareFlows
         {
             if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("MAPROULETTE_API_KEY")))
             {
-                systemLogger.Error("MAPROULETTE_API_KEY environment variable is not set. Set it before running, or set MaprouletteProjectId to 0 in bikeshare_systems.json to skip task creation. Aborting.");
+                systemLogger.Error("MAPROULETTE_API_KEY environment variable is not set. Aborting.");
+                ConsoleUI.PrintError("MAPROULETTE_API_KEY environment variable is not set.");
+                ConsoleUI.PrintAction("Set MAPROULETTE_API_KEY before running, or set MaprouletteProjectId to 0 in bikeshare_systems.json to skip task creation.");
                 return;
             }
 
+            ConsoleUI.PrintStep($"Validating MapRoulette project {system.MaprouletteProjectId}");
             systemLogger.Information("Validating Maproulette project. ProjectId: {ProjectId}", system.MaprouletteProjectId);
             try
             {
@@ -88,22 +95,26 @@ public class BikeShareFlows
                 {
                     systemLogger.Error("Maproulette project validation failed. ProjectId: {ProjectId}. Aborting.",
                         system.MaprouletteProjectId);
+                    ConsoleUI.PrintError($"MapRoulette project {system.MaprouletteProjectId} validation failed. Aborting.");
                     return;
                 }
                 systemLogger.Information("Maproulette project validated successfully. ProjectId: {ProjectId}",
                     system.MaprouletteProjectId);
+                ConsoleUI.PrintSuccess($"MapRoulette project {system.MaprouletteProjectId} validated.");
                 projectValidForTasks = true;
             }
             catch (Exception ex)
             {
                 systemLogger.Error(ex, "Maproulette project validation error. ProjectId: {ProjectId}. Aborting.",
                     system.MaprouletteProjectId);
+                ConsoleUI.PrintError($"MapRoulette project validation error: {ex.Message}");
                 return;
             }
         }
         else
         {
             systemLogger.Warning("No Maproulette project configured. Action: SkippingTaskCreation");
+            ConsoleUI.PrintWarning("No MapRoulette project configured - task creation will be skipped.");
         }
 
         var validationResult = _systemSetup.ValidateSystem(system.Name, throwOnMissing: false);
@@ -111,6 +122,7 @@ public class BikeShareFlows
         {
             systemLogger.Warning("System setup validation failed. Issue: {Issue}, Action: AttemptingAutoCreate",
                 validationResult.ErrorMessage);
+            ConsoleUI.PrintWarning($"System setup incomplete ({validationResult.ErrorMessage}); will auto-create missing files.");
         }
 
         try
@@ -120,39 +132,55 @@ public class BikeShareFlows
         catch (Exception ex)
         {
             Log.Fatal(ex, "Fatal error during run for {Name}", system.Name);
+            ConsoleUI.PrintError($"Fatal error during run for {system.Name}: {ex.Message}");
         }
     }
 
     public async Task ValidateSystemAsync(int systemId)
     {
+        ConsoleUI.PrintStep($"Validating system setup {systemId}");
         Log.Information("Validating system setup {SystemId}", systemId);
         try
         {
             var system = await _systemLoader.LoadByIdAsync(systemId);
             Log.Information("System configuration loaded: {Name} ({City})", system.Name, system.City);
+            ConsoleUI.PrintSuccess($"System loaded: {system.Name} ({system.City})");
+
             SystemSetupHelper.ValidateSystemSetup(system.Name, throwOnMissing: true);
             Log.Information("System directory and files validated for {Name}", system.Name);
+            ConsoleUI.PrintSuccess("Directory and files validated.");
+
             _systemSetup.ValidateInstructionFiles(system.Name);
             Log.Information("Instruction files validated for {Name}", system.Name);
+            ConsoleUI.PrintSuccess("Instruction files validated.");
+
             if (system.MaprouletteProjectId > 0)
             {
                 var projectValid = await _maproulette.ValidateProjectAsync(system.MaprouletteProjectId);
-                if (projectValid) Log.Information("Maproulette project {ProjectId} validated", system.MaprouletteProjectId);
+                if (projectValid)
+                {
+                    Log.Information("Maproulette project {ProjectId} validated", system.MaprouletteProjectId);
+                    ConsoleUI.PrintSuccess($"MapRoulette project {system.MaprouletteProjectId} validated.");
+                }
             }
             else
             {
                 Log.Warning("No Maproulette project configured for {Name} - task creation skipped", system.Name);
+                ConsoleUI.PrintWarning($"No MapRoulette project configured for {system.Name} - task creation skipped.");
             }
             Log.Information("All validations passed for {Name}. System ready.", system.Name);
+            ConsoleUI.PrintSuccess($"All validations passed for {system.Name}. System ready.");
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Validation failed for system {SystemId}", systemId);
+            ConsoleUI.PrintError($"Validation failed for system {systemId}: {ex.Message}");
         }
     }
 
     public async Task TestProjectAsync(int projectId)
     {
+        ConsoleUI.PrintStep($"Validating MapRoulette project {projectId}");
         Log.Information("Validating Maproulette project {ProjectId}", projectId);
         try
         {
@@ -160,11 +188,13 @@ public class BikeShareFlows
             if (isValid)
             {
                 Log.Information("Project {ProjectId} validation succeeded. ID can be used in configuration.", projectId);
+                ConsoleUI.PrintSuccess($"Project {projectId} validated. ID can be used in configuration.");
             }
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Project validation failed for {ProjectId}.", projectId);
+            ConsoleUI.PrintError($"Project {projectId} validation failed: {ex.Message}");
         }
     }
 
@@ -178,12 +208,15 @@ public class BikeShareFlows
         catch (Exception ex)
         {
             Log.Error(ex, "Error setting up system files for {Name}.", system.Name);
+            ConsoleUI.PrintError($"Error setting up system files for {system.Name}: {ex.Message}");
             throw;
         }
 
         if (newlyCreated)
         {
             Log.Information("Initial scaffold created for {Name}. Re-run the command to fetch and compare data after reviewing instructions.", system.Name);
+            ConsoleUI.PrintSuccess($"Initial scaffold created for {system.Name}.");
+            ConsoleUI.PrintAction($"Review the instructions in data_results/{system.Name}/ and re-run this command to fetch and compare data.");
             return; // Do not proceed further on the initial scaffolding run
         }
 
@@ -194,13 +227,16 @@ public class BikeShareFlows
         if (isNewSystem)
         {
             Log.Information("No previous bikeshare.geojson found for {Name}. Treating as new system.", system.Name);
+            ConsoleUI.PrintInfo($"No previous bikeshare.geojson found - treating {system.Name} as a new system.");
             lastSyncDate = DateTime.Now;
         }
         else
         {
             Log.Information("Last sync date for {Name}: {LastSync}", system.Name, lastSyncDate);
+            ConsoleUI.PrintInfo($"Last sync: {lastSyncDate:yyyy-MM-dd HH:mm}");
         }
 
+        ConsoleUI.PrintStep($"Fetching GBFS stations for {system.Name}");
         List<GeoPoint> locationsList;
         try
         {
@@ -209,14 +245,17 @@ public class BikeShareFlows
         catch (Exception ex)
         {
             Log.Error(ex, "Failed fetching bike share data for {Name}. URL={Url}", system.Name, system.GetStationInformationUrl());
+            ConsoleUI.PrintError($"Failed fetching GBFS data for {system.Name}: {ex.Message}");
             throw;
         }
+        ConsoleUI.PrintSuccess($"Fetched {locationsList.Count} GBFS stations.");
 
         // Apply optional station name prefix from configuration if provided
         var appliedCount = StationNamePrefixer.Apply(locationsList, system.StationNamePrefix);
         if (appliedCount > 0)
         {
             Log.Information("Applied station name prefix '{Prefix}' to {Count} stations for {Name}", system.StationNamePrefix, appliedCount, system.Name);
+            ConsoleUI.PrintInfo($"Applied prefix '{system.StationNamePrefix}' to {appliedCount} stations.");
         }
 
         await _geoWriter.WriteMainAsync(locationsList, system.Name);
@@ -241,15 +280,18 @@ public class BikeShareFlows
 
                     await _maproulette.CreateDuplicateTasksAsync(system.MaprouletteProjectId, system.Name);
                     Log.Information("Duplicate detection tasks created successfully");
+                    ConsoleUI.PrintSuccess("Duplicate detection tasks created.");
                 }
                 catch (Exception ex)
                 {
                     Log.Error(ex, "Error creating duplicate detection tasks for {Name}", system.Name);
+                    ConsoleUI.PrintError($"Error creating duplicate detection tasks: {ex.Message}");
                 }
             }
             else
             {
                 Log.Information("User declined duplicate detection task creation.");
+                ConsoleUI.PrintInfo("Duplicate detection task creation skipped.");
             }
         }
 
@@ -257,6 +299,7 @@ public class BikeShareFlows
         if (!(system.MaprouletteProjectId > 0 && projectValidForTasks))
         {
             Log.Warning("Skipping Maproulette task creation for {Name} (no valid project).", system.Name);
+            ConsoleUI.PrintWarning($"Skipping MapRoulette task creation for {system.Name} (no valid project).");
             return;
         }
 
@@ -264,6 +307,7 @@ public class BikeShareFlows
         if (confirm.ToString().ToLower() != "y")
         {
             Log.Information("User declined task creation.");
+            ConsoleUI.PrintInfo("Task creation skipped.");
             return;
         }
 
@@ -275,17 +319,20 @@ public class BikeShareFlows
         catch (InvalidOperationException ex) when (ex.Message.Contains("instruction files"))
         {
             Log.Error(ex, "Instruction file issue prevented task creation for {Name}", system.Name);
+            ConsoleUI.PrintError($"Instruction file issue prevented task creation: {ex.Message}");
             throw;
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Error creating Maproulette tasks for {Name}", system.Name);
+            ConsoleUI.PrintError($"Error creating MapRoulette tasks for {system.Name}: {ex.Message}");
             throw;
         }
     }
 
     private async Task CompareAndGenerateDiffFiles(List<GeoPoint> currentPoints, BikeShareSystem system, bool isNewSystem = false)
     {
+        ConsoleUI.PrintStep($"Comparing with last committed version of {system.Name}");
         Log.Information("Comparing current data with last committed version for {Name}", system.Name);
         try
         {
@@ -302,15 +349,22 @@ public class BikeShareFlows
 
             await _geoWriter.WriteDiffAsync(addedPoints, removedPoints, movedPoints, renamedPoints, system.Name);
             Log.Information("Diff summary for {Name}: Added={Added} Removed={Removed} Moved={Moved} Renamed={Renamed}", system.Name, addedPoints.Count, removedPoints.Count, movedPoints.Count, renamedPoints.Count);
+            ConsoleUI.PrintSuccess("Diff vs last committed version:");
+            ConsoleUI.PrintStat("added", addedPoints.Count);
+            ConsoleUI.PrintStat("removed", removedPoints.Count);
+            ConsoleUI.PrintStat("moved", movedPoints.Count);
+            ConsoleUI.PrintStat("renamed", renamedPoints.Count);
         }
         catch (FileNotFoundException ex) when (ex.Message.Contains("not found in git repository"))
         {
             Log.Warning("No previous version in git for {Name}; treating all stations as added.", system.Name);
+            ConsoleUI.PrintWarning($"No previous version in git for {system.Name}; treating all stations as added.");
             await GenerateNewSystemDiffFiles(currentPoints, system);
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Git comparison failed for {Name}; treating all stations as added.", system.Name);
+            ConsoleUI.PrintError($"Git comparison failed ({ex.Message}); treating all stations as added.");
             await GenerateNewSystemDiffFiles(currentPoints, system);
         }
     }
@@ -321,10 +375,12 @@ public class BikeShareFlows
         var emptyTupleList = new List<(GeoPoint current, GeoPoint old)>();
         await _geoWriter.WriteDiffAsync(currentPoints, emptyList, emptyList, emptyTupleList, system.Name);
         Log.Information("Generated diff files for new system {Name}: {Count} added", system.Name, currentPoints.Count);
+        ConsoleUI.PrintSuccess($"New system {system.Name}: {currentPoints.Count} stations recorded as added.");
     }
 
     private async Task<bool> CompareWithOSMData(List<GeoPoint> bikeshareApiPoints, BikeShareSystem system)
     {
+        ConsoleUI.PrintStep($"Fetching OSM stations for {system.Name}");
         Log.Information("Fetching OSM stations for {Name}", system.Name);
         List<GeoPoint> osmPoints;
         try
@@ -336,9 +392,12 @@ public class BikeShareFlows
         {
             Log.Error(ex, "OSM API fetch failed for {Name}. bikeshare.geojson has already been overwritten; run 'dotnet run -- reset {SystemId}' to restore the previous state before retrying.",
                 system.Name, system.Id);
+            ConsoleUI.PrintError($"OSM API fetch failed for {system.Name}: {ex.Message}");
+            ConsoleUI.PrintAction($"bikeshare.geojson has already been overwritten. Run: dotnet run -- reset {system.Id}");
             return false;
         }
         Log.Information("Fetched {Count} OSM stations for {Name}", osmPoints.Count, system.Name);
+        ConsoleUI.PrintSuccess($"Fetched {osmPoints.Count} OSM stations.");
 
         // Generate enhanced duplicate report with GBFS data for comparison
         await OSMDataFetcher.GenerateEnhancedDuplicateReportAsync(osmPoints, bikeshareApiPoints, system.Name);
@@ -349,6 +408,11 @@ public class BikeShareFlows
         await _geoWriter.WriteOsmCompareAsync(missingInOSM, extraInOSM, differentInOSM, renamedInOSM, system.Name);
         await _osmChangeWriter.WriteRenameChangesAsync(renamedInOSM, system.Name);
         Log.Information("OSM comparison for {Name}: Missing={Missing} Extra={Extra} Moved={Moved} Renamed={Renamed}", system.Name, missingInOSM.Count, extraInOSM.Count, differentInOSM.Count, renamedInOSM.Count);
+        ConsoleUI.PrintSuccess("GBFS vs OSM comparison:");
+        ConsoleUI.PrintStat("missing in OSM", missingInOSM.Count);
+        ConsoleUI.PrintStat("extra in OSM", extraInOSM.Count);
+        ConsoleUI.PrintStat("moved", differentInOSM.Count);
+        ConsoleUI.PrintStat("renamed", renamedInOSM.Count);
         return true;
     }
 }

@@ -14,6 +14,7 @@ namespace prepareBikeParking
         {
             using var client = new HttpClient();
             Log.Information("Fetching global GBFS service provider list from {Url}", SystemsCsvUrl);
+            ConsoleUI.PrintStep("Fetching global GBFS service provider list");
             var csv = await client.GetStringAsync(SystemsCsvUrl);
             return csv;
         }

@@ -36,6 +36,8 @@ namespace prepareBikeParking
                 // Fallback to default query generation for backward compatibility
                 Log.Warning("System-specific stations.overpass file not found for {System}. Using fallback query generation.", systemName);
                 Log.Information("Consider creating data_results/{System}/stations.overpass for customization.", systemName);
+                ConsoleUI.PrintWarning($"stations.overpass file not found for {systemName}; using fallback query.");
+                ConsoleUI.PrintAction($"Create data_results/{systemName}/stations.overpass to customize the Overpass query.");
                 overpassQuery = GenerateDefaultOverpassQuery(systemName);
             }
 
@@ -143,6 +145,8 @@ out meta;
                 await FileManager.WriteSystemTextFileAsync(systemName, "stations.overpass", defaultQuery);
                 Log.Information("Created default stations.overpass file for {System}", systemName);
                 Log.Information("Edit data_results/{System}/stations.overpass to customize the Overpass query", systemName);
+                ConsoleUI.PrintSuccess($"Created default stations.overpass for {systemName}.");
+                ConsoleUI.PrintAction($"Edit data_results/{systemName}/stations.overpass to customize the Overpass query.");
             }
         }
 
@@ -323,6 +327,8 @@ out meta;
                            "Total affected stations: {AffectedStations}. " +
                            "See data_results/{System}/bikeshare_osm_duplicates.geojson for details",
                            totalDuplicateRefs, systemName, totalAffectedStations, systemName);
+                ConsoleUI.PrintWarning($"Found {totalDuplicateRefs} duplicate ref value(s) in OSM ({totalAffectedStations} affected stations).");
+                ConsoleUI.PrintAction($"Review data_results/{systemName}/bikeshare_osm_duplicates.geojson and fix duplicates in OSM.");
 
                 // Log each duplicate ref with OSM element details
                 foreach (var dup in duplicates)

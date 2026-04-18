@@ -5,7 +5,9 @@ using Spectre.Console;
 namespace prepareBikeParking;
 
 /// <summary>
-/// Handles console UI and logging configuration
+/// Console output for end users. Separate from Serilog logging, which writes
+/// structured records to files for diagnostics. Use ConsoleUI for anything the
+/// human running the command should see; use Log.* for file-only diagnostics.
 /// </summary>
 public static class ConsoleUI
 {
@@ -13,13 +15,16 @@ public static class ConsoleUI
     public static bool IsQuiet { get; set; }
 
     /// <summary>
-    /// Reconfigure Serilog based on verbosity settings
+    /// Reconfigure Serilog. Normal/quiet: file sinks only. Verbose: also mirror
+    /// to the console so developers can see structured details live.
     /// </summary>
     public static void ConfigureLogging()
     {
         var config = new LoggerConfiguration()
             .Enrich.FromLogContext()
             .Enrich.With<Logging.SystemContextEnricher>()
+            .MinimumLevel.Debug()
+            .MinimumLevel.Override("System", LogEventLevel.Information)
             .WriteTo.File("logs/bikeshare-.log",
                 rollingInterval: RollingInterval.Day,
                 retainedFileCountLimit: 7,
@@ -31,67 +36,65 @@ public static class ConsoleUI
 
         if (IsVerbose)
         {
-            // Verbose: Show everything with correlation IDs and timestamps
-            config.MinimumLevel.Debug()
-                  .MinimumLevel.Override("System", LogEventLevel.Information)
-                  .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}");
-        }
-        else if (IsQuiet)
-        {
-            // Quiet: Only errors and warnings to console
-            config.MinimumLevel.Warning()
-                  .WriteTo.Console(outputTemplate: "{Message:lj}{NewLine}{Exception}");
-        }
-        else
-        {
-            // Normal: Clean output without timestamps/correlation IDs
-            config.MinimumLevel.Information()
-                  .MinimumLevel.Override("System", LogEventLevel.Warning)
-                  .WriteTo.Console(outputTemplate: "{Message:lj}{NewLine}{Exception}");
+            config.WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}");
         }
 
         Log.Logger = config.CreateLogger();
     }
 
-    /// <summary>
-    /// Print a section header
-    /// </summary>
+    /// <summary>Section header. Hidden in quiet mode.</summary>
     public static void PrintHeader(string title)
     {
         if (IsQuiet) return;
-
         AnsiConsole.WriteLine();
-        AnsiConsole.Write(new Rule($"[bold cyan]{title}[/]").RuleStyle("cyan dim").LeftJustified());
+        AnsiConsole.Write(new Rule($"[bold cyan]{Markup.Escape(title)}[/]").RuleStyle("cyan dim").LeftJustified());
         AnsiConsole.WriteLine();
     }
 
-    /// <summary>
-    /// Print a success message
-    /// </summary>
+    /// <summary>Progress step (cyan). Hidden in quiet mode.</summary>
+    public static void PrintStep(string message)
+    {
+        if (IsQuiet) return;
+        AnsiConsole.MarkupLine($"[cyan]›[/] {Markup.Escape(message)}");
+    }
+
+    /// <summary>Completion of a step (green). Hidden in quiet mode.</summary>
     public static void PrintSuccess(string message)
     {
+        if (IsQuiet) return;
         AnsiConsole.MarkupLine($"[green]✓[/] {Markup.Escape(message)}");
     }
 
+    /// <summary>Named count / stat line. Hidden in quiet mode.</summary>
+    public static void PrintStat(string label, object value)
+    {
+        if (IsQuiet) return;
+        AnsiConsole.MarkupLine($"  [grey]{Markup.Escape(label)}:[/] [white]{Markup.Escape(value.ToString() ?? "")}[/]");
+    }
+
     /// <summary>
-    /// Print a warning message
+    /// User must take an action. Use for prompts, suggested CLI commands,
+    /// environment-variable setup, or other instructions the operator needs
+    /// to notice. Bold magenta, visible even in quiet mode.
     /// </summary>
+    public static void PrintAction(string message)
+    {
+        AnsiConsole.MarkupLine($"[bold magenta]→ {Markup.Escape(message)}[/]");
+    }
+
+    /// <summary>Non-fatal issue the user should see.</summary>
     public static void PrintWarning(string message)
     {
-        AnsiConsole.MarkupLine($"[yellow]⚠[/] {Markup.Escape(message)}");
+        AnsiConsole.MarkupLine($"[yellow]⚠[/] [yellow]{Markup.Escape(message)}[/]");
     }
 
-    /// <summary>
-    /// Print an error message
-    /// </summary>
+    /// <summary>Failure the user should see. Always shown.</summary>
     public static void PrintError(string message)
     {
-        AnsiConsole.MarkupLine($"[red]✗[/] {Markup.Escape(message)}");
+        AnsiConsole.MarkupLine($"[red]✗[/] [red]{Markup.Escape(message)}[/]");
     }
 
-    /// <summary>
-    /// Print an info message
-    /// </summary>
+    /// <summary>Secondary info (grey). Hidden in quiet mode.</summary>
     public static void PrintInfo(string message)
     {
         if (IsQuiet) return;

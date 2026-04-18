@@ -9,16 +9,16 @@ using prepareBikeParking.ServicesImpl;
 using prepareBikeParking.Logging;
 using Spectre.Console;
 
-// Initial logger - will be reconfigured after parsing command line args
+// Initial logger - file sinks only; console output is driven by ConsoleUI.
+// Reconfigured after parsing command line args so verbose can mirror to console.
 Log.Logger = new LoggerConfiguration()
-    .MinimumLevel.Information()
-    .MinimumLevel.Override("System", LogEventLevel.Warning)
+    .MinimumLevel.Debug()
+    .MinimumLevel.Override("System", LogEventLevel.Information)
     .Enrich.FromLogContext()
     .Enrich.WithThreadId()
     .Enrich.WithEnvironmentName()
     .Enrich.WithMachineName()
     .Enrich.With<SystemContextEnricher>()
-    .WriteTo.Console(outputTemplate: "[{Level:u3}] {Message:lj}{NewLine}{Exception}")
     .WriteTo.File("logs/bikeshare-.log",
         rollingInterval: RollingInterval.Day,
         retainedFileCountLimit: 7,
@@ -120,6 +120,7 @@ try
         var filePath = Path.Combine("data_results", "global_gbfs_services.csv");
         await GlobalGbfsServiceFetcher.SaveGlobalServiceListAsync(filePath);
         Log.Information("Global GBFS service provider list saved to {Path}", filePath);
+        ConsoleUI.PrintSuccess($"Global GBFS service provider list saved to {filePath}");
     });
 
     // fetch-brand-tags command
@@ -137,6 +138,8 @@ try
             if (!success)
             {
                 Log.Warning("No OSM brand tags found for system {SystemId}: {Name}. Ensure brand:wikidata is set in bikeshare_systems.json", systemId.Value, system.Name);
+                ConsoleUI.PrintWarning($"No OSM brand tags found for system {systemId.Value}: {system.Name}.");
+                ConsoleUI.PrintAction("Ensure brand:wikidata is set in bikeshare_systems.json for this system.");
             }
         }
         else
@@ -144,6 +147,7 @@ try
             // Fetch for all systems
             var successCount = await NameSuggestionIndexFetcher.FetchAndSaveOsmTagsForAllSystemsAsync();
             Log.Information("Brand tags fetch completed for {Success} systems", successCount);
+            ConsoleUI.PrintSuccess($"Brand tags fetch completed for {successCount} systems.");
         }
     });
 
@@ -165,13 +169,21 @@ try
             var sys = await provider.GetRequiredService<IBikeShareSystemLoader>().LoadByIdAsync(id);
             var created = await SystemSetupHelper.EnsureSystemSetUpAsync(sys.Name, sys.Name, sys.Name, sys.City);
             if (created)
+            {
                 Log.Information("Scaffolding created for {System}. You can now run comparison.", sys.Name);
+                ConsoleUI.PrintSuccess($"Scaffolding created for {sys.Name}.");
+                ConsoleUI.PrintAction($"Review data_results/{sys.Name}/ and run: dotnet run -- {id}");
+            }
             else
+            {
                 Log.Information("System {System} already set up.", sys.Name);
+                ConsoleUI.PrintInfo($"System {sys.Name} already set up.");
+            }
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Setup failed for system {Id}", id);
+            ConsoleUI.PrintError($"Setup failed for system {id}: {ex.Message}");
         }
     });
     root.Subcommands.Add(setupCommand);
@@ -190,6 +202,7 @@ try
             if (systemDir == null || !Directory.Exists(systemDir))
             {
                 Log.Warning("No data directory found for {System}", sys.Name);
+                ConsoleUI.PrintWarning($"No data directory found for {sys.Name}.");
                 return;
             }
 
@@ -201,6 +214,7 @@ try
             if (outputFiles.Count == 0)
             {
                 Log.Information("No generated files to reset for {System}", sys.Name);
+                ConsoleUI.PrintInfo($"No generated files to reset for {sys.Name}.");
                 return;
             }
 
@@ -259,6 +273,7 @@ try
                     {
                         var err = proc.StandardError.ReadToEnd();
                         Log.Warning("git checkout failed: {Error}", err);
+                        ConsoleUI.PrintWarning($"git checkout failed: {err.Trim()}");
                     }
                 }
             }
@@ -269,10 +284,12 @@ try
 
             Log.Information("Reset {System}: restored {Tracked} tracked files, deleted {Untracked} untracked files",
                 sys.Name, tracked.Count, untracked.Count);
+            ConsoleUI.PrintSuccess($"Reset {sys.Name}: restored {tracked.Count} tracked files, deleted {untracked.Count} untracked files.");
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Reset failed for system {Id}", id);
+            ConsoleUI.PrintError($"Reset failed for system {id}: {ex.Message}");
         }
     });
     root.Subcommands.Add(resetCommand);
@@ -284,6 +301,7 @@ try
 catch (Exception ex)
 {
     Log.Fatal(ex, "Unhandled exception caused termination");
+    ConsoleUI.PrintError($"Unhandled exception: {ex.Message}");
     return 1;
 }
 finally

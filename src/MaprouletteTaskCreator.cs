@@ -22,6 +22,7 @@ namespace prepareBikeParking
         internal static IMaprouletteHttpClientFactory HttpFactory { get; set; } = new DefaultMaprouletteHttpClientFactory();
         public async static Task CreateTasksAsync(int projectId, DateTime lastSyncDate, string systemName = "Toronto", bool isNewSystem = false)
         {
+            ConsoleUI.PrintStep("Creating MapRoulette tasks");
             Serilog.Log.Information("Creating Maproulette tasks...");
 
             // First, validate that the project exists and is accessible
@@ -36,6 +37,7 @@ namespace prepareBikeParking
             {
                 Serilog.Log.Information("New system setup detected; skipping 'removed' task creation to preserve existing OSM data.");
                 Serilog.Log.Information("Only 'added' (and future 'moved') tasks will be created in this run.");
+                ConsoleUI.PrintInfo("New system: only 'added' tasks will be created (skipping 'removed' to preserve existing OSM data).");
             }
 
             // Create challenges for each type of change
@@ -68,6 +70,7 @@ namespace prepareBikeParking
         /// </summary>
         public async static Task CreateDuplicateTasksAsync(int projectId, string systemName)
         {
+            ConsoleUI.PrintStep("Creating duplicate-ref MapRoulette tasks");
             Serilog.Log.Information("Checking for duplicate ref value tasks to create...");
 
             // First, validate that the project exists and is accessible
@@ -105,6 +108,8 @@ namespace prepareBikeParking
             if (string.IsNullOrEmpty(apiKey))
             {
                 Serilog.Log.Error("MAPROULETTE_API_KEY environment variable is not set. Project validation requires API authentication.");
+                ConsoleUI.PrintError("MAPROULETTE_API_KEY environment variable is not set.");
+                ConsoleUI.PrintAction("Set MAPROULETTE_API_KEY before running (see README for setup).");
                 throw new InvalidOperationException("MAPROULETTE_API_KEY environment variable is required for project validation and task creation.");
             }
 
@@ -132,6 +137,7 @@ namespace prepareBikeParking
                             if (!isEnabled)
                             {
                                 Serilog.Log.Warning("Project {Name} (ID: {Id}) is disabled; tasks may not be visible", projectName, projectId);
+                                ConsoleUI.PrintWarning($"Project {projectName} (ID: {projectId}) is disabled; tasks may not be visible.");
                             }
                         }
 
@@ -142,18 +148,23 @@ namespace prepareBikeParking
                 {
                     Serilog.Log.Error("Maproulette project {ProjectId} not found", projectId);
                     Serilog.Log.Information("Check: ID correctness, access permissions, project existence");
+                    ConsoleUI.PrintError($"MapRoulette project {projectId} not found.");
+                    ConsoleUI.PrintAction("Verify the project ID, your access permissions, and that the project exists.");
                     throw new ArgumentException($"Maproulette project {projectId} not found. Please verify the project ID and your access permissions.");
                 }
                 else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                 {
                     Serilog.Log.Error("Unauthorized access to Maproulette project {ProjectId}", projectId);
                     Serilog.Log.Information("Ensure API key validity and project permissions");
+                    ConsoleUI.PrintError($"Unauthorized access to MapRoulette project {projectId}.");
+                    ConsoleUI.PrintAction("Check that MAPROULETTE_API_KEY is valid and has access to this project.");
                     throw new UnauthorizedAccessException($"Unauthorized access to Maproulette project {projectId}. Please check your API key and permissions.");
                 }
                 else
                 {
                     Serilog.Log.Error("Failed to validate Maproulette project {ProjectId} - Status {Status}", projectId, response.StatusCode);
                     Serilog.Log.Debug("Validation response: {Body}", await response.Content.ReadAsStringAsync());
+                    ConsoleUI.PrintError($"Failed to validate MapRoulette project {projectId}. HTTP status: {response.StatusCode}");
                     throw new InvalidOperationException($"Failed to validate Maproulette project {projectId}. HTTP Status: {response.StatusCode}");
                 }
             }
@@ -161,6 +172,8 @@ namespace prepareBikeParking
             {
                 Serilog.Log.Error(ex, "Network error validating Maproulette project {ProjectId}", projectId);
                 Serilog.Log.Information("Check internet connection, site availability, retry later");
+                ConsoleUI.PrintError($"Network error validating MapRoulette project {projectId}: {ex.Message}");
+                ConsoleUI.PrintAction("Check your internet connection and retry later.");
                 throw new InvalidOperationException($"Network error while validating Maproulette project {projectId}: {ex.Message}", ex);
             }
             catch (Exception ex) when (ex is not InvalidOperationException && ex is not ArgumentException && ex is not UnauthorizedAccessException)
@@ -200,6 +213,7 @@ namespace prepareBikeParking
             if (!FileManager.SystemFileExists(systemName, fileName))
             {
                 Serilog.Log.Information("No {Type} stations file {File} for system {System}; skipping challenge creation", taskType, fileName, systemName);
+                ConsoleUI.PrintInfo($"No {taskType} stations file ({fileName}); skipping challenge.");
                 return;
             }
 
@@ -207,6 +221,7 @@ namespace prepareBikeParking
             if (string.IsNullOrWhiteSpace(fileContent))
             {
                 Serilog.Log.Information("No {Type} stations found; skipping challenge creation", taskType);
+                ConsoleUI.PrintInfo($"No {taskType} stations found; skipping challenge.");
                 return;
             }
 
@@ -220,6 +235,7 @@ namespace prepareBikeParking
             if (stations.Count == 0)
             {
                 Serilog.Log.Information("No valid {Type} stations parsed; skipping challenge creation", taskType);
+                ConsoleUI.PrintInfo($"No valid {taskType} stations parsed; skipping challenge.");
                 return;
             }
 
@@ -317,6 +333,7 @@ namespace prepareBikeParking
             var challengeId = challengeResult.GetProperty("id").GetInt32();
 
             Serilog.Log.Information("Creating {Count} {Type} tasks", stations.Count, taskType);
+            ConsoleUI.PrintInfo($"Creating {stations.Count} {taskType} tasks...");
 
             // Create tasks one by one
             int successCount = 0;
@@ -350,9 +367,17 @@ namespace prepareBikeParking
 
             Serilog.Log.Information("{Type} challenge creation completed: {Name} (ID: {Id})", taskType.ToUpper(), challengeName, challengeId);
             Serilog.Log.Information("Task results - Success: {Success} Failed: {Fail} Total: {Total}", successCount, failureCount, stations.Count);
+            ConsoleUI.PrintSuccess($"{taskType.ToUpper()} challenge created: {challengeName} (ID: {challengeId})");
+            ConsoleUI.PrintStat("tasks created", $"{successCount}/{stations.Count}");
+            if (failureCount > 0)
+            {
+                ConsoleUI.PrintWarning($"{failureCount} task(s) failed — see logs for details.");
+            }
 
             // Provide link to the created challenge
-            Serilog.Log.Information("View challenge: https://maproulette.org/admin/project/{ProjectId}/challenge/{ChallengeId}", projectId, challengeId);
+            var challengeUrl = $"https://maproulette.org/admin/project/{projectId}/challenge/{challengeId}";
+            Serilog.Log.Information("View challenge: {Url}", challengeUrl);
+            ConsoleUI.PrintAction($"View challenge: {challengeUrl}");
         }
 
         private static async Task ResetTaskInstructionsAsync(string taskType, HttpClient client, string challengeName, int challengeId)

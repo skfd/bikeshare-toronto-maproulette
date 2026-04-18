@@ -83,13 +83,13 @@ public class PromptService : IPromptService
         if (Console.IsInputRedirected || Console.IsOutputRedirected)
         {
             Serilog.Log.Warning("Non-interactive mode detected. Auto-declining prompt: {Message}", message);
-            AnsiConsole.MarkupLine($"[yellow]⚠[/] Non-interactive mode: auto-declining - {Markup.Escape(message)}");
+            ConsoleUI.PrintAction($"Non-interactive mode: auto-declining — {message}");
             return defaultAnswer;
         }
 
-        // Interactive mode: use Spectre.Console for better prompts
+        // Interactive mode: use Spectre.Console with bold magenta to match PrintAction.
         var defaultChoice = defaultAnswer == 'y' ? "y" : "n";
-        var prompt = new TextPrompt<string>($"[cyan]?[/] {Markup.Escape(message)}")
+        var prompt = new TextPrompt<string>($"[bold magenta]→ {Markup.Escape(message)}[/]")
             .AddChoice("y")
             .AddChoice("n")
             .DefaultValue(defaultChoice)
