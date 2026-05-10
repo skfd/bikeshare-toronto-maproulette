@@ -23,7 +23,12 @@
       "WebFetch(domain:learn.maproulette.org)",
       "WebFetch(domain:josm.openstreetmap.de)",
       "Bash(git check-ignore *)",
-      "Bash(git pull *)"
+      "Bash(git pull *)",
+      "Bash(awk NR==128 || NR==129 || NR==130 {print NR\": \"length\\($0\\)\" chars\"} *)",
+      "Bash(awk 'NR==128 {for\\(i=1;i<=length\\($0\\);i++\\){c=substr\\($0,i,1\\); printf \"%d:%s\\(%d\\) \", i, c, sprintf\\(\"%c\", 0\\)+0}}' C:/Users/kk/Code/bikeshare-toronto-maproulette/src/GeoJsonGenerator.cs)",
+      "Bash(git -C C:/Users/kk/Code/bikeshare-toronto-maproulette show HEAD:src/GeoJsonGenerator.cs)",
+      "Bash(awk *)",
+      "Bash(git *)"
     ],
     "deny": [],
     "ask": []
