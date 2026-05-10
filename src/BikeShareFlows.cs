@@ -447,20 +447,50 @@ public class BikeShareFlows
             ConsoleUI.PrintWarning($"Skipped {disusedStations.Count} temporarily disused station(s) from extra-in-OSM (disused:amenity=bicycle_rental).");
         }
 
-        await _geoWriter.WriteOsmCompareAsync(missingInOSM, activeExtraInOSM, differentInOSM, renamedInOSM, system.Name);
-        await _osmChangeWriter.WriteRenameChangesAsync(renamedInOSM, system.Name);
-        Log.Information("OSM comparison for {Name}: Missing={Missing} Extra={Extra} Moved={Moved} Renamed={Renamed} DisusedSkipped={Disused}",
-            system.Name, missingInOSM.Count, activeExtraInOSM.Count, differentInOSM.Count, renamedInOSM.Count, disusedStations.Count);
+        // Reactivations: GBFS station id matches an OSM node tagged disused:amenity=bicycle_rental.
+        // The comparer joins by id, so these never land in missingInOSM/extraInOSM. We detect them
+        // here and produce a retag OSC; rename/move entries for the same id are suppressed because
+        // the reactivation OSC handles the name update and a separate edit would conflict on version.
+        var disusedById = osmPoints.Where(p => p.IsDisused).ToDictionary(p => p.id);
+        var reactivatedInOSM = bikeshareApiPoints
+            .Where(p => disusedById.ContainsKey(p.id))
+            .Select(p => (current: p, disused: disusedById[p.id]))
+            .ToList();
+        var reactivatedIds = reactivatedInOSM.Select(r => r.current.id).ToHashSet();
+        var renamedInOSMFiltered = renamedInOSM.Where(r => !reactivatedIds.Contains(r.current.id)).ToList();
+        var differentInOSMFiltered = differentInOSM.Where(p => !reactivatedIds.Contains(p.id)).ToList();
+
+        if (reactivatedInOSM.Count > 0)
+        {
+            Log.Warning("Detected {Count} reactivated station(s) in OSM for {Name} (GBFS active, OSM still tagged disused:amenity=bicycle_rental). " +
+                        "Generated bikeshare_reactivations.osc to drop the disused prefix.",
+                        reactivatedInOSM.Count, system.Name);
+            foreach (var (current, disused) in reactivatedInOSM)
+            {
+                Log.Warning("  Reactivation: {Id} \"{StationName}\" (OSM {OsmType}/{OsmId})",
+                    current.id, current.name, disused.osmType ?? "unknown", disused.osmId ?? "unknown");
+            }
+            ConsoleUI.PrintWarning($"Detected {reactivatedInOSM.Count} reactivated station(s) — see bikeshare_reactivations.osc.");
+        }
+
+        await _geoWriter.WriteOsmCompareAsync(missingInOSM, activeExtraInOSM, differentInOSMFiltered, renamedInOSMFiltered, system.Name);
+        await _osmChangeWriter.WriteRenameChangesAsync(renamedInOSMFiltered, system.Name);
+        await _geoWriter.WriteReactivationsAsync(reactivatedInOSM, system.Name);
+        await _osmChangeWriter.WriteReactivationChangesAsync(reactivatedInOSM, system.Name);
+        Log.Information("OSM comparison for {Name}: Missing={Missing} Extra={Extra} Moved={Moved} Renamed={Renamed} DisusedSkipped={Disused} Reactivated={Reactivated}",
+            system.Name, missingInOSM.Count, activeExtraInOSM.Count, differentInOSMFiltered.Count, renamedInOSMFiltered.Count, disusedStations.Count, reactivatedInOSM.Count);
         ConsoleUI.PrintSuccess("GBFS vs OSM comparison:");
         ConsoleUI.PrintStat("missing in OSM", missingInOSM.Count);
         ConsoleUI.PrintStat("extra in OSM", activeExtraInOSM.Count);
-        ConsoleUI.PrintStat("moved", differentInOSM.Count);
-        ConsoleUI.PrintStat("renamed", renamedInOSM.Count);
+        ConsoleUI.PrintStat("moved", differentInOSMFiltered.Count);
+        ConsoleUI.PrintStat("renamed", renamedInOSMFiltered.Count);
+        ConsoleUI.PrintStat("reactivated", reactivatedInOSM.Count);
 
         summary.MissingInOsm = missingInOSM.Count;
         summary.ExtraInOsm = activeExtraInOSM.Count;
-        summary.MovedInOsm = differentInOSM.Count;
-        summary.RenamedInOsm = renamedInOSM.Count;
+        summary.MovedInOsm = differentInOSMFiltered.Count;
+        summary.RenamedInOsm = renamedInOSMFiltered.Count;
+        summary.ReactivatedInOsm = reactivatedInOSM.Count;
         return true;
     }
 
@@ -471,6 +501,11 @@ public class BikeShareFlows
         if (summary.RenamedInOsm > 0)
         {
             items.Add($"Load data_results/{system.Name}/bikeshare_renames.osc in JOSM, verify, and upload — {summary.RenamedInOsm} rename(s) pending.");
+        }
+
+        if (summary.ReactivatedInOsm > 0)
+        {
+            items.Add($"Load data_results/{system.Name}/bikeshare_reactivations.osc in JOSM, verify, and upload — {summary.ReactivatedInOsm} station(s) to reactivate (drop disused:amenity).");
         }
 
         if (summary.DuplicatesFileExists)
@@ -525,6 +560,7 @@ public class BikeShareFlows
         public int ExtraInOsm { get; set; }
         public int MovedInOsm { get; set; }
         public int RenamedInOsm { get; set; }
+        public int ReactivatedInOsm { get; set; }
         public bool DuplicatesFileExists { get; set; }
         public bool DuplicateTasksCreated { get; set; }
         public bool NewLocationTasksCreated { get; set; }

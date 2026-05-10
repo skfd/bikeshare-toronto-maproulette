@@ -16,6 +16,7 @@ public interface IGeoJsonWriter
     Task WriteMainAsync(List<GeoPoint> points, string systemName);
     Task WriteDiffAsync(List<GeoPoint> added, List<GeoPoint> removed, List<GeoPoint> moved, List<(GeoPoint current, GeoPoint old)> renamed, string systemName);
     Task WriteOsmCompareAsync(List<GeoPoint> missing, List<GeoPoint> extra, List<GeoPoint> moved, List<(GeoPoint current, GeoPoint old)> renamed, string systemName);
+    Task WriteReactivationsAsync(List<(GeoPoint current, GeoPoint disused)> reactivations, string systemName);
 }
 
 public interface IComparerService
@@ -65,4 +66,5 @@ public interface IBikeShareSystemLoader
 public interface IOsmChangeWriter
 {
     Task WriteRenameChangesAsync(List<(GeoPoint current, GeoPoint old)> renamed, string systemName);
+    Task WriteReactivationChangesAsync(List<(GeoPoint current, GeoPoint disused)> reactivations, string systemName);
 }

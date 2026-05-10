@@ -26,7 +26,7 @@ namespace prepareBikeParking
 
         public static string GenerateGeojsonLine(GeoPoint point, string systemName)
         {
-            var template = "\u001e{{\"type\":\"FeatureCollection\"" +
+            var template = "{{\"type\":\"FeatureCollection\"" +
                 ",\"features\":[{{\"type\":\"Feature\",\"geometry\":{{\"type\":\"Point\"," +
                 "\"coordinates\":[{0},{1}]}},\"properties\":{{" +
                         "\"address\":\"{2}\"," +
@@ -48,7 +48,7 @@ namespace prepareBikeParking
 
         public static string GenerateGeojsonLineWithOldName(GeoPoint point, string oldName, string systemName)
         {
-            var template = "\u001e{{\"type\":\"FeatureCollection\"" +
+            var template = "{{\"type\":\"FeatureCollection\"" +
                 ",\"features\":[{{\"type\":\"Feature\",\"geometry\":{{\"type\":\"Point\"," +
                 "\"coordinates\":[{0},{1}]}},\"properties\":{{" +
                         "\"address\":\"{2}\"," +
@@ -72,7 +72,7 @@ namespace prepareBikeParking
 
         public static string GenerateGeojsonLineWithError(GeoPoint point, string systemName, string errorMessage)
         {
-            var template = "\u001e{{\"type\":\"FeatureCollection\"" +
+            var template = "{{\"type\":\"FeatureCollection\"" +
                 ",\"features\":[{{\"type\":\"Feature\",\"geometry\":{{\"type\":\"Point\"," +
                 "\"coordinates\":[{0},{1}]}},\"properties\":{{" +
                         "\"address\":\"{2}\"," +
@@ -108,6 +108,48 @@ namespace prepareBikeParking
             await FileManager.WriteSystemGeoJsonFileWithOldNamesAsync(systemName, "bikeshare_renamed_in_osm.geojson", renamedInOSM, (point, oldName) => GenerateGeojsonLineWithOldName(point, oldName, systemName));
 
             Log.Information("OSM comparison files generated successfully for {SystemName}", systemName);
+        }
+
+        public static async Task GenerateReactivationsFileAsync(List<(GeoPoint current, GeoPoint disused)> reactivations, string systemName)
+        {
+            Log.Information("Generating reactivation file for {SystemName}: {Count} station(s)", systemName, reactivations.Count);
+
+            var lines = reactivations
+                .OrderBy(r => r.current.id)
+                .Select(r => GenerateGeojsonLineForReactivation(r.current, r.disused, systemName));
+
+            await FileManager.WriteSystemLinesAsync(systemName, "bikeshare_reactivated_in_osm.geojson", lines);
+
+            Log.Information("Reactivation file generated successfully for {SystemName}", systemName);
+        }
+
+        public static string GenerateGeojsonLineForReactivation(GeoPoint current, GeoPoint disused, string systemName)
+        {
+            var template = "{{\"type\":\"FeatureCollection\"" +
+                ",\"features\":[{{\"type\":\"Feature\",\"geometry\":{{\"type\":\"Point\"," +
+                "\"coordinates\":[{0},{1}]}},\"properties\":{{" +
+                        "\"address\":\"{2}\"," +
+                        "\"latitude\":\"{1}\"," +
+                        "\"longitude\":\"{0}\"," +
+                        "\"name\":\"{3}\"," +
+                        "\"oldName\":\"{6}\"," +
+                        "\"capacity\":\"{4}\"," +
+                        "\"operator\":\"{5}\"," +
+                        "\"osmType\":\"{7}\"," +
+                        "\"osmId\":\"{8}\"," +
+                        "\"action\":\"reactivate\"}}}}]}}";
+
+            return string.Format(
+                template,
+                GeoPoint.ParseCoords(current.lon).ToString(System.Globalization.CultureInfo.InvariantCulture),
+                GeoPoint.ParseCoords(current.lat).ToString(System.Globalization.CultureInfo.InvariantCulture),
+                current.id,
+                current.name.Trim(),
+                current.capacity,
+                systemName,
+                disused.name.Trim(),
+                disused.osmType ?? "",
+                disused.osmId ?? "");
         }
     }
 }

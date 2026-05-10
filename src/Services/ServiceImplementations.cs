@@ -33,6 +33,7 @@ public class GeoJsonWriterService : IGeoJsonWriter
     public Task WriteMainAsync(List<GeoPoint> points, string systemName) => GeoJsonGenerator.GenerateMainFileAsync(points, systemName);
     public Task WriteDiffAsync(List<GeoPoint> added, List<GeoPoint> removed, List<GeoPoint> moved, List<(GeoPoint current, GeoPoint old)> renamed, string systemName) => GeoJsonGenerator.GenerateDiffFilesAsync(added, removed, moved, renamed, systemName);
     public Task WriteOsmCompareAsync(List<GeoPoint> missing, List<GeoPoint> extra, List<GeoPoint> moved, List<(GeoPoint current, GeoPoint old)> renamed, string systemName) => GeoJsonGenerator.GenerateOSMComparisonFilesAsync(missing, extra, moved, renamed, systemName);
+    public Task WriteReactivationsAsync(List<(GeoPoint current, GeoPoint disused)> reactivations, string systemName) => GeoJsonGenerator.GenerateReactivationsFileAsync(reactivations, systemName);
 }
 
 public class ComparerService : IComparerService
@@ -119,4 +120,5 @@ public class BikeShareSystemLoaderService : IBikeShareSystemLoader
 public class OsmChangeWriterService : IOsmChangeWriter
 {
     public Task WriteRenameChangesAsync(List<(GeoPoint current, GeoPoint old)> renamed, string systemName) => OsmFileFunctions.GenerateRenameOsmChangeFile(renamed, systemName);
+    public Task WriteReactivationChangesAsync(List<(GeoPoint current, GeoPoint disused)> reactivations, string systemName) => OsmFileFunctions.GenerateReactivationOsmChangeFile(reactivations, systemName);
 }
