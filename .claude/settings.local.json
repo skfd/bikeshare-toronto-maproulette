@@ -22,7 +22,8 @@
       "Bash(git commit *)",
       "WebFetch(domain:learn.maproulette.org)",
       "WebFetch(domain:josm.openstreetmap.de)",
-      "Bash(git check-ignore *)"
+      "Bash(git check-ignore *)",
+      "Bash(git pull *)"
     ],
     "deny": [],
     "ask": []
