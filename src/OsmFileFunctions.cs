@@ -57,6 +57,7 @@ internal class OsmFileFunctions
             }
 
             // Copy all existing tags from the original OSM element, updating the name
+            var nameEmitted = false;
             if (old.osmXmlElement.TryGetProperty("tags", out var tags) && tags.ValueKind == JsonValueKind.Object)
             {
                 foreach (var tag in tags.EnumerateObject())
@@ -68,6 +69,7 @@ internal class OsmFileFunctions
                     if (key == "name")
                     {
                         value = newName;
+                        nameEmitted = true;
                     }
                     else
                     {
@@ -78,9 +80,10 @@ internal class OsmFileFunctions
                     changeBlock += $"      <tag k=\"{System.Security.SecurityElement.Escape(key)}\" v=\"{value}\"/>\n";
                 }
             }
-            else
+
+            // Original OSM element had no name tag — add one so the rename actually applies.
+            if (!nameEmitted)
             {
-                // Fallback: if no tags found, at least add the name tag
                 changeBlock += $"      <tag k=\"name\" v=\"{newName}\"/>\n";
             }
 
