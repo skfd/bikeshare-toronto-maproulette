@@ -11,10 +11,23 @@ namespace prepareBikeParking
 
     public class DefaultOverpassHttpClientFactory : IOverpassHttpClientFactory
     {
-        private static readonly HttpClient _shared = new HttpClient
+        private static readonly HttpClient _shared = CreateConfiguredClient();
+
+        private static HttpClient CreateConfiguredClient()
         {
-            Timeout = TimeSpan.FromSeconds(180)
-        };
+            var client = new HttpClient
+            {
+                Timeout = TimeSpan.FromSeconds(180)
+            };
+            // overpass-api.de's Apache front-end returns 406 Not Acceptable for
+            // requests missing a User-Agent or a matching Accept header.
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(
+                "bikeshare-toronto-maproulette/1.0 (+https://github.com/skfd/bikeshare-toronto-maproulette)");
+            client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+            client.DefaultRequestHeaders.Accept.ParseAdd("*/*;q=0.8");
+            return client;
+        }
+
         public HttpClient CreateClient() => _shared;
     }
 
