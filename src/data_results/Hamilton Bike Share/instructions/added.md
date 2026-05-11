@@ -13,8 +13,11 @@ fixme=please set exact location
 amenity=bicycle_rental
 bicycle_rental=docking_station
 brand=Hamilton Bike Share
-operator=Hamilton Bike Share
-operator:type=public"]
+brand:wikidata=Q20710920
+network=Hamilton Bike Share
+operator=Hamilton Bike Share Inc.
+operator:type=private_non_profit
+fee=yes"]
 
 ```
 ref={{address}}
@@ -25,7 +28,10 @@ fixme=please set exact location
 amenity=bicycle_rental
 bicycle_rental=docking_station
 brand=Hamilton Bike Share
-operator=Hamilton Bike Share
-operator:type=public
+brand:wikidata=Q20710920
+network=Hamilton Bike Share
+operator=Hamilton Bike Share Inc.
+operator:type=private_non_profit
+fee=yes
 ```
 

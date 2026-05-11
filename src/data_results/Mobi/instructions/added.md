@@ -13,6 +13,9 @@ fixme=please set exact location
 amenity=bicycle_rental
 bicycle_rental=docking_station
 brand=Mobi
+brand:wikidata=Q26211470
+network=Mobi
+network:wikidata=Q26211470
 operator=Mobi
 operator:type=public"]
 
@@ -25,6 +28,9 @@ fixme=please set exact location
 amenity=bicycle_rental
 bicycle_rental=docking_station
 brand=Mobi
+brand:wikidata=Q26211470
+network=Mobi
+network:wikidata=Q26211470
 operator=Mobi
 operator:type=public
 ```
