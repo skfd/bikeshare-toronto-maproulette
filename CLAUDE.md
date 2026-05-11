@@ -91,6 +91,7 @@ dotnet clean
   - `move_threshold_meters` (default: 3.0): Distance threshold for detecting moved stations in git diff
   - `osm_comparison_threshold_meters` (default: 30.0): Distance threshold for matching stations with OSM
   - `station_name_prefix`: Optional prefix to add to all station names
+  - `expand_street_names` (default: false): When true, expand abbreviated street tokens (Ave→Avenue, St→Street, N→North, etc.) per [OSM convention](https://wiki.openstreetmap.org/wiki/Abbreviations). Splits intersection names on `&`; preserves a leading `St` (Saint) per side; only expands directions at start/end positions so middle initials like `S.` are left alone. Applied before any prefix.
   - `brand:wikidata`: Wikidata ID for the bike share brand
 - `stations.overpass`: Per-system Overpass queries (auto-generated on first run)
 - `instructions/*.md`: MapRoulette task templates (customizable per system)

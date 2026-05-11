@@ -7,6 +7,7 @@
     "gbfs_api": "https://example.com/gbfs/station_information.json",
     "brand:wikidata": "Q12345",
     "station_name_prefix": "Example Prefix - ",
+    "expand_street_names": false,
     "move_threshold_meters": 3.0,
     "osm_comparison_threshold_meters": 30.0
   }

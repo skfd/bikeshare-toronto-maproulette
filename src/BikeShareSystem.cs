@@ -25,6 +25,9 @@ namespace prepareBikeParking
     [JsonPropertyName("station_name_prefix")]
     public string? StationNamePrefix { get; set; }
 
+        [JsonPropertyName("expand_street_names")]
+        public bool ExpandStreetNames { get; set; }
+
         [JsonPropertyName("move_threshold_meters")]
         public double? MoveThresholdMeters { get; set; }
 

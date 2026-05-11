@@ -252,6 +252,15 @@ public class BikeShareFlows
         }
         ConsoleUI.PrintSuccess($"Fetched {locationsList.Count} GBFS stations.");
 
+        // Expand abbreviated street tokens (Ave→Avenue, etc.) before prefixing,
+        // so the operator-controlled prefix is never tokenized.
+        var expandedCount = StationNameExpander.Apply(locationsList, system.ExpandStreetNames);
+        if (expandedCount > 0)
+        {
+            Log.Information("Expanded street name abbreviations in {Count} stations for {Name}", expandedCount, system.Name);
+            ConsoleUI.PrintInfo($"Expanded street name abbreviations in {expandedCount} stations.");
+        }
+
         // Apply optional station name prefix from configuration if provided
         var appliedCount = StationNamePrefixer.Apply(locationsList, system.StationNamePrefix);
         if (appliedCount > 0)
