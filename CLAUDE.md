@@ -41,8 +41,10 @@ bikeshare-sync/
 │       ├── bikeshare_osm.geojson          # Current OSM data
 │       ├── bikeshare_osm_duplicates.geojson  # OSM validation issues (if found)
 │       ├── bikeshare_missing_in_osm.geojson  # Stations not in OSM (closed stations excluded)
-│       ├── bikeshare_extra_in_osm.geojson    # OSM stations not in GBFS
+│       ├── bikeshare_extra_in_osm.geojson    # OSM stations not in GBFS (ref-conflict nodes excluded)
 │       ├── bikeshare_closed.geojson       # GBFS stations closed per station_status (for manual review)
+│       ├── bikeshare_ref_conflicts.geojson    # OSM elements with a stale/recycled ref (if any)
+│       ├── bikeshare_ref_conflicts.osc        # JOSM changeset adding the correct ref/ref:gbfs to ref-less nodes (if any)
 │       ├── bikeshare_renames.osc          # JOSM changeset for renames
 │       └── stations.overpass              # Overpass query for this system
 └── logs/                          # Rolling log files
@@ -91,6 +93,7 @@ dotnet clean
 - `bikeshare_systems.json`: System configurations with GBFS URLs, MapRoulette project IDs, and optional thresholds
   - `move_threshold_meters` (default: 3.0): Distance threshold for detecting moved stations in git diff
   - `osm_comparison_threshold_meters` (default: 30.0): Distance threshold for matching stations with OSM
+  - `ref_conflict_threshold_meters` (default: `osm_comparison_threshold_meters` × 10, min 100.0): Distance beyond which an OSM element that shares a `ref` with a GBFS station is treated as a stale/recycled id rather than a moved station (see "Ref Conflict Handling" below)
   - `station_name_prefix`: Optional prefix to add to all station names
   - `expand_street_names` (default: false): When true, expand abbreviated street tokens (Ave→Avenue, St→Street, N→North, etc.) per [OSM convention](https://wiki.openstreetmap.org/wiki/Abbreviations). Splits intersection names on `&`; preserves a leading `St` (Saint) per side; only expands directions at start/end positions so middle initials like `S.` are left alone. Applied before any prefix.
   - `brand:wikidata`: Wikidata ID for the bike share brand
@@ -105,9 +108,10 @@ dotnet clean
 5. **OSM data validated** for duplicate ref values (generates `bikeshare_osm_duplicates.geojson` if issues found)
 6. **Temporarily disused stations** (tagged `disused:amenity=bicycle_rental`) are detected and excluded from the "extra in OSM" removal list
 7. **Closed GBFS stations** (per `station_status.json`) are detected and excluded from "missing in OSM" and from rename/move detection (see "Closed Station Handling" below)
-8. Comparison generates multiple GeoJSON outputs (diff and OSM comparison files)
-9. Optional MapRoulette challenge creation
-10. OSC file generated for bulk renames
+8. **Ref conflicts** (OSM `ref` tag points at a station GBFS no longer uses that id for — usually a recycled id) are detected; ref-less OSM nodes that clearly are a current station get an auto-fix `.osc`, and the affected ids are dropped from the missing/moved lists (see "Ref Conflict Handling" below)
+9. Comparison generates multiple GeoJSON outputs (diff and OSM comparison files)
+10. Optional MapRoulette challenge creation
+11. OSC files generated for bulk renames, reactivations, ref:gbfs additions, and ref conflicts
 
 ## Disused Station Handling
 Stations tagged with `disused:amenity=bicycle_rental` in OSM are considered temporarily closed. These are:
@@ -127,6 +131,17 @@ The mirror of disused-OSM handling, on the GBFS feed. Each run also fetches `sta
 - Logged with a warning listing each closed station's ID and name
 
 Fetching/parsing `station_status.json` is a soft dependency: a 404, network error, malformed body, or empty `data.stations` is logged and the run proceeds with no stations flagged closed. Older feeds (PBSC v1 like Toronto/àVélo, legacy SoBi like Hamilton) hardcode the status flags to true, so this is a graceful no-op for them.
+
+## Ref Conflict Handling
+The GBFS↔OSM join key is `ref` (see memory: `ref:gbfs` is validation-only). When an operator **recycles a station id** — gives id `N` to a new station while OSM still has `ref=N` on the old one — the id-based comparison goes wrong: the new station looks like it "moved" (sometimes kilometres) and a separate OSM node carrying the correct *name* but no `ref` gets flagged as "extra in OSM" (a false deletion candidate). `RefConflictDetector` (run in `BikeShareFlows.CompareWithOSMData`) catches both shapes by cross-checking name + proximity:
+
+- **`fix-ref`** — an OSM element with no `ref` whose normalized name exactly matches exactly one current GBFS station within `osm_comparison_threshold_meters`. We're confident what it is, so it's:
+  - **removed from `bikeshare_extra_in_osm.geojson`** (no false deletion task)
+  - **written to `bikeshare_ref_conflicts.osc`** as a `<modify>` adding `ref` and `ref:gbfs` (review + upload in JOSM, like the rename `.osc`)
+  - its GBFS id removed from `bikeshare_missing_in_osm.geojson`
+- **`review-ref`** — an OSM element that *does* carry a `ref`, but the GBFS station with that id is more than `ref_conflict_threshold_meters` away (a stale/recycled id). We don't auto-edit it (changing a `ref` risks creating a duplicate; the right id is often a chain the operator must untangle). It's surfaced in `bikeshare_ref_conflicts.geojson` (with a best-effort "likely ref" when its name matches a nearby station), and its id is **dropped from `bikeshare_moved_in_osm.geojson`** so the bogus "move" disappears.
+
+Ambiguous cases (a no-ref node matching multiple stations, or multiple no-ref nodes matching one station) are logged and skipped — never auto-edited. Both `.osc` and `.geojson` outputs are removed when there are no conflicts, so a stale file is never left behind. Name matching is case/whitespace-insensitive and normalizes curly apostrophes, but is otherwise strict (no token-set fuzzing) to keep auto-generated edits safe; a `station_name_prefix` will simply suppress detection rather than risk a wrong match.
 
 ## Testing Strategy
 - Unit tests for all core services

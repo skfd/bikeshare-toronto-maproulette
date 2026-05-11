@@ -502,13 +502,60 @@ public class BikeShareFlows
             ConsoleUI.PrintWarning($"Detected {reactivatedInOSM.Count} reactivated station(s) — see bikeshare_reactivations.osc.");
         }
 
+        // Ref conflicts: OSM elements whose ref tag no longer matches the station GBFS uses that id for
+        // (operator recycled the id). "fix-ref" cases (a ref-less OSM node that clearly is a current
+        // station) are auto-retagged via bikeshare_ref_conflicts.osc and pulled out of extra-in-OSM;
+        // "review-ref" cases are surfaced for manual handling. Either way the affected GBFS ids are
+        // dropped from the missing/moved lists so we don't emit bogus tasks for them.
+        var refConflictThreshold = system.GetRefConflictThresholdMeters();
+        var refResult = RefConflictDetector.Detect(bikeshareApiPoints, osmPoints, osmComparisonThreshold, refConflictThreshold);
+        foreach (var w in refResult.Warnings)
+        {
+            Log.Warning("Ref-conflict (skipped): {Detail}", w);
+        }
+        if (refResult.Conflicts.Count > 0)
+        {
+            var conflictOsmKeys = refResult.Conflicts
+                .Select(c => $"{c.OsmNode.osmType}/{c.OsmNode.osmId}")
+                .ToHashSet();
+            var suppressedGbfsIds = refResult.SuppressedGbfsIds;
+
+            activeExtraInOSM = activeExtraInOSM.Where(p => !conflictOsmKeys.Contains($"{p.osmType}/{p.osmId}")).ToList();
+            activeMissingInOSM = activeMissingInOSM.Where(p => !suppressedGbfsIds.Contains(p.id)).ToList();
+            differentInOSMFiltered = differentInOSMFiltered.Where(p => !suppressedGbfsIds.Contains(p.id)).ToList();
+            renamedInOSMFiltered = renamedInOSMFiltered.Where(r => !suppressedGbfsIds.Contains(r.current.id)).ToList();
+
+            var autoFixCount = refResult.AutoFixes.Count();
+            Log.Warning("Detected {Count} ref conflict(s) in OSM for {Name} (ref tag points at a station GBFS no longer uses that id for — likely a recycled id). " +
+                        "{Auto} auto-fixable (see bikeshare_ref_conflicts.osc); {Review} need manual review (see bikeshare_ref_conflicts.geojson).",
+                        refResult.Conflicts.Count, system.Name, autoFixCount, refResult.Conflicts.Count - autoFixCount);
+            foreach (var c in refResult.Conflicts)
+            {
+                if (c.Kind == "fix-ref")
+                {
+                    Log.Warning("  Ref fix: OSM {Type}/{Id} \"{OsmName}\" -> ref={NewRef} (\"{GbfsName}\", {Dist:F0}m)",
+                        c.OsmNode.osmType, c.OsmNode.osmId, c.OsmNode.name, c.ResolvedGbfs!.id, c.ResolvedGbfs!.name, c.ResolvedDistanceMeters ?? 0);
+                }
+                else
+                {
+                    Log.Warning("  Ref review: OSM {Type}/{Id} \"{OsmName}\" carries ref={Ref} but GBFS {Ref} is \"{GbfsName}\" {Dist:F0}m away{Likely}",
+                        c.OsmNode.osmType, c.OsmNode.osmId, c.OsmNode.name, c.CurrentRef, c.ClaimedGbfsName, c.ClaimedDistanceMeters ?? 0,
+                        c.ResolvedGbfs != null ? $" (likely ref={c.ResolvedGbfs.id})" : "");
+                }
+            }
+            ConsoleUI.PrintWarning($"Detected {refResult.Conflicts.Count} ref conflict(s) in OSM — {autoFixCount} auto-fixable (bikeshare_ref_conflicts.osc).");
+        }
+        await OsmFileFunctions.GenerateRefConflictOsmChangeFile(refResult.Conflicts, system.Name, system.GbfsSystemId);
+        await GeoJsonGenerator.GenerateRefConflictsFileAsync(refResult.Conflicts, system.Name);
+
         await _geoWriter.WriteOsmCompareAsync(activeMissingInOSM, activeExtraInOSM, differentInOSMFiltered, renamedInOSMFiltered, closedStations, system.Name);
         await _osmChangeWriter.WriteRenameChangesAsync(renamedInOSMFiltered, system.Name);
         await _geoWriter.WriteReactivationsAsync(reactivatedInOSM, system.Name);
         await _osmChangeWriter.WriteReactivationChangesAsync(reactivatedInOSM, system.Name);
         await _osmChangeWriter.WriteAddRefGbfsChangesAsync(osmPoints, bikeshareApiPoints, system.Name, system.GbfsSystemId);
-        Log.Information("OSM comparison for {Name}: Missing={Missing} Extra={Extra} Moved={Moved} Renamed={Renamed} DisusedSkipped={Disused} Reactivated={Reactivated} ClosedSkipped={Closed}",
-            system.Name, activeMissingInOSM.Count, activeExtraInOSM.Count, differentInOSMFiltered.Count, renamedInOSMFiltered.Count, disusedStations.Count, reactivatedInOSM.Count, closedStations.Count);
+        var refConflictAutoFixes = refResult.AutoFixes.Count();
+        Log.Information("OSM comparison for {Name}: Missing={Missing} Extra={Extra} Moved={Moved} Renamed={Renamed} DisusedSkipped={Disused} Reactivated={Reactivated} ClosedSkipped={Closed} RefConflicts={RefConflicts}",
+            system.Name, activeMissingInOSM.Count, activeExtraInOSM.Count, differentInOSMFiltered.Count, renamedInOSMFiltered.Count, disusedStations.Count, reactivatedInOSM.Count, closedStations.Count, refResult.Conflicts.Count);
         ConsoleUI.PrintSuccess("GBFS vs OSM comparison:");
         ConsoleUI.PrintStat("missing in OSM", activeMissingInOSM.Count);
         ConsoleUI.PrintStat("extra in OSM", activeExtraInOSM.Count);
@@ -516,6 +563,7 @@ public class BikeShareFlows
         ConsoleUI.PrintStat("renamed", renamedInOSMFiltered.Count);
         ConsoleUI.PrintStat("reactivated", reactivatedInOSM.Count);
         ConsoleUI.PrintStat("closed (skipped)", closedStations.Count);
+        ConsoleUI.PrintStat("ref conflicts", refResult.Conflicts.Count);
 
         summary.MissingInOsm = activeMissingInOSM.Count;
         summary.ExtraInOsm = activeExtraInOSM.Count;
@@ -523,6 +571,8 @@ public class BikeShareFlows
         summary.RenamedInOsm = renamedInOSMFiltered.Count;
         summary.ReactivatedInOsm = reactivatedInOSM.Count;
         summary.ClosedSkipped = closedStations.Count;
+        summary.RefConflicts = refResult.Conflicts.Count;
+        summary.RefConflictAutoFixes = refConflictAutoFixes;
         return true;
     }
 
@@ -538,6 +588,16 @@ public class BikeShareFlows
         if (summary.ReactivatedInOsm > 0)
         {
             items.Add($"Load data_results/{system.Name}/bikeshare_reactivations.osc in JOSM, verify, and upload — {summary.ReactivatedInOsm} station(s) to reactivate (drop disused:amenity).");
+        }
+
+        if (summary.RefConflictAutoFixes > 0)
+        {
+            items.Add($"Load data_results/{system.Name}/bikeshare_ref_conflicts.osc in JOSM, verify, and upload — {summary.RefConflictAutoFixes} OSM node(s) to retag with the correct ref/ref:gbfs.");
+        }
+
+        if (summary.RefConflicts - summary.RefConflictAutoFixes > 0)
+        {
+            items.Add($"Review data_results/{system.Name}/bikeshare_ref_conflicts.geojson — {summary.RefConflicts - summary.RefConflictAutoFixes} OSM node(s) with a stale/recycled ref to fix manually.");
         }
 
         if (summary.ClosedSkipped > 0)
@@ -599,6 +659,8 @@ public class BikeShareFlows
         public int RenamedInOsm { get; set; }
         public int ReactivatedInOsm { get; set; }
         public int ClosedSkipped { get; set; }
+        public int RefConflicts { get; set; }
+        public int RefConflictAutoFixes { get; set; }
         public bool DuplicatesFileExists { get; set; }
         public bool DuplicateTasksCreated { get; set; }
         public bool NewLocationTasksCreated { get; set; }

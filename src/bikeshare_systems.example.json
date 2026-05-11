@@ -9,6 +9,7 @@
     "station_name_prefix": "Example Prefix - ",
     "expand_street_names": false,
     "move_threshold_meters": 3.0,
-    "osm_comparison_threshold_meters": 30.0
+    "osm_comparison_threshold_meters": 30.0,
+    "ref_conflict_threshold_meters": 300.0
   }
 ]

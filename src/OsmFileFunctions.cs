@@ -214,6 +214,87 @@ internal class OsmFileFunctions
         await FileManager.WriteSystemTextFileAsync(systemName, osmChangeFileName, osmXml);
     }
 
+    internal static async Task GenerateRefConflictOsmChangeFile(
+        IReadOnlyList<RefConflictDetector.RefConflict> conflicts,
+        string systemName,
+        string gbfsSystemId)
+    {
+        var osmChangeFileName = "bikeshare_ref_conflicts.osc";
+        var autoFixes = conflicts.Where(c => c.Kind == "fix-ref" && c.ResolvedGbfs != null).ToList();
+
+        if (autoFixes.Count == 0)
+        {
+            // Don't leave a stale .osc around once the conflicts are resolved.
+            var stale = FileManager.GetSystemFullPath(systemName, osmChangeFileName);
+            if (File.Exists(stale)) File.Delete(stale);
+            Log.Debug("No ref-conflict auto-fixes for {System}", systemName);
+            return;
+        }
+
+        var osmXml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<osmChange version=\"0.6\" generator=\"prepareBikeParking\">\n";
+
+        foreach (var fix in autoFixes)
+        {
+            var osm = fix.OsmNode;
+            if (string.IsNullOrEmpty(osm.osmId) || string.IsNullOrEmpty(osm.osmType))
+            {
+                Log.Debug("Skipping ref-conflict fix for OSM element with missing id/type");
+                continue;
+            }
+
+            var osmType = osm.osmType.ToLower();
+            var newRef = System.Security.SecurityElement.Escape(fix.ResolvedGbfs!.id);
+            var newRefGbfs = System.Security.SecurityElement.Escape($"{gbfsSystemId}:{fix.ResolvedGbfs!.id}");
+
+            var changeBlock = $"  <modify>\n    <{osmType} id=\"{osm.osmId}\" version=\"{osm.osmVersion}\"";
+
+            if (osmType == "node")
+            {
+                if (osm.osmXmlElement.TryGetProperty("lat", out var latProperty))
+                    changeBlock += $" lat=\"{latProperty.GetDouble().ToString(System.Globalization.CultureInfo.InvariantCulture)}\"";
+                if (osm.osmXmlElement.TryGetProperty("lon", out var lonProperty))
+                    changeBlock += $" lon=\"{lonProperty.GetDouble().ToString(System.Globalization.CultureInfo.InvariantCulture)}\"";
+            }
+
+            changeBlock += ">\n";
+
+            if (osmType == "way" && osm.osmXmlElement.TryGetProperty("nodes", out var nodesProperty) && nodesProperty.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var nodeId in nodesProperty.EnumerateArray())
+                {
+                    changeBlock += $"      <nd ref=\"{nodeId.GetInt64()}\"/>\n";
+                }
+            }
+
+            var refEmitted = false;
+            var refGbfsEmitted = false;
+            if (osm.osmXmlElement.TryGetProperty("tags", out var tags) && tags.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var tag in tags.EnumerateObject())
+                {
+                    var key = tag.Name;
+                    string value;
+                    if (key == "ref") { value = newRef; refEmitted = true; }
+                    else if (key == "ref:gbfs") { value = newRefGbfs; refGbfsEmitted = true; }
+                    else { value = System.Security.SecurityElement.Escape(tag.Value.GetString() ?? ""); }
+                    changeBlock += $"      <tag k=\"{System.Security.SecurityElement.Escape(key)}\" v=\"{value}\"/>\n";
+                }
+            }
+
+            if (!refEmitted) changeBlock += $"      <tag k=\"ref\" v=\"{newRef}\"/>\n";
+            if (!refGbfsEmitted) changeBlock += $"      <tag k=\"ref:gbfs\" v=\"{newRefGbfs}\"/>\n";
+
+            changeBlock += $"    </{osmType}>\n  </modify>\n";
+            osmXml += changeBlock;
+        }
+
+        osmXml += "</osmChange>";
+
+        await FileManager.WriteSystemTextFileAsync(systemName, osmChangeFileName, osmXml);
+        Log.Information("Ref-conflict OSC written to data_results/{System}/{File} ({Count} node(s))",
+            systemName, osmChangeFileName, autoFixes.Count);
+    }
+
     internal static async Task GenerateAddRefGbfsOsmChangeFile(
         List<GeoPoint> osmPoints,
         List<GeoPoint> gbfsPoints,

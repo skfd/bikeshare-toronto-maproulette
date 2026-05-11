@@ -38,6 +38,9 @@ namespace prepareBikeParking
         [JsonPropertyName("osm_comparison_threshold_meters")]
         public double? OsmComparisonThresholdMeters { get; set; }
 
+        [JsonPropertyName("ref_conflict_threshold_meters")]
+        public double? RefConflictThresholdMeters { get; set; }
+
         /// <summary>
         /// Gets the movement threshold in meters for git diff comparison (current vs previous data).
         /// Default: 3 meters
@@ -49,6 +52,12 @@ namespace prepareBikeParking
         /// Default: 30 meters (more lenient due to mapping imprecision)
         /// </summary>
         public double GetOsmComparisonThresholdMeters() => OsmComparisonThresholdMeters ?? 30.0;
+
+        /// <summary>
+        /// Distance beyond which an OSM element that shares a <c>ref</c> with a GBFS station is treated as a
+        /// stale/recycled ref rather than a moved station. Default: 10x the OSM comparison threshold (min 100 m).
+        /// </summary>
+        public double GetRefConflictThresholdMeters() => RefConflictThresholdMeters ?? Math.Max(GetOsmComparisonThresholdMeters() * 10, 100.0);
 
         /// <summary>
         /// Gets the station_information endpoint URL from the GBFS API base URL

@@ -111,6 +111,67 @@ namespace prepareBikeParking
             Log.Information("OSM comparison files generated successfully for {SystemName}", systemName);
         }
 
+        public static async Task GenerateRefConflictsFileAsync(IReadOnlyList<RefConflictDetector.RefConflict> conflicts, string systemName)
+        {
+            var fileName = "bikeshare_ref_conflicts.geojson";
+            if (conflicts.Count == 0)
+            {
+                var stale = FileManager.GetSystemFullPath(systemName, fileName);
+                if (File.Exists(stale)) File.Delete(stale);
+                return;
+            }
+
+            Log.Information("Generating ref-conflict file for {SystemName}: {Count} conflict(s)", systemName, conflicts.Count);
+            var lines = conflicts
+                .OrderBy(c => c.Kind)
+                .ThenBy(c => c.OsmNode.osmId)
+                .Select(c => GenerateGeojsonLineForRefConflict(c, systemName));
+            await FileManager.WriteSystemLinesAsync(systemName, fileName, lines);
+        }
+
+        public static string GenerateGeojsonLineForRefConflict(RefConflictDetector.RefConflict c, string systemName)
+        {
+            static string J(string s) => s.Replace("\\", "\\\\").Replace("\"", "\\\"");
+            static string Num(double d) => Math.Round(d).ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+            var osm = c.OsmNode;
+            var lon = GeoPoint.ParseCoords(osm.lon).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            var lat = GeoPoint.ParseCoords(osm.lat).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            var address = c.Kind == "fix-ref" ? (c.ResolvedGbfs?.id ?? osm.id) : osm.id;
+
+            var props = new System.Text.StringBuilder();
+            props.Append($"\"address\":\"{J(address)}\",");
+            props.Append($"\"latitude\":\"{lat}\",");
+            props.Append($"\"longitude\":\"{lon}\",");
+            props.Append($"\"name\":\"{J(osm.name.Trim())}\",");
+            props.Append($"\"capacity\":\"{osm.capacity}\",");
+            props.Append($"\"operator\":\"{J(systemName)}\",");
+            props.Append($"\"osmType\":\"{J(osm.osmType ?? "")}\",");
+            props.Append($"\"osmId\":\"{J(osm.osmId ?? "")}\",");
+            props.Append($"\"action\":\"{c.Kind}\",");
+            props.Append($"\"currentRef\":\"{J(c.CurrentRef ?? "")}\"");
+
+            if (c.Kind == "fix-ref" && c.ResolvedGbfs != null)
+            {
+                props.Append($",\"resolvedRef\":\"{J(c.ResolvedGbfs.id)}\"");
+                if (c.ResolvedDistanceMeters is double rd) props.Append($",\"resolvedDistanceMeters\":\"{Num(rd)}\"");
+            }
+            else
+            {
+                if (c.ClaimedGbfsName != null) props.Append($",\"claimedGbfsName\":\"{J(c.ClaimedGbfsName.Trim())}\"");
+                if (c.ClaimedDistanceMeters is double cd) props.Append($",\"claimedDistanceMeters\":\"{Num(cd)}\"");
+                if (c.ResolvedGbfs != null)
+                {
+                    props.Append($",\"likelyRef\":\"{J(c.ResolvedGbfs.id)}\"");
+                    props.Append($",\"likelyName\":\"{J(c.ResolvedGbfs.name.Trim())}\"");
+                    if (c.ResolvedDistanceMeters is double rd) props.Append($",\"likelyDistanceMeters\":\"{Num(rd)}\"");
+                }
+            }
+
+            return "{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":["
+                + lon + "," + lat + "]},\"properties\":{" + props + "}}]}";
+        }
+
         public static async Task GenerateReactivationsFileAsync(List<(GeoPoint current, GeoPoint disused)> reactivations, string systemName)
         {
             Log.Information("Generating reactivation file for {SystemName}: {Count} station(s)", systemName, reactivations.Count);
