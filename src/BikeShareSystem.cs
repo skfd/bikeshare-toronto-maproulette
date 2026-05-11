@@ -19,6 +19,9 @@ namespace prepareBikeParking
         [JsonPropertyName("gbfs_api")]
         public string GbfsApi { get; set; } = string.Empty;
 
+        [JsonPropertyName("gbfs_system_id")]
+        public string GbfsSystemId { get; set; } = string.Empty;
+
         [JsonPropertyName("brand:wikidata")]
         public string? BrandWikidata { get; set; }
 

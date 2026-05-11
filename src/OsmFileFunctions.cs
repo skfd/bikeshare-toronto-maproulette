@@ -213,4 +213,111 @@ internal class OsmFileFunctions
 
         await FileManager.WriteSystemTextFileAsync(systemName, osmChangeFileName, osmXml);
     }
+
+    internal static async Task GenerateAddRefGbfsOsmChangeFile(
+        List<GeoPoint> osmPoints,
+        List<GeoPoint> gbfsPoints,
+        string systemName,
+        string gbfsSystemId)
+    {
+        var osmChangeFileName = "bikeshare_add_ref_gbfs.osc";
+        var mismatchFileName = "bikeshare_refgbfs_mismatches.geojson";
+
+        var gbfsIds = new HashSet<string>(gbfsPoints.Where(p => !string.IsNullOrEmpty(p.id)).Select(p => p.id));
+
+        var toAdd = new List<GeoPoint>();
+        var mismatchLines = new List<string>();
+
+        foreach (var osm in osmPoints)
+        {
+            if (string.IsNullOrEmpty(osm.id) || osm.id.StartsWith("osm_")) continue;
+            if (string.IsNullOrEmpty(osm.osmId) || string.IsNullOrEmpty(osm.osmType)) continue;
+            if (!gbfsIds.Contains(osm.id)) continue;
+
+            var expected = $"{gbfsSystemId}:{osm.id}";
+
+            if (string.IsNullOrWhiteSpace(osm.RefGbfs))
+            {
+                toAdd.Add(osm);
+            }
+            else if (osm.RefGbfs != expected)
+            {
+                Log.Warning("ref:gbfs mismatch on OSM {Type}/{Id}: expected '{Expected}', found '{Actual}' — skipping",
+                    osm.osmType, osm.osmId, expected, osm.RefGbfs);
+                mismatchLines.Add(GeoJsonGenerator.GenerateGeojsonLineWithError(
+                    osm,
+                    systemName,
+                    $"ref:gbfs mismatch: expected '{expected}', found '{osm.RefGbfs}'"));
+            }
+        }
+
+        if (mismatchLines.Count > 0)
+        {
+            try
+            {
+                await FileManager.WriteSystemLinesAsync(systemName, mismatchFileName, mismatchLines);
+                Log.Information("ref:gbfs mismatch report written to data_results/{System}/{File} ({Count} stations)",
+                    systemName, mismatchFileName, mismatchLines.Count);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Could not write ref:gbfs mismatch report for {System}", systemName);
+            }
+        }
+
+        if (toAdd.Count == 0)
+        {
+            Log.Debug("No OSM stations need ref:gbfs added for {System}", systemName);
+            return;
+        }
+
+        var osmXml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<osmChange version=\"0.6\" generator=\"prepareBikeParking\">\n";
+
+        foreach (var osm in toAdd)
+        {
+            var osmType = osm.osmType!.ToLower();
+            var refGbfsValue = System.Security.SecurityElement.Escape($"{gbfsSystemId}:{osm.id}");
+
+            var changeBlock = $"  <modify>\n    <{osmType} id=\"{osm.osmId}\" version=\"{osm.osmVersion}\"";
+
+            if (osmType == "node")
+            {
+                if (osm.osmXmlElement.TryGetProperty("lat", out var latProperty))
+                    changeBlock += $" lat=\"{latProperty.GetDouble().ToString(System.Globalization.CultureInfo.InvariantCulture)}\"";
+                if (osm.osmXmlElement.TryGetProperty("lon", out var lonProperty))
+                    changeBlock += $" lon=\"{lonProperty.GetDouble().ToString(System.Globalization.CultureInfo.InvariantCulture)}\"";
+            }
+
+            changeBlock += ">\n";
+
+            if (osmType == "way" && osm.osmXmlElement.TryGetProperty("nodes", out var nodesProperty) && nodesProperty.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var nodeId in nodesProperty.EnumerateArray())
+                {
+                    changeBlock += $"      <nd ref=\"{nodeId.GetInt64()}\"/>\n";
+                }
+            }
+
+            if (osm.osmXmlElement.TryGetProperty("tags", out var tags) && tags.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var tag in tags.EnumerateObject())
+                {
+                    var key = tag.Name;
+                    var value = System.Security.SecurityElement.Escape(tag.Value.GetString() ?? "");
+                    changeBlock += $"      <tag k=\"{System.Security.SecurityElement.Escape(key)}\" v=\"{value}\"/>\n";
+                }
+            }
+
+            changeBlock += $"      <tag k=\"ref:gbfs\" v=\"{refGbfsValue}\"/>\n";
+            changeBlock += $"    </{osmType}>\n  </modify>\n";
+
+            osmXml += changeBlock;
+        }
+
+        osmXml += "</osmChange>";
+
+        await FileManager.WriteSystemTextFileAsync(systemName, osmChangeFileName, osmXml);
+        Log.Information("ref:gbfs OSC written to data_results/{System}/{File} ({Count} stations)",
+            systemName, osmChangeFileName, toAdd.Count);
+    }
 }

@@ -357,4 +357,64 @@ public class OSMDataFetcherTests
         Assert.That(result.Count, Is.EqualTo(1));
         Assert.That(result[0].IsDisused, Is.False, "Active station should not be marked as disused");
     }
+
+    [Test]
+    public async Task Parse_NodeWithRefGbfs_PopulatesRefGbfsField()
+    {
+        var node = new Dictionary<string, object>
+        {
+            { "type", "node" }, { "id", 7001 }, { "version", 1 }, { "lat", 43.1 }, { "lon", -79.2 },
+            { "tags", new Dictionary<string, string>
+                { { "bicycle_rental", "docking_station" }, { "name", "GbfsStation" }, { "ref", "G1" }, { "ref:gbfs", "bike_share_toronto:G1" } }
+            }
+        };
+        var fetcher = new OSMDataFetcher(new Factory(new StubHandler(new[]{(HttpStatusCode.OK, WrapElements(node))})));
+        var result = await fetcher.FetchFromOverpassApiAsync("TestRefGbfs");
+        Assert.That(result.Count, Is.EqualTo(1));
+        Assert.That(result[0].id, Is.EqualTo("G1"));
+        Assert.That(result[0].RefGbfs, Is.EqualTo("bike_share_toronto:G1"));
+    }
+
+    [Test]
+    public async Task Parse_NodeWithoutRefGbfs_LeavesRefGbfsNull()
+    {
+        var node = new { type="node", id=7002, version=1, lat=43.1, lon=-79.2, tags=new { bicycle_rental="docking_station", name="NoGbfs", @ref="N1" } };
+        var fetcher = new OSMDataFetcher(new Factory(new StubHandler(new[]{(HttpStatusCode.OK, WrapElements(node))})));
+        var result = await fetcher.FetchFromOverpassApiAsync("TestNoRefGbfs");
+        Assert.That(result[0].RefGbfs, Is.Null);
+    }
+
+    [Test]
+    public async Task DuplicateRefGbfsValues_AppearInDuplicateReport()
+    {
+        // Two nodes with different `ref` but the SAME `ref:gbfs` — should trigger ref:gbfs duplicate detection
+        var node1 = new Dictionary<string, object>
+        {
+            { "type", "node" }, { "id", 7101 }, { "version", 1 }, { "lat", 43.1 }, { "lon", -79.2 },
+            { "tags", new Dictionary<string, string>
+                { { "bicycle_rental", "docking_station" }, { "name", "A" }, { "ref", "REF_A" }, { "ref:gbfs", "sys:DUP" } }
+            }
+        };
+        var node2 = new Dictionary<string, object>
+        {
+            { "type", "node" }, { "id", 7102 }, { "version", 1 }, { "lat", 43.2 }, { "lon", -79.3 },
+            { "tags", new Dictionary<string, string>
+                { { "bicycle_rental", "docking_station" }, { "name", "B" }, { "ref", "REF_B" }, { "ref:gbfs", "sys:DUP" } }
+            }
+        };
+        var fetcher = new OSMDataFetcher(new Factory(new StubHandler(new[]{(HttpStatusCode.OK, WrapElements(node1, node2))})));
+
+        var systemName = "TestRefGbfsDuplicates";
+        var duplicateReportPath = FileManager.GetSystemFullPath(systemName, "bikeshare_osm_duplicates.geojson");
+        if (System.IO.File.Exists(duplicateReportPath)) System.IO.File.Delete(duplicateReportPath);
+
+        var result = await fetcher.FetchFromOverpassApiAsync(systemName);
+
+        Assert.That(result.Count, Is.EqualTo(2));
+        Assert.That(System.IO.File.Exists(duplicateReportPath), Is.True, "Duplicate validation report should be created for ref:gbfs duplicates");
+
+        var reportContent = await System.IO.File.ReadAllTextAsync(duplicateReportPath);
+        Assert.That(reportContent, Does.Contain("ref:gbfs"));
+        Assert.That(reportContent, Does.Contain("sys:DUP"));
+    }
 }

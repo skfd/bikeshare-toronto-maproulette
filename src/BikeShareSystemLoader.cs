@@ -115,6 +115,9 @@ namespace prepareBikeParking
                          (uri.Scheme != "http" && uri.Scheme != "https"))
                     systemErrors.Add("GBFS API must be a valid HTTP/HTTPS URL");
 
+                if (string.IsNullOrWhiteSpace(system.GbfsSystemId))
+                    systemErrors.Add("gbfs_system_id is required (the system_id from this feed's system_information.json; used to build ref:gbfs values)");
+
                 if (systemErrors.Any())
                 {
                     errors.Add($"System ID {system.Id} ('{system.Name}'): {string.Join(", ", systemErrors)}");

@@ -40,7 +40,7 @@ public interface IMaprouletteService
 
 public interface ISystemSetupService
 {
-    Task<bool> EnsureAsync(string systemName, string operatorName, string brandName, string? cityName = null);
+    Task<bool> EnsureAsync(string systemName, string operatorName, string brandName, string gbfsSystemId, string? cityName = null);
     void ValidateInstructionFiles(string systemName);
     SystemValidationResult ValidateSystem(string systemName, bool throwOnMissing = false);
     Task EnsureDuplicatesInstructionFileAsync(string systemName);
@@ -67,4 +67,5 @@ public interface IOsmChangeWriter
 {
     Task WriteRenameChangesAsync(List<(GeoPoint current, GeoPoint old)> renamed, string systemName);
     Task WriteReactivationChangesAsync(List<(GeoPoint current, GeoPoint disused)> reactivations, string systemName);
+    Task WriteAddRefGbfsChangesAsync(List<GeoPoint> osmPoints, List<GeoPoint> gbfsPoints, string systemName, string gbfsSystemId);
 }

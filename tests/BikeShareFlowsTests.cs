@@ -31,7 +31,7 @@ public class BikeShareFlowsTests
     public async Task RunSystemFlow_ExistingSystem_GeneratesMainDiffAndOsmCompare_NoTasksWhenDeclined()
     {
         using var _env = SetApiKey("test-key");
-        var system = new BikeShareSystem { Id=1, Name="TestSys", City="CityX", GbfsApi="https://example", MaprouletteProjectId=123 };
+        var system = new BikeShareSystem { Id=1, Name="TestSys", City="CityX", GbfsApi="https://example", GbfsSystemId="test_sys", MaprouletteProjectId=123 };
         var currentPoints = new List<GeoPoint>{ Pt("1","Old"), Pt("2","New") };
         var previousPoints = new List<GeoPoint>{ Pt("1","Old") };
         // Generate previous version content (one line)
@@ -82,7 +82,7 @@ public class BikeShareFlowsTests
 
         var setupSvc = new Mock<ISystemSetupService>();
         setupSvc.Setup(s => s.ValidateSystem(system.Name, false)).Returns(new SystemValidationResult{ SystemName=system.Name, IsValid=true });
-    setupSvc.Setup(s => s.EnsureAsync(system.Name, system.Name, system.Name, system.City)).ReturnsAsync(false);
+    setupSvc.Setup(s => s.EnsureAsync(system.Name, system.Name, system.Name, system.GbfsSystemId, system.City)).ReturnsAsync(false);
         setupSvc.Setup(s => s.ValidateInstructionFiles(system.Name)).Verifiable();
 
         var paths = new Mock<IFilePathProvider>();
@@ -102,7 +102,7 @@ public class BikeShareFlowsTests
     [Test]
     public async Task RunSystemFlow_NewSystem_AllStationsAddedWhenNoGitHistory()
     {
-        var system = new BikeShareSystem { Id=2, Name="NewSys", City="CityY", GbfsApi="https://example", MaprouletteProjectId=0 };
+        var system = new BikeShareSystem { Id=2, Name="NewSys", City="CityY", GbfsApi="https://example", GbfsSystemId="new_sys", MaprouletteProjectId=0 };
         var currentPoints = new List<GeoPoint>{ Pt("10","Only") };
 
         var loader = new Mock<IBikeShareSystemLoader>();
@@ -140,7 +140,7 @@ public class BikeShareFlowsTests
 
         var setupSvc = new Mock<ISystemSetupService>();
         setupSvc.Setup(s => s.ValidateSystem(system.Name, false)).Returns(new SystemValidationResult{ SystemName=system.Name, IsValid=true });
-    setupSvc.Setup(s => s.EnsureAsync(system.Name, system.Name, system.Name, system.City)).ReturnsAsync(false);
+    setupSvc.Setup(s => s.EnsureAsync(system.Name, system.Name, system.Name, system.GbfsSystemId, system.City)).ReturnsAsync(false);
 
         var paths = new Mock<IFilePathProvider>();
         paths.Setup(p => p.GetSystemFullPath(system.Name, "bikeshare.geojson")).Returns("dummy-new.geojson");
@@ -160,7 +160,7 @@ public class BikeShareFlowsTests
     public async Task RunSystemFlow_ProjectValidationFails_TasksNotCreated()
     {
         using var _env = SetApiKey("test-key");
-        var system = new BikeShareSystem { Id=3, Name="ValFail", City="CityZ", GbfsApi="https://example", MaprouletteProjectId=999 };
+        var system = new BikeShareSystem { Id=3, Name="ValFail", City="CityZ", GbfsApi="https://example", GbfsSystemId="valfail_sys", MaprouletteProjectId=999 };
         var currentPoints = new List<GeoPoint>{ Pt("1","A") };
 
         var loader = new Mock<IBikeShareSystemLoader>();
@@ -200,7 +200,7 @@ public class BikeShareFlowsTests
 
         var setupSvc = new Mock<ISystemSetupService>();
         setupSvc.Setup(s => s.ValidateSystem(system.Name, false)).Returns(new SystemValidationResult{ SystemName=system.Name, IsValid=true });
-    setupSvc.Setup(s => s.EnsureAsync(system.Name, system.Name, system.Name, system.City)).ReturnsAsync(false);
+    setupSvc.Setup(s => s.EnsureAsync(system.Name, system.Name, system.Name, system.GbfsSystemId, system.City)).ReturnsAsync(false);
         setupSvc.Setup(s => s.ValidateInstructionFiles(system.Name)).Verifiable();
 
         var paths = new Mock<IFilePathProvider>();
@@ -220,7 +220,7 @@ public class BikeShareFlowsTests
     [Test]
     public async Task RunSystemFlow_NewScaffold_EarlyExitBeforeFetching()
     {
-        var system = new BikeShareSystem { Id=4, Name="ScaffoldOnly", City="CityS", GbfsApi="https://example", MaprouletteProjectId=0 };
+        var system = new BikeShareSystem { Id=4, Name="ScaffoldOnly", City="CityS", GbfsApi="https://example", GbfsSystemId="scaffold_sys", MaprouletteProjectId=0 };
 
         var loader = new Mock<IBikeShareSystemLoader>();
         loader.Setup(l => l.LoadByIdAsync(system.Id)).ReturnsAsync(system);
@@ -239,7 +239,7 @@ public class BikeShareFlowsTests
         var setupSvc = new Mock<ISystemSetupService>();
         setupSvc.Setup(s => s.ValidateSystem(system.Name, false)).Returns(new SystemValidationResult{ SystemName=system.Name, IsValid=false });
         // Return true meaning newly created
-        setupSvc.Setup(s => s.EnsureAsync(system.Name, system.Name, system.Name, system.City)).ReturnsAsync(true);
+        setupSvc.Setup(s => s.EnsureAsync(system.Name, system.Name, system.Name, system.GbfsSystemId, system.City)).ReturnsAsync(true);
 
         var paths = new Mock<IFilePathProvider>();
         paths.Setup(p => p.GetSystemFullPath(system.Name, "bikeshare.geojson")).Returns("dummy.geojson");
@@ -259,7 +259,7 @@ public class BikeShareFlowsTests
     public async Task RunSystemFlow_DisusedStations_ExcludedFromExtraInOSM()
     {
         using var _env = SetApiKey("test-key");
-        var system = new BikeShareSystem { Id=5, Name="DisusedTest", City="CityD", GbfsApi="https://example", MaprouletteProjectId=456 };
+        var system = new BikeShareSystem { Id=5, Name="DisusedTest", City="CityD", GbfsApi="https://example", GbfsSystemId="disused_sys", MaprouletteProjectId=456 };
         var currentPoints = new List<GeoPoint>{ Pt("1","Active") };
 
         // Simulate an OSM result with a disused station not matching any GBFS station
@@ -311,7 +311,7 @@ public class BikeShareFlowsTests
 
         var setupSvc = new Mock<ISystemSetupService>();
         setupSvc.Setup(s => s.ValidateSystem(system.Name, false)).Returns(new SystemValidationResult{ SystemName=system.Name, IsValid=true });
-        setupSvc.Setup(s => s.EnsureAsync(system.Name, system.Name, system.Name, system.City)).ReturnsAsync(false);
+        setupSvc.Setup(s => s.EnsureAsync(system.Name, system.Name, system.Name, system.GbfsSystemId, system.City)).ReturnsAsync(false);
         setupSvc.Setup(s => s.ValidateInstructionFiles(system.Name));
 
         var paths = new Mock<IFilePathProvider>();

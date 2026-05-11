@@ -261,6 +261,11 @@ out meta;
                                 geoPoint.id = "osm_" + idProp.GetInt64().ToString();
                         }
 
+                        if (tags.TryGetProperty("ref:gbfs", out var refGbfsProp))
+                        {
+                            geoPoint.RefGbfs = refGbfsProp.GetString();
+                        }
+
                         // Get station name
                         if (tags.TryGetProperty("name", out var nameProp))
                         {
@@ -355,110 +360,131 @@ out meta;
         }
 
         /// <summary>
-        /// Validates OSM data for duplicate ref values and generates a report if found
+        /// Validates OSM data for duplicate ref and ref:gbfs values and generates a report if found
         /// </summary>
         private static async Task ValidateAndReportDuplicates(List<GeoPoint> geoPoints, string systemName)
         {
             // Group by ref ID, excluding auto-generated IDs (those starting with "osm_")
-            var duplicates = geoPoints
+            var refDuplicates = geoPoints
                 .Where(p => !string.IsNullOrEmpty(p.id) && !p.id.StartsWith("osm_"))
                 .GroupBy(p => p.id)
                 .Where(g => g.Count() > 1)
                 .ToList();
 
-            if (duplicates.Any())
+            var refGbfsDuplicates = geoPoints
+                .Where(p => !string.IsNullOrWhiteSpace(p.RefGbfs))
+                .GroupBy(p => p.RefGbfs!)
+                .Where(g => g.Count() > 1)
+                .ToList();
+
+            if (!refDuplicates.Any() && !refGbfsDuplicates.Any())
             {
-                var duplicateStations = duplicates.SelectMany(g => g).ToList();
-                var totalDuplicateRefs = duplicates.Count;
-                var totalAffectedStations = duplicateStations.Count;
+                Log.Debug("No duplicate ref or ref:gbfs values found in OSM data for {System}", systemName);
+                return;
+            }
 
-                // Log warning to console
-                Log.Warning("Found {DuplicateRefs} duplicate ref values in OSM data for {System}. " +
-                           "Total affected stations: {AffectedStations}. " +
-                           "See data_results/{System}/bikeshare_osm_duplicates.geojson for details",
-                           totalDuplicateRefs, systemName, totalAffectedStations, systemName);
-                ConsoleUI.PrintWarning($"Found {totalDuplicateRefs} duplicate ref value(s) in OSM ({totalAffectedStations} affected stations).");
-                ConsoleUI.PrintAction($"Review data_results/{systemName}/bikeshare_osm_duplicates.geojson and fix duplicates in OSM.");
+            var totalAffected = refDuplicates.SelectMany(g => g).Count() + refGbfsDuplicates.SelectMany(g => g).Count();
 
-                // Log each duplicate ref with OSM element details
-                foreach (var dup in duplicates)
+            Log.Warning("Found {RefDups} duplicate ref value(s) and {GbfsDups} duplicate ref:gbfs value(s) in OSM data for {System}. " +
+                       "Total affected entries: {Affected}. " +
+                       "See data_results/{System}/bikeshare_osm_duplicates.geojson for details",
+                       refDuplicates.Count, refGbfsDuplicates.Count, systemName, totalAffected, systemName);
+            ConsoleUI.PrintWarning($"Found {refDuplicates.Count} duplicate ref + {refGbfsDuplicates.Count} duplicate ref:gbfs in OSM ({totalAffected} affected entries).");
+            ConsoleUI.PrintAction($"Review data_results/{systemName}/bikeshare_osm_duplicates.geojson and fix duplicates in OSM.");
+
+            foreach (var dup in refDuplicates)
+            {
+                var osmDetails = string.Join(", ", dup.Select(d => $"{d.osmType}/{d.osmId}"));
+                Log.Warning("  Duplicate ref '{Ref}' found in {Count} OSM elements: {OsmIds}",
+                    dup.Key, dup.Count(), osmDetails);
+            }
+            foreach (var dup in refGbfsDuplicates)
+            {
+                var osmDetails = string.Join(", ", dup.Select(d => $"{d.osmType}/{d.osmId}"));
+                Log.Warning("  Duplicate ref:gbfs '{Ref}' found in {Count} OSM elements: {OsmIds}",
+                    dup.Key, dup.Count(), osmDetails);
+            }
+
+            var refCounts = refDuplicates.ToDictionary(g => g.Key, g => g.Count());
+            var refGbfsCounts = refGbfsDuplicates.ToDictionary(g => g.Key, g => g.Count());
+
+            var lines = new List<string>();
+            foreach (var dup in refDuplicates)
+            {
+                foreach (var point in dup)
                 {
-                    var osmDetails = string.Join(", ", dup.Select(d => $"{d.osmType}/{d.osmId}"));
-                    Log.Warning("  Duplicate ref '{Ref}' found in {Count} OSM elements: {OsmIds}",
-                        dup.Key, dup.Count(), osmDetails);
-                }
-
-                // Create a dictionary to lookup duplicate counts by ref
-                var duplicateCounts = duplicates.ToDictionary(g => g.Key, g => g.Count());
-
-                // Generate GeoJSON file with duplicate stations for editor review
-                try
-                {
-                    await FileManager.WriteSystemGeoJsonFileAsync(
+                    lines.Add(GeoJsonGenerator.GenerateGeojsonLineWithError(
+                        point,
                         systemName,
-                        "bikeshare_osm_duplicates.geojson",
-                        duplicateStations,
-                        point => GeoJsonGenerator.GenerateGeojsonLineWithError(
-                            point,
-                            systemName,
-                            $"Duplicate ref '{point.id}' appears {duplicateCounts[point.id]} times in OSM (this is OSM {point.osmType}/{point.osmId})"
-                        )
-                    );
-
-                    Log.Information("Duplicate validation report saved to data_results/{System}/bikeshare_osm_duplicates.geojson",
-                        systemName);
-                }
-                catch (Exception ex)
-                {
-                    Log.Warning(ex, "Could not save duplicate validation report for {System}", systemName);
+                        $"Duplicate ref '{point.id}' appears {refCounts[point.id]} times in OSM (this is OSM {point.osmType}/{point.osmId})"));
                 }
             }
-            else
+            foreach (var dup in refGbfsDuplicates)
             {
-                Log.Debug("No duplicate ref values found in OSM data for {System}", systemName);
+                foreach (var point in dup)
+                {
+                    lines.Add(GeoJsonGenerator.GenerateGeojsonLineWithError(
+                        point,
+                        systemName,
+                        $"Duplicate ref:gbfs '{point.RefGbfs}' appears {refGbfsCounts[point.RefGbfs!]} times in OSM (this is OSM {point.osmType}/{point.osmId})"));
+                }
+            }
+
+            try
+            {
+                await FileManager.WriteSystemLinesAsync(systemName, "bikeshare_osm_duplicates.geojson", lines);
+                Log.Information("Duplicate validation report saved to data_results/{System}/bikeshare_osm_duplicates.geojson", systemName);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Could not save duplicate validation report for {System}", systemName);
             }
         }
 
         /// <summary>
-        /// Generates an enhanced duplicate report that includes GBFS data for comparison
+        /// Generates an enhanced duplicate report that includes GBFS data for comparison.
+        /// Detects duplicates on both `ref` and `ref:gbfs`.
         /// </summary>
         /// <param name="osmPoints">OSM data points that may contain duplicates</param>
         /// <param name="gbfsPoints">GBFS/API data points for reference</param>
         /// <param name="systemName">Name of the bike share system</param>
         public static async Task GenerateEnhancedDuplicateReportAsync(List<GeoPoint> osmPoints, List<GeoPoint> gbfsPoints, string systemName)
         {
-            // Find duplicate ref values in OSM data
-            var duplicates = osmPoints
+            var refDuplicates = osmPoints
                 .Where(p => !string.IsNullOrEmpty(p.id) && !p.id.StartsWith("osm_"))
                 .GroupBy(p => p.id)
                 .Where(g => g.Count() > 1)
                 .ToList();
 
-            if (!duplicates.Any())
+            var refGbfsDuplicates = osmPoints
+                .Where(p => !string.IsNullOrWhiteSpace(p.RefGbfs))
+                .GroupBy(p => p.RefGbfs!)
+                .Where(g => g.Count() > 1)
+                .ToList();
+
+            if (!refDuplicates.Any() && !refGbfsDuplicates.Any())
             {
-                Log.Debug("No duplicate ref values found - enhanced report not needed");
+                Log.Debug("No duplicate ref or ref:gbfs values found - enhanced report not needed");
                 return;
             }
 
-            var enhancedStations = new List<GeoPoint>();
-            var duplicateCounts = duplicates.ToDictionary(g => g.Key, g => g.Count());
+            var refCounts = refDuplicates.ToDictionary(g => g.Key, g => g.Count());
+            var refGbfsCounts = refGbfsDuplicates.ToDictionary(g => g.Key, g => g.Count());
+            var lines = new List<string>();
 
-            foreach (var duplicateGroup in duplicates)
+            foreach (var dup in refDuplicates)
             {
-                var refValue = duplicateGroup.Key;
-                var count = duplicateGroup.Count();
-
-                // Add all OSM stations with this duplicate ref
-                foreach (var osmStation in duplicateGroup)
+                foreach (var osmStation in dup)
                 {
-                    enhancedStations.Add(osmStation);
+                    lines.Add(GeoJsonGenerator.GenerateGeojsonLineWithError(
+                        osmStation,
+                        systemName,
+                        $"Duplicate ref '{osmStation.id}' appears {refCounts[osmStation.id]} times in OSM (this is OSM {osmStation.osmType}/{osmStation.osmId})"));
                 }
 
-                // Find matching GBFS station (if any) with this ref
-                var gbfsStation = gbfsPoints.FirstOrDefault(g => g.id == refValue);
+                var gbfsStation = gbfsPoints.FirstOrDefault(g => g.id == dup.Key);
                 if (gbfsStation != null)
                 {
-                    // Add GBFS station for comparison with special marker
                     var gbfsForComparison = new GeoPoint
                     {
                         id = gbfsStation.id,
@@ -466,40 +492,32 @@ out meta;
                         lat = gbfsStation.lat,
                         lon = gbfsStation.lon,
                         capacity = gbfsStation.capacity,
-                        osmType = "GBFS",  // Mark as GBFS data
-                        osmId = "official", // Mark as official source
+                        osmType = "GBFS",
+                        osmId = "official",
                         osmVersion = 0,
                         osmXmlElement = default(JsonElement)
                     };
-                    enhancedStations.Add(gbfsForComparison);
+                    lines.Add(GeoJsonGenerator.GenerateGeojsonLineWithError(
+                        gbfsForComparison,
+                        systemName,
+                        $"OFFICIAL GBFS DATA for ref '{dup.Key}' - Compare with OSM duplicates above to verify which is correct"));
                 }
             }
 
-            // Generate enhanced GeoJSON file
+            foreach (var dup in refGbfsDuplicates)
+            {
+                foreach (var osmStation in dup)
+                {
+                    lines.Add(GeoJsonGenerator.GenerateGeojsonLineWithError(
+                        osmStation,
+                        systemName,
+                        $"Duplicate ref:gbfs '{osmStation.RefGbfs}' appears {refGbfsCounts[osmStation.RefGbfs!]} times in OSM (this is OSM {osmStation.osmType}/{osmStation.osmId})"));
+                }
+            }
+
             try
             {
-                await FileManager.WriteSystemGeoJsonFileAsync(
-                    systemName,
-                    "bikeshare_osm_duplicates.geojson",
-                    enhancedStations,
-                    point => {
-                        var refValue = point.id;
-                        var count = duplicateCounts.ContainsKey(refValue) ? duplicateCounts[refValue] : 0;
-
-                        string errorMsg;
-                        if (point.osmType == "GBFS")
-                        {
-                            errorMsg = $"OFFICIAL GBFS DATA for ref '{refValue}' - Compare with OSM duplicates above to verify which is correct";
-                        }
-                        else
-                        {
-                            errorMsg = $"Duplicate ref '{refValue}' appears {count} times in OSM (this is OSM {point.osmType}/{point.osmId})";
-                        }
-
-                        return GeoJsonGenerator.GenerateGeojsonLineWithError(point, systemName, errorMsg);
-                    }
-                );
-
+                await FileManager.WriteSystemLinesAsync(systemName, "bikeshare_osm_duplicates.geojson", lines);
                 Log.Information("Enhanced duplicate report with GBFS comparison saved to data_results/{System}/bikeshare_osm_duplicates.geojson", systemName);
             }
             catch (Exception ex)
@@ -543,6 +561,11 @@ out meta;
                 // If no ref, use OSM way ID as fallback
                 if (element.TryGetProperty("id", out var idProp))
                     geoPoint.id = "osm_way_" + idProp.GetInt64().ToString();
+            }
+
+            if (tags.TryGetProperty("ref:gbfs", out var refGbfsProp))
+            {
+                geoPoint.RefGbfs = refGbfsProp.GetString();
             }
 
             // Get station name from way tags

@@ -57,7 +57,7 @@ public class MaprouletteService : IMaprouletteService
 
 public class SystemSetupService : ISystemSetupService
 {
-    public Task<bool> EnsureAsync(string systemName, string operatorName, string brandName, string? cityName = null) => SystemSetupHelper.EnsureSystemSetUpAsync(systemName, operatorName, brandName, cityName);
+    public Task<bool> EnsureAsync(string systemName, string operatorName, string brandName, string gbfsSystemId, string? cityName = null) => SystemSetupHelper.EnsureSystemSetUpAsync(systemName, operatorName, brandName, gbfsSystemId, cityName);
     public void ValidateInstructionFiles(string systemName) => SystemSetupHelper.ValidateInstructionFilesForTaskCreation(systemName);
     public SystemValidationResult ValidateSystem(string systemName, bool throwOnMissing = false) => SystemSetupHelper.ValidateSystemSetup(systemName, throwOnMissing);
     public Task EnsureDuplicatesInstructionFileAsync(string systemName) => SystemSetupHelper.EnsureDuplicatesInstructionFileAsync(systemName);
@@ -121,4 +121,5 @@ public class OsmChangeWriterService : IOsmChangeWriter
 {
     public Task WriteRenameChangesAsync(List<(GeoPoint current, GeoPoint old)> renamed, string systemName) => OsmFileFunctions.GenerateRenameOsmChangeFile(renamed, systemName);
     public Task WriteReactivationChangesAsync(List<(GeoPoint current, GeoPoint disused)> reactivations, string systemName) => OsmFileFunctions.GenerateReactivationOsmChangeFile(reactivations, systemName);
+    public Task WriteAddRefGbfsChangesAsync(List<GeoPoint> osmPoints, List<GeoPoint> gbfsPoints, string systemName, string gbfsSystemId) => OsmFileFunctions.GenerateAddRefGbfsOsmChangeFile(osmPoints, gbfsPoints, systemName, gbfsSystemId);
 }

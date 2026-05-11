@@ -25,6 +25,28 @@ public class ResilienceTests
     }
 
     [Test]
+    public void MissingGbfsSystemId_Throws()
+    {
+        // Write a temp config in the working dir (one of the loader's candidate search paths).
+        var tempConfig = "bikeshare_systems.json";
+        var hadExisting = File.Exists(tempConfig);
+        var backup = tempConfig + ".bak";
+        if (hadExisting) File.Move(tempConfig, backup, overwrite: true);
+        try
+        {
+            File.WriteAllText(tempConfig, "[{\"id\":99,\"name\":\"Broken\",\"city\":\"Nowhere\",\"gbfs_api\":\"https://example.com/x.json\"}]");
+            var ex = Assert.Throws<InvalidOperationException>(() => prepareBikeParking.BikeShareSystemLoader.LoadAllSystemsAsync().GetAwaiter().GetResult());
+            Assert.That(ex!.Message, Does.Contain("gbfs_system_id"));
+            Assert.That(ex.Message, Does.Contain("Broken"));
+        }
+        finally
+        {
+            if (File.Exists(tempConfig)) File.Delete(tempConfig);
+            if (hadExisting && File.Exists(backup)) File.Move(backup, tempConfig, overwrite: true);
+        }
+    }
+
+    [Test]
     public void MissingMaprouletteApiKey_Throws()
     {
         var prev = Environment.GetEnvironmentVariable("MAPROULETTE_API_KEY");

@@ -411,3 +411,5 @@ bikeshare_renames.osc
 bikeshare_reactivations.osc
 bikeshare_reactivated_in_osm.geojson
 bikeshare_osm_duplicates.geojson
+bikeshare_add_ref_gbfs.osc
+bikeshare_refgbfs_mismatches.geojson

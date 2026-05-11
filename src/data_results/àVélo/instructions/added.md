@@ -1,10 +1,12 @@
 ﻿Add a point with these tags, or update existing point with them:
 
 update existing: [copyable "ref={{address}}
+ref:gbfs=avelo_quebec:{{address}}
 name={{name}}
 capacity={{capacity}}"]
 
 create new: [copyable "ref={{address}}
+ref:gbfs=avelo_quebec:{{address}}
 name={{name}}
 capacity={{capacity}}
 fixme=please set exact location
@@ -19,6 +21,7 @@ operator:wikidata=Q3456768"]
 
 ```
 ref={{address}}
+ref:gbfs=avelo_quebec:{{address}}
 name={{name}}
 capacity={{capacity}}
 fixme=please set exact location

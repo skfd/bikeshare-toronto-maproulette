@@ -1,10 +1,12 @@
 ﻿Add a point with these tags, or update existing point with them:
 
 update existing: [copyable "ref={{address}}
+ref:gbfs=lyft_nyc:{{address}}
 name={{name}}
 capacity={{capacity}}"]
 
 create new: [copyable "ref={{address}}
+ref:gbfs=lyft_nyc:{{address}}
 name={{name}}
 capacity={{capacity}}
 fixme=please set exact location
@@ -21,6 +23,7 @@ operator:wikidata=Q17077936"]
 
 ```
 ref={{address}}
+ref:gbfs=lyft_nyc:{{address}}
 name={{name}}
 capacity={{capacity}}
 fixme=please set exact location

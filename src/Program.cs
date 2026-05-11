@@ -167,7 +167,7 @@ try
         try
         {
             var sys = await provider.GetRequiredService<IBikeShareSystemLoader>().LoadByIdAsync(id);
-            var created = await SystemSetupHelper.EnsureSystemSetUpAsync(sys.Name, sys.Name, sys.Name, sys.City);
+            var created = await SystemSetupHelper.EnsureSystemSetUpAsync(sys.Name, sys.Name, sys.Name, sys.GbfsSystemId, sys.City);
             if (created)
             {
                 Log.Information("Scaffolding created for {System}. You can now run comparison.", sys.Name);

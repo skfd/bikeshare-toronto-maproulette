@@ -21,13 +21,21 @@ public class SystemSetupHelperTests
     [Test]
     public async Task SetupNewSystem_CreatesInstructionFilesAndOverpass()
     {
-        await prepareBikeParking.SystemSetupHelper.SetupNewSystemAsync(_system, "OpName", "BrandName", operatorType: "public", cityName: "CityX");
+        await prepareBikeParking.SystemSetupHelper.SetupNewSystemAsync(_system, "OpName", "BrandName", "test_sys", operatorType: "public", cityName: "CityX");
         Assert.That(Directory.Exists(SystemPath), Is.True);
         Assert.That(File.Exists(Path.Combine(InstructionsPath, "added.md")), Is.True);
         Assert.That(File.Exists(Path.Combine(InstructionsPath, "removed.md")), Is.True);
         Assert.That(File.Exists(Path.Combine(InstructionsPath, "moved.md")), Is.True);
         Assert.That(File.Exists(Path.Combine(InstructionsPath, "renamed.md")), Is.True);
         Assert.That(File.Exists(prepareBikeParking.FileManager.GetSystemFullPath(_system, "stations.overpass")), Is.True);
+    }
+
+    [Test]
+    public async Task SetupNewSystem_AddedTemplate_ContainsRefGbfsLine()
+    {
+        await prepareBikeParking.SystemSetupHelper.SetupNewSystemAsync(_system, "OpName", "BrandName", "test_sys", operatorType: "public", cityName: "CityX");
+        var added = await File.ReadAllTextAsync(Path.Combine(InstructionsPath, "added.md"));
+        Assert.That(added, Does.Contain("ref:gbfs=test_sys:{{address}}"));
     }
 
     [Test]

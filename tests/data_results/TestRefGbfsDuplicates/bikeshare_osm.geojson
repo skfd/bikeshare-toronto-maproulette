@@ -1,0 +1,2 @@
+﻿{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[-79.2,43.1]},"properties":{"address":"REF_A","latitude":"43.1","longitude":"-79.2","name":"A","capacity":"0","operator":"TestRefGbfsDuplicates"}}]}
+{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[-79.3,43.2]},"properties":{"address":"REF_B","latitude":"43.2","longitude":"-79.3","name":"B","capacity":"0","operator":"TestRefGbfsDuplicates"}}]}

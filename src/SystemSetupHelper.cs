@@ -21,6 +21,7 @@ namespace prepareBikeParking
             string systemName,
             string operatorName,
             string brandName,
+            string gbfsSystemId,
             string operatorType = "public",
             string? brandWikidataId = null,
             string? operatorWikidataId = null,
@@ -45,7 +46,7 @@ namespace prepareBikeParking
             }
 
             // Create instruction files
-            await CreateInstructionFileAsync(systemName, "added.md", GenerateAddedInstructions(operatorName, brandName, operatorType, brandWikidataId, operatorWikidataId));
+            await CreateInstructionFileAsync(systemName, "added.md", GenerateAddedInstructions(operatorName, brandName, gbfsSystemId, operatorType, brandWikidataId, operatorWikidataId));
             await CreateInstructionFileAsync(systemName, "removed.md", GenerateRemovedInstructions());
             await CreateInstructionFileAsync(systemName, "moved.md", GenerateMovedInstructions());
             await CreateInstructionFileAsync(systemName, "renamed.md", GenerateRenamedInstructions());
@@ -79,13 +80,14 @@ namespace prepareBikeParking
         /// <summary>
         /// Generates the "added" instruction template
         /// </summary>
-        private static string GenerateAddedInstructions(string operatorName, string brandName, string operatorType, string? brandWikidataId, string? operatorWikidataId)
+        private static string GenerateAddedInstructions(string operatorName, string brandName, string gbfsSystemId, string operatorType, string? brandWikidataId, string? operatorWikidataId)
         {
             var sb = new StringBuilder();
             sb.AppendLine("Add a point with these tags, or update existing point with them:");
             sb.AppendLine();
             sb.AppendLine("```");
             sb.AppendLine("ref={{address}}");
+            sb.AppendLine($"ref:gbfs={gbfsSystemId}:{{{{address}}}}");
             sb.AppendLine("name={{name}}");
             sb.AppendLine("capacity={{capacity}}");
             sb.AppendLine("fixme=please set exact location");
@@ -241,13 +243,13 @@ The ref={{address}} appears multiple times in OSM. Each bike share station MUST 
         /// <param name="operatorName">Operator name (used for default templates)</param>
         /// <param name="brandName">Brand name (used for default templates)</param>
         /// <param name="cityName">City name for Overpass query (optional)</param>
-        public static async Task<bool> EnsureSystemSetUpAsync(string systemName, string operatorName, string brandName, string? cityName = null)
+        public static async Task<bool> EnsureSystemSetUpAsync(string systemName, string operatorName, string brandName, string gbfsSystemId, string? cityName = null)
         {
             var newlyCreated = false;
             if (!IsSystemSetUp(systemName))
             {
                 Serilog.Log.Warning("System {System} not fully set up. Creating missing instruction files...", systemName);
-                await SetupNewSystemAsync(systemName, operatorName, brandName, "public", null, null, cityName);
+                await SetupNewSystemAsync(systemName, operatorName, brandName, gbfsSystemId, "public", null, null, cityName);
                 newlyCreated = true;
             }
             else

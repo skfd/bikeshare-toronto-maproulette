@@ -205,7 +205,7 @@ public class BikeShareFlows
         bool newlyCreated = false;
         try
         {
-            newlyCreated = await _systemSetup.EnsureAsync(system.Name, system.Name, system.Name, system.City);
+            newlyCreated = await _systemSetup.EnsureAsync(system.Name, system.Name, system.Name, system.GbfsSystemId, system.City);
         }
         catch (Exception ex)
         {
@@ -486,6 +486,7 @@ public class BikeShareFlows
         await _osmChangeWriter.WriteRenameChangesAsync(renamedInOSMFiltered, system.Name);
         await _geoWriter.WriteReactivationsAsync(reactivatedInOSM, system.Name);
         await _osmChangeWriter.WriteReactivationChangesAsync(reactivatedInOSM, system.Name);
+        await _osmChangeWriter.WriteAddRefGbfsChangesAsync(osmPoints, bikeshareApiPoints, system.Name, system.GbfsSystemId);
         Log.Information("OSM comparison for {Name}: Missing={Missing} Extra={Extra} Moved={Moved} Renamed={Renamed} DisusedSkipped={Disused} Reactivated={Reactivated}",
             system.Name, missingInOSM.Count, activeExtraInOSM.Count, differentInOSMFiltered.Count, renamedInOSMFiltered.Count, disusedStations.Count, reactivatedInOSM.Count);
         ConsoleUI.PrintSuccess("GBFS vs OSM comparison:");
