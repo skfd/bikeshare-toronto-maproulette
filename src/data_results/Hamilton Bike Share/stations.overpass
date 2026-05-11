@@ -1,0 +1,10 @@
+﻿[out:json];
+
+area(3607034910)->.city;
+(
+    node(area.city)[bicycle_rental=docking_station];
+    way(area.city)[bicycle_rental=docking_station];
+    relation(area.city)[bicycle_rental=docking_station];
+);
+
+out meta;

@@ -1,0 +1,14 @@
+[out:json];
+
+(
+  area(3601852574);
+  area(3603422923);
+  area(3611678160);
+)->.city;
+(
+    node(area.city)[bicycle_rental=docking_station];
+    way(area.city)[bicycle_rental=docking_station];
+    relation(area.city)[bicycle_rental=docking_station];
+);
+
+out meta;

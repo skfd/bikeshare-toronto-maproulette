@@ -44,5 +44,27 @@
     "expand_street_names": true,
     "move_threshold_meters": 3.0,
     "osm_comparison_threshold_meters": 30.0
+  },
+  {
+    "id": 5,
+    "name": "Mobi",
+    "city": "Vancouver",
+    "maproulette_project_id": 60735,
+    "gbfs_api": "https://gbfs.kappa.fifteen.eu/gbfs/2.2/mobi/en/station_information.json",
+    "gbfs_system_id": "Mobibikes_CA_Vancouver",
+    "brand:wikidata": "Q26211470",
+    "move_threshold_meters": 3.0,
+    "osm_comparison_threshold_meters": 30.0
+  },
+  {
+    "id": 6,
+    "name": "Hamilton Bike Share",
+    "city": "Hamilton",
+    "maproulette_project_id": 60735,
+    "gbfs_api": "https://hamilton.socialbicycles.com/opendata/station_information.json",
+    "gbfs_system_id": "sobi_hamilton",
+    "brand:wikidata": "Q20710920",
+    "move_threshold_meters": 3.0,
+    "osm_comparison_threshold_meters": 30.0
   }
 ]
