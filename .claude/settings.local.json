@@ -38,7 +38,8 @@
       "WebFetch(domain:hamilton.socialbicycles.com)",
       "WebFetch(domain:www.wikidata.org)",
       "Bash(curl -s -G \"https://overpass-api.de/api/interpreter\" --data-urlencode \"data=[out:json];\\( area\\(3601852574\\); area\\(3603422923\\); area\\(3611678160\\); \\)->.city; \\( node\\(area.city\\)[bicycle_rental=docking_station]; way\\(area.city\\)[bicycle_rental=docking_station]; relation\\(area.city\\)[bicycle_rental=docking_station]; \\); out meta;\")",
-      "Bash(curl *)"
+      "Bash(curl *)",
+      "Bash(xargs grep -l \"IsDisused\")"
     ],
     "deny": [],
     "ask": []
