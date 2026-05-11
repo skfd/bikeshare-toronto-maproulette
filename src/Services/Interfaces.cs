@@ -2,7 +2,7 @@ namespace prepareBikeParking.Services;
 
 public interface IBikeShareDataFetcher
 {
-    Task<List<GeoPoint>> FetchStationsAsync(string url);
+    Task<List<GeoPoint>> FetchStationsAsync(string url, string? statusUrl = null);
 }
 
 public interface IOSMDataFetcher
@@ -15,7 +15,7 @@ public interface IGeoJsonWriter
 {
     Task WriteMainAsync(List<GeoPoint> points, string systemName);
     Task WriteDiffAsync(List<GeoPoint> added, List<GeoPoint> removed, List<GeoPoint> moved, List<(GeoPoint current, GeoPoint old)> renamed, string systemName);
-    Task WriteOsmCompareAsync(List<GeoPoint> missing, List<GeoPoint> extra, List<GeoPoint> moved, List<(GeoPoint current, GeoPoint old)> renamed, string systemName);
+    Task WriteOsmCompareAsync(List<GeoPoint> missing, List<GeoPoint> extra, List<GeoPoint> moved, List<(GeoPoint current, GeoPoint old)> renamed, List<GeoPoint> closed, string systemName);
     Task WriteReactivationsAsync(List<(GeoPoint current, GeoPoint disused)> reactivations, string systemName);
 }
 

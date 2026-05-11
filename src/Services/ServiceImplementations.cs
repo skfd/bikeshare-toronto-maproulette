@@ -11,7 +11,7 @@ public class BikeShareDataFetcherService : IBikeShareDataFetcher
     {
         _impl = impl;
     }
-    public Task<List<GeoPoint>> FetchStationsAsync(string url) => _impl.FetchFromApiAsync(url);
+    public Task<List<GeoPoint>> FetchStationsAsync(string url, string? statusUrl = null) => _impl.FetchFromApiAsync(url, statusUrl);
 }
 
 public class OsmDataFetcherService : IOSMDataFetcher
@@ -32,7 +32,7 @@ public class GeoJsonWriterService : IGeoJsonWriter
 {
     public Task WriteMainAsync(List<GeoPoint> points, string systemName) => GeoJsonGenerator.GenerateMainFileAsync(points, systemName);
     public Task WriteDiffAsync(List<GeoPoint> added, List<GeoPoint> removed, List<GeoPoint> moved, List<(GeoPoint current, GeoPoint old)> renamed, string systemName) => GeoJsonGenerator.GenerateDiffFilesAsync(added, removed, moved, renamed, systemName);
-    public Task WriteOsmCompareAsync(List<GeoPoint> missing, List<GeoPoint> extra, List<GeoPoint> moved, List<(GeoPoint current, GeoPoint old)> renamed, string systemName) => GeoJsonGenerator.GenerateOSMComparisonFilesAsync(missing, extra, moved, renamed, systemName);
+    public Task WriteOsmCompareAsync(List<GeoPoint> missing, List<GeoPoint> extra, List<GeoPoint> moved, List<(GeoPoint current, GeoPoint old)> renamed, List<GeoPoint> closed, string systemName) => GeoJsonGenerator.GenerateOSMComparisonFilesAsync(missing, extra, moved, renamed, closed, systemName);
     public Task WriteReactivationsAsync(List<(GeoPoint current, GeoPoint disused)> reactivations, string systemName) => GeoJsonGenerator.GenerateReactivationsFileAsync(reactivations, systemName);
 }
 

@@ -242,7 +242,7 @@ public class BikeShareFlows
         List<GeoPoint> locationsList;
         try
         {
-            locationsList = await _bikeShareFetcher.FetchStationsAsync(system.GetStationInformationUrl());
+            locationsList = await _bikeShareFetcher.FetchStationsAsync(system.GetStationInformationUrl(), system.GetStationStatusUrl());
         }
         catch (Exception ex)
         {
@@ -439,6 +439,26 @@ public class BikeShareFlows
         Log.Debug("Using OSM comparison threshold: {Threshold}m for {Name}", osmComparisonThreshold, system.Name);
         var (missingInOSM, extraInOSM, differentInOSM, renamedInOSM) = _comparer.Compare(bikeshareApiPoints, osmPoints, osmComparisonThreshold);
 
+        // Closed GBFS stations (station_status reports not-installed, or installed but not renting/returning):
+        // don't propose them as new OSM stations and don't auto-generate rename/move edits for any existing
+        // OSM entry — surface the full set in bikeshare_closed.geojson for manual review (e.g. disused: retag).
+        var closedStations = bikeshareApiPoints.Where(p => p.IsClosed).ToList();
+        var closedIds = closedStations.Select(p => p.id).ToHashSet();
+        var activeMissingInOSM = missingInOSM.Where(p => !p.IsClosed).ToList();
+
+        if (closedStations.Count > 0)
+        {
+            var closedAndMissing = missingInOSM.Count(p => p.IsClosed);
+            Log.Warning("Detected {Count} closed station(s) in GBFS for {Name} (station_status: not-installed or not renting/returning). " +
+                        "{Missing} of them are absent from OSM and excluded from the missing-in-OSM list; see bikeshare_closed.geojson.",
+                        closedStations.Count, system.Name, closedAndMissing);
+            foreach (var station in closedStations)
+            {
+                Log.Warning("  Closed station: {Id} \"{StationName}\"", station.id, station.name);
+            }
+            ConsoleUI.PrintWarning($"Detected {closedStations.Count} closed station(s) in GBFS — excluded from missing-in-OSM; see bikeshare_closed.geojson.");
+        }
+
         // Separate temporarily disused stations from the extra-in-OSM list
         var disusedStations = extraInOSM.Where(p => p.IsDisused).ToList();
         var activeExtraInOSM = extraInOSM.Where(p => !p.IsDisused).ToList();
@@ -466,8 +486,8 @@ public class BikeShareFlows
             .Select(p => (current: p, disused: disusedById[p.id]))
             .ToList();
         var reactivatedIds = reactivatedInOSM.Select(r => r.current.id).ToHashSet();
-        var renamedInOSMFiltered = renamedInOSM.Where(r => !reactivatedIds.Contains(r.current.id)).ToList();
-        var differentInOSMFiltered = differentInOSM.Where(p => !reactivatedIds.Contains(p.id)).ToList();
+        var renamedInOSMFiltered = renamedInOSM.Where(r => !reactivatedIds.Contains(r.current.id) && !closedIds.Contains(r.current.id)).ToList();
+        var differentInOSMFiltered = differentInOSM.Where(p => !reactivatedIds.Contains(p.id) && !closedIds.Contains(p.id)).ToList();
 
         if (reactivatedInOSM.Count > 0)
         {
@@ -482,25 +502,27 @@ public class BikeShareFlows
             ConsoleUI.PrintWarning($"Detected {reactivatedInOSM.Count} reactivated station(s) — see bikeshare_reactivations.osc.");
         }
 
-        await _geoWriter.WriteOsmCompareAsync(missingInOSM, activeExtraInOSM, differentInOSMFiltered, renamedInOSMFiltered, system.Name);
+        await _geoWriter.WriteOsmCompareAsync(activeMissingInOSM, activeExtraInOSM, differentInOSMFiltered, renamedInOSMFiltered, closedStations, system.Name);
         await _osmChangeWriter.WriteRenameChangesAsync(renamedInOSMFiltered, system.Name);
         await _geoWriter.WriteReactivationsAsync(reactivatedInOSM, system.Name);
         await _osmChangeWriter.WriteReactivationChangesAsync(reactivatedInOSM, system.Name);
         await _osmChangeWriter.WriteAddRefGbfsChangesAsync(osmPoints, bikeshareApiPoints, system.Name, system.GbfsSystemId);
-        Log.Information("OSM comparison for {Name}: Missing={Missing} Extra={Extra} Moved={Moved} Renamed={Renamed} DisusedSkipped={Disused} Reactivated={Reactivated}",
-            system.Name, missingInOSM.Count, activeExtraInOSM.Count, differentInOSMFiltered.Count, renamedInOSMFiltered.Count, disusedStations.Count, reactivatedInOSM.Count);
+        Log.Information("OSM comparison for {Name}: Missing={Missing} Extra={Extra} Moved={Moved} Renamed={Renamed} DisusedSkipped={Disused} Reactivated={Reactivated} ClosedSkipped={Closed}",
+            system.Name, activeMissingInOSM.Count, activeExtraInOSM.Count, differentInOSMFiltered.Count, renamedInOSMFiltered.Count, disusedStations.Count, reactivatedInOSM.Count, closedStations.Count);
         ConsoleUI.PrintSuccess("GBFS vs OSM comparison:");
-        ConsoleUI.PrintStat("missing in OSM", missingInOSM.Count);
+        ConsoleUI.PrintStat("missing in OSM", activeMissingInOSM.Count);
         ConsoleUI.PrintStat("extra in OSM", activeExtraInOSM.Count);
         ConsoleUI.PrintStat("moved", differentInOSMFiltered.Count);
         ConsoleUI.PrintStat("renamed", renamedInOSMFiltered.Count);
         ConsoleUI.PrintStat("reactivated", reactivatedInOSM.Count);
+        ConsoleUI.PrintStat("closed (skipped)", closedStations.Count);
 
-        summary.MissingInOsm = missingInOSM.Count;
+        summary.MissingInOsm = activeMissingInOSM.Count;
         summary.ExtraInOsm = activeExtraInOSM.Count;
         summary.MovedInOsm = differentInOSMFiltered.Count;
         summary.RenamedInOsm = renamedInOSMFiltered.Count;
         summary.ReactivatedInOsm = reactivatedInOSM.Count;
+        summary.ClosedSkipped = closedStations.Count;
         return true;
     }
 
@@ -516,6 +538,11 @@ public class BikeShareFlows
         if (summary.ReactivatedInOsm > 0)
         {
             items.Add($"Load data_results/{system.Name}/bikeshare_reactivations.osc in JOSM, verify, and upload — {summary.ReactivatedInOsm} station(s) to reactivate (drop disused:amenity).");
+        }
+
+        if (summary.ClosedSkipped > 0)
+        {
+            items.Add($"Review data_results/{system.Name}/bikeshare_closed.geojson — {summary.ClosedSkipped} station(s) closed in GBFS; check whether any need disused:amenity in OSM.");
         }
 
         if (summary.DuplicatesFileExists)
@@ -571,6 +598,7 @@ public class BikeShareFlows
         public int MovedInOsm { get; set; }
         public int RenamedInOsm { get; set; }
         public int ReactivatedInOsm { get; set; }
+        public int ClosedSkipped { get; set; }
         public bool DuplicatesFileExists { get; set; }
         public bool DuplicateTasksCreated { get; set; }
         public bool NewLocationTasksCreated { get; set; }

@@ -19,6 +19,7 @@ public class GeoPoint
     public required string lat { get; set; }
     public required string lon { get; set; }
     public bool IsDisused { get; set; }
+    public bool IsClosed { get; set; }
     public string? RefGbfs { get; set; }
     public string? osmId { get; set; }
     public string? osmType { get; internal set; }

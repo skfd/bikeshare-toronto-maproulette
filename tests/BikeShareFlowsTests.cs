@@ -42,7 +42,7 @@ public class BikeShareFlowsTests
         loader.Setup(l => l.LoadByIdAsync(system.Id)).ReturnsAsync(system);
 
         var fetcher = new Mock<IBikeShareDataFetcher>();
-        fetcher.Setup(f => f.FetchStationsAsync(It.IsAny<string>())).ReturnsAsync(currentPoints);
+        fetcher.Setup(f => f.FetchStationsAsync(It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync(currentPoints);
 
         var git = new Mock<IGitReader>();
         git.Setup(g => g.GetLastCommitDate(It.IsAny<string>())).Returns(DateTime.UtcNow.AddDays(-1));
@@ -65,7 +65,7 @@ public class BikeShareFlowsTests
                 Assert.That(added[0].id, Is.EqualTo("2"));
             })
             .Verifiable();
-        geoWriter.Setup(w => w.WriteOsmCompareAsync(It.IsAny<List<GeoPoint>>(), It.IsAny<List<GeoPoint>>(), It.IsAny<List<GeoPoint>>(), It.IsAny<List<(GeoPoint current, GeoPoint old)>>(), system.Name))
+        geoWriter.Setup(w => w.WriteOsmCompareAsync(It.IsAny<List<GeoPoint>>(), It.IsAny<List<GeoPoint>>(), It.IsAny<List<GeoPoint>>(), It.IsAny<List<(GeoPoint current, GeoPoint old)>>(), It.IsAny<List<GeoPoint>>(), system.Name))
             .Returns(Task.CompletedTask).Verifiable();
 
         var osmFetcher = new Mock<IOSMDataFetcher>();
@@ -109,7 +109,7 @@ public class BikeShareFlowsTests
         loader.Setup(l => l.LoadByIdAsync(system.Id)).ReturnsAsync(system);
 
         var fetcher = new Mock<IBikeShareDataFetcher>();
-        fetcher.Setup(f => f.FetchStationsAsync(It.IsAny<string>())).ReturnsAsync(currentPoints);
+        fetcher.Setup(f => f.FetchStationsAsync(It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync(currentPoints);
 
         var git = new Mock<IGitReader>();
         git.Setup(g => g.GetLastCommitDate(It.IsAny<string>())).Returns((DateTime?)null); // new system
@@ -125,7 +125,7 @@ public class BikeShareFlowsTests
                 Assert.That(removed, Is.Empty);
             })
             .Returns(Task.CompletedTask).Verifiable();
-        geoWriter.Setup(w => w.WriteOsmCompareAsync(It.IsAny<List<GeoPoint>>(), It.IsAny<List<GeoPoint>>(), It.IsAny<List<GeoPoint>>(), It.IsAny<List<(GeoPoint current, GeoPoint old)>>(), system.Name))
+        geoWriter.Setup(w => w.WriteOsmCompareAsync(It.IsAny<List<GeoPoint>>(), It.IsAny<List<GeoPoint>>(), It.IsAny<List<GeoPoint>>(), It.IsAny<List<(GeoPoint current, GeoPoint old)>>(), It.IsAny<List<GeoPoint>>(), system.Name))
             .Returns(Task.CompletedTask);
 
         var osmFetcher = new Mock<IOSMDataFetcher>();
@@ -167,7 +167,7 @@ public class BikeShareFlowsTests
         loader.Setup(l => l.LoadByIdAsync(system.Id)).ReturnsAsync(system);
 
         var fetcher = new Mock<IBikeShareDataFetcher>();
-        fetcher.Setup(f => f.FetchStationsAsync(It.IsAny<string>())).ReturnsAsync(currentPoints);
+        fetcher.Setup(f => f.FetchStationsAsync(It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync(currentPoints);
 
         var git = new Mock<IGitReader>();
         git.Setup(g => g.GetLastCommitDate(It.IsAny<string>())).Returns(DateTime.UtcNow.AddDays(-2));
@@ -183,7 +183,7 @@ public class BikeShareFlowsTests
         geoWriter.Setup(w => w.WriteMainAsync(currentPoints, system.Name)).Returns(Task.CompletedTask).Verifiable();
         geoWriter.Setup(w => w.WriteDiffAsync(It.IsAny<List<GeoPoint>>(), It.IsAny<List<GeoPoint>>(), It.IsAny<List<GeoPoint>>(), It.IsAny<List<(GeoPoint current, GeoPoint old)>>(), system.Name))
             .Returns(Task.CompletedTask);
-        geoWriter.Setup(w => w.WriteOsmCompareAsync(It.IsAny<List<GeoPoint>>(), It.IsAny<List<GeoPoint>>(), It.IsAny<List<GeoPoint>>(), It.IsAny<List<(GeoPoint current, GeoPoint old)>>(), system.Name))
+        geoWriter.Setup(w => w.WriteOsmCompareAsync(It.IsAny<List<GeoPoint>>(), It.IsAny<List<GeoPoint>>(), It.IsAny<List<GeoPoint>>(), It.IsAny<List<(GeoPoint current, GeoPoint old)>>(), It.IsAny<List<GeoPoint>>(), system.Name))
             .Returns(Task.CompletedTask);
 
         var osmFetcher = new Mock<IOSMDataFetcher>();
@@ -214,7 +214,7 @@ public class BikeShareFlowsTests
         // Validation failure aborts the run — no fetch, no writes, no task creation
         maproulette.Verify(m => m.CreateTasksAsync(It.IsAny<int>(), It.IsAny<DateTime>(), system.Name, It.IsAny<bool>()), Times.Never);
         geoWriter.Verify(w => w.WriteMainAsync(It.IsAny<List<GeoPoint>>(), It.IsAny<string>()), Times.Never);
-        fetcher.Verify(f => f.FetchStationsAsync(It.IsAny<string>()), Times.Never);
+        fetcher.Verify(f => f.FetchStationsAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
     }
 
     [Test]
@@ -226,7 +226,7 @@ public class BikeShareFlowsTests
         loader.Setup(l => l.LoadByIdAsync(system.Id)).ReturnsAsync(system);
 
         var fetcher = new Mock<IBikeShareDataFetcher>();
-        fetcher.Setup(f => f.FetchStationsAsync(It.IsAny<string>())).Throws(new Exception("Should not fetch when scaffolding"));
+        fetcher.Setup(f => f.FetchStationsAsync(It.IsAny<string>(), It.IsAny<string>())).Throws(new Exception("Should not fetch when scaffolding"));
 
         var git = new Mock<IGitReader>();
         var comparer = new Mock<IComparerService>();
@@ -251,7 +251,7 @@ public class BikeShareFlowsTests
 
         // Ensure no downstream calls executed
         geoWriter.Verify(g => g.WriteMainAsync(It.IsAny<List<GeoPoint>>(), It.IsAny<string>()), Times.Never);
-        fetcher.Verify(f => f.FetchStationsAsync(It.IsAny<string>()), Times.Never);
+        fetcher.Verify(f => f.FetchStationsAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
         comparer.Verify(c => c.Compare(It.IsAny<List<GeoPoint>>(), It.IsAny<List<GeoPoint>>(), It.IsAny<double>()), Times.Never);
     }
 
@@ -274,7 +274,7 @@ public class BikeShareFlowsTests
         loader.Setup(l => l.LoadByIdAsync(system.Id)).ReturnsAsync(system);
 
         var fetcher = new Mock<IBikeShareDataFetcher>();
-        fetcher.Setup(f => f.FetchStationsAsync(It.IsAny<string>())).ReturnsAsync(currentPoints);
+        fetcher.Setup(f => f.FetchStationsAsync(It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync(currentPoints);
 
         var git = new Mock<IGitReader>();
         git.Setup(g => g.GetLastCommitDate(It.IsAny<string>())).Returns(DateTime.UtcNow.AddDays(-1));
@@ -293,8 +293,8 @@ public class BikeShareFlowsTests
         geoWriter.Setup(w => w.WriteMainAsync(currentPoints, system.Name)).Returns(Task.CompletedTask);
         geoWriter.Setup(w => w.WriteDiffAsync(It.IsAny<List<GeoPoint>>(), It.IsAny<List<GeoPoint>>(), It.IsAny<List<GeoPoint>>(), It.IsAny<List<(GeoPoint current, GeoPoint old)>>(), system.Name))
             .Returns(Task.CompletedTask);
-        geoWriter.Setup(w => w.WriteOsmCompareAsync(It.IsAny<List<GeoPoint>>(), It.IsAny<List<GeoPoint>>(), It.IsAny<List<GeoPoint>>(), It.IsAny<List<(GeoPoint current, GeoPoint old)>>(), system.Name))
-            .Callback<List<GeoPoint>, List<GeoPoint>, List<GeoPoint>, List<(GeoPoint current, GeoPoint old)>, string>((missing, extra, moved, renamed, s) => {
+        geoWriter.Setup(w => w.WriteOsmCompareAsync(It.IsAny<List<GeoPoint>>(), It.IsAny<List<GeoPoint>>(), It.IsAny<List<GeoPoint>>(), It.IsAny<List<(GeoPoint current, GeoPoint old)>>(), It.IsAny<List<GeoPoint>>(), system.Name))
+            .Callback<List<GeoPoint>, List<GeoPoint>, List<GeoPoint>, List<(GeoPoint current, GeoPoint old)>, List<GeoPoint>, string>((missing, extra, moved, renamed, closed, s) => {
                 capturedExtra = extra;
             })
             .Returns(Task.CompletedTask);
@@ -328,5 +328,88 @@ public class BikeShareFlowsTests
         Assert.That(capturedExtra!.Count, Is.EqualTo(1), "Only the active extra station should be in extra list");
         Assert.That(capturedExtra[0].id, Is.EqualTo("88"), "The active extra station should remain");
         Assert.That(capturedExtra.Any(p => p.id == "99"), Is.False, "The disused station should be excluded from extra-in-OSM");
+    }
+
+    [Test]
+    public async Task RunSystemFlow_ClosedStations_ExcludedFromMissingAndRename_EmittedToClosedFile()
+    {
+        using var _env = SetApiKey("test-key");
+        var system = new BikeShareSystem { Id=6, Name="ClosedTest", City="CityC", GbfsApi="https://example", GbfsSystemId="closed_sys", MaprouletteProjectId=789 };
+
+        var active = new GeoPoint{ id="1", name="Active", capacity=0, lat="43.0", lon="-79.0" };
+        var closedNotInOsm = new GeoPoint{ id="2", name="Closed Decommissioned", capacity=0, lat="43.1", lon="-79.1", IsClosed=true };
+        var closedInOsmCurrent = new GeoPoint{ id="3", name="Closed Renamed New", capacity=0, lat="43.2", lon="-79.2", IsClosed=true };
+        var closedInOsmOld = new GeoPoint{ id="3", name="Closed Renamed Old", capacity=0, lat="43.2", lon="-79.2", osmType="node", osmId="3333" };
+        var currentPoints = new List<GeoPoint>{ active, closedNotInOsm, closedInOsmCurrent };
+        var osmPoints = new List<GeoPoint>{ closedInOsmOld };
+
+        var prevContent = prepareBikeParking.GeoJsonGenerator.GenerateGeojsonLine(active, system.Name) + "\n";
+
+        var loader = new Mock<IBikeShareSystemLoader>();
+        loader.Setup(l => l.LoadByIdAsync(system.Id)).ReturnsAsync(system);
+
+        var fetcher = new Mock<IBikeShareDataFetcher>();
+        fetcher.Setup(f => f.FetchStationsAsync(It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync(currentPoints);
+
+        var git = new Mock<IGitReader>();
+        git.Setup(g => g.GetLastCommitDate(It.IsAny<string>())).Returns(DateTime.UtcNow.AddDays(-1));
+        git.Setup(g => g.GetLastCommittedVersion(It.IsAny<string>())).Returns(prevContent);
+
+        var comparer = new Mock<IComparerService>();
+        comparer.Setup(c => c.Compare(currentPoints, It.IsAny<List<GeoPoint>>(), 3))
+            .Returns((new List<GeoPoint>(), new List<GeoPoint>(), new List<GeoPoint>(), new List<(GeoPoint current, GeoPoint old)>()));
+        // OSM compare: stations 1 and 2 are missing in OSM; station 3 is renamed in OSM.
+        comparer.Setup(c => c.Compare(currentPoints, osmPoints, 30))
+            .Returns((new List<GeoPoint>{ active, closedNotInOsm }, new List<GeoPoint>(), new List<GeoPoint>(),
+                      new List<(GeoPoint current, GeoPoint old)>{ (closedInOsmCurrent, closedInOsmOld) }));
+
+        List<GeoPoint>? capturedMissing = null;
+        List<(GeoPoint current, GeoPoint old)>? capturedRenamed = null;
+        List<GeoPoint>? capturedClosed = null;
+        var geoWriter = new Mock<IGeoJsonWriter>();
+        geoWriter.Setup(w => w.WriteMainAsync(currentPoints, system.Name)).Returns(Task.CompletedTask);
+        geoWriter.Setup(w => w.WriteDiffAsync(It.IsAny<List<GeoPoint>>(), It.IsAny<List<GeoPoint>>(), It.IsAny<List<GeoPoint>>(), It.IsAny<List<(GeoPoint current, GeoPoint old)>>(), system.Name))
+            .Returns(Task.CompletedTask);
+        geoWriter.Setup(w => w.WriteOsmCompareAsync(It.IsAny<List<GeoPoint>>(), It.IsAny<List<GeoPoint>>(), It.IsAny<List<GeoPoint>>(), It.IsAny<List<(GeoPoint current, GeoPoint old)>>(), It.IsAny<List<GeoPoint>>(), system.Name))
+            .Callback<List<GeoPoint>, List<GeoPoint>, List<GeoPoint>, List<(GeoPoint current, GeoPoint old)>, List<GeoPoint>, string>((missing, extra, moved, renamed, closed, s) => {
+                capturedMissing = missing; capturedRenamed = renamed; capturedClosed = closed;
+            })
+            .Returns(Task.CompletedTask);
+
+        var osmFetcher = new Mock<IOSMDataFetcher>();
+        osmFetcher.Setup(o => o.EnsureStationsFileAsync(system.Name, system.City)).Returns(Task.CompletedTask);
+        osmFetcher.Setup(o => o.FetchOsmStationsAsync(system.Name, system.City)).ReturnsAsync(osmPoints);
+
+        List<(GeoPoint current, GeoPoint old)>? capturedRenameOsc = null;
+        var osmChangeWriter = new Mock<IOsmChangeWriter>();
+        osmChangeWriter.Setup(o => o.WriteRenameChangesAsync(It.IsAny<List<(GeoPoint current, GeoPoint old)>>(), system.Name))
+            .Callback<List<(GeoPoint current, GeoPoint old)>, string>((renamed, s) => { capturedRenameOsc = renamed; })
+            .Returns(Task.CompletedTask);
+
+        var maproulette = new Mock<IMaprouletteService>();
+        maproulette.Setup(m => m.ValidateProjectAsync(system.MaprouletteProjectId)).ReturnsAsync(true);
+
+        var setupSvc = new Mock<ISystemSetupService>();
+        setupSvc.Setup(s => s.ValidateSystem(system.Name, false)).Returns(new SystemValidationResult{ SystemName=system.Name, IsValid=true });
+        setupSvc.Setup(s => s.EnsureAsync(system.Name, system.Name, system.Name, system.GbfsSystemId, system.City)).ReturnsAsync(false);
+        setupSvc.Setup(s => s.ValidateInstructionFiles(system.Name));
+
+        var paths = new Mock<IFilePathProvider>();
+        paths.Setup(p => p.GetSystemFullPath(system.Name, "bikeshare.geojson")).Returns("dummy-closed.geojson");
+
+        var prompt = new Mock<IPromptService>();
+        prompt.Setup(p => p.ReadConfirmation(It.IsAny<string>(), 'n')).Returns('n');
+
+        var flows = new BikeShareFlows(fetcher.Object, osmFetcher.Object, geoWriter.Object, comparer.Object, git.Object, maproulette.Object, setupSvc.Object, paths.Object, prompt.Object, loader.Object, osmChangeWriter.Object);
+        await flows.RunSystemFlow(system.Id);
+
+        Assert.That(capturedMissing, Is.Not.Null, "WriteOsmCompareAsync should have been called");
+        Assert.That(capturedMissing!.Select(p => p.id), Is.EquivalentTo(new[]{ "1" }), "Closed station 2 should be excluded from missing-in-OSM");
+        Assert.That(capturedRenamed, Is.Not.Null);
+        Assert.That(capturedRenamed!, Is.Empty, "Closed station 3 should be excluded from renamed-in-OSM");
+        Assert.That(capturedClosed, Is.Not.Null);
+        Assert.That(capturedClosed!.Select(p => p.id), Is.EquivalentTo(new[]{ "2", "3" }), "All closed stations should appear in bikeshare_closed.geojson");
+        Assert.That(capturedRenameOsc, Is.Not.Null);
+        Assert.That(capturedRenameOsc!, Is.Empty, "No rename OSC should be generated for a closed station");
     }
 }

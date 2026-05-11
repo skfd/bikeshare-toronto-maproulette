@@ -98,14 +98,15 @@ namespace prepareBikeParking
                 point.osmId ?? "");
         }
 
-        public static async Task GenerateOSMComparisonFilesAsync(List<GeoPoint> missingInOSM, List<GeoPoint> extraInOSM, List<GeoPoint> differentInOSM, List<(GeoPoint current, GeoPoint old)> renamedInOSM, string systemName)
+        public static async Task GenerateOSMComparisonFilesAsync(List<GeoPoint> missingInOSM, List<GeoPoint> extraInOSM, List<GeoPoint> differentInOSM, List<(GeoPoint current, GeoPoint old)> renamedInOSM, List<GeoPoint> closedStations, string systemName)
         {
-            Log.Information("Generating OSM comparison files for {SystemName}: Missing={Missing} Extra={Extra} Moved={Moved} Renamed={Renamed}", systemName, missingInOSM.Count, extraInOSM.Count, differentInOSM.Count, renamedInOSM.Count);
+            Log.Information("Generating OSM comparison files for {SystemName}: Missing={Missing} Extra={Extra} Moved={Moved} Renamed={Renamed} Closed={Closed}", systemName, missingInOSM.Count, extraInOSM.Count, differentInOSM.Count, renamedInOSM.Count, closedStations.Count);
 
             await FileManager.WriteSystemGeoJsonFileAsync(systemName, "bikeshare_missing_in_osm.geojson", missingInOSM, point => GenerateGeojsonLine(point, systemName));
             await FileManager.WriteSystemGeoJsonFileAsync(systemName, "bikeshare_extra_in_osm.geojson", extraInOSM, point => GenerateGeojsonLine(point, systemName));
             await FileManager.WriteSystemGeoJsonFileAsync(systemName, "bikeshare_moved_in_osm.geojson", differentInOSM, point => GenerateGeojsonLine(point, systemName));
             await FileManager.WriteSystemGeoJsonFileWithOldNamesAsync(systemName, "bikeshare_renamed_in_osm.geojson", renamedInOSM, (point, oldName) => GenerateGeojsonLineWithOldName(point, oldName, systemName));
+            await FileManager.WriteSystemGeoJsonFileAsync(systemName, "bikeshare_closed.geojson", closedStations, point => GenerateGeojsonLine(point, systemName));
 
             Log.Information("OSM comparison files generated successfully for {SystemName}", systemName);
         }

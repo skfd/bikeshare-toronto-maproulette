@@ -1,6 +1,8 @@
 using NUnit.Framework;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace prepareBikeParking.Tests;
 
@@ -46,5 +48,26 @@ public class GeoJsonGeneratorTests
         Assert.That(line.Contains("Station, "));
         Assert.That(line.Contains("\"Quoted\""), "Quotes should appear escaped in JSON output");
         Assert.That(line.Contains("& More"));
+    }
+
+    [Test]
+    public async Task OSMComparison_WritesClosedFile()
+    {
+        const string sys = "TestSystem_Closed_GJ";
+        var dir = FileManager.GetSystemFullPath(sys, "");
+        if (Directory.Exists(dir)) Directory.Delete(dir, true);
+
+        var closed = new List<GeoPoint> { Pt("9", "Closed Station", 43.5, -79.5, 10) };
+        await GeoJsonGenerator.GenerateOSMComparisonFilesAsync(
+            new List<GeoPoint>(), new List<GeoPoint>(), new List<GeoPoint>(),
+            new List<(GeoPoint current, GeoPoint old)>(), closed, sys);
+
+        var path = FileManager.GetSystemFullPath(sys, "bikeshare_closed.geojson");
+        Assert.That(File.Exists(path), Is.True, "bikeshare_closed.geojson should be written");
+        var text = await File.ReadAllTextAsync(path);
+        Assert.That(text.Contains("\"name\":\"Closed Station\""));
+        Assert.That(text.Trim().Split('\n').Length, Is.EqualTo(1));
+
+        Directory.Delete(dir, true);
     }
 }

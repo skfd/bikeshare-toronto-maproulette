@@ -40,8 +40,9 @@ bikeshare-sync/
 │       ├── bikeshare_renamed.geojson      # Renamed stations (vs git)
 │       ├── bikeshare_osm.geojson          # Current OSM data
 │       ├── bikeshare_osm_duplicates.geojson  # OSM validation issues (if found)
-│       ├── bikeshare_missing_in_osm.geojson  # Stations not in OSM
+│       ├── bikeshare_missing_in_osm.geojson  # Stations not in OSM (closed stations excluded)
 │       ├── bikeshare_extra_in_osm.geojson    # OSM stations not in GBFS
+│       ├── bikeshare_closed.geojson       # GBFS stations closed per station_status (for manual review)
 │       ├── bikeshare_renames.osc          # JOSM changeset for renames
 │       └── stations.overpass              # Overpass query for this system
 └── logs/                          # Rolling log files
@@ -103,9 +104,10 @@ dotnet clean
 4. OSM data fetched using system-specific Overpass query
 5. **OSM data validated** for duplicate ref values (generates `bikeshare_osm_duplicates.geojson` if issues found)
 6. **Temporarily disused stations** (tagged `disused:amenity=bicycle_rental`) are detected and excluded from the "extra in OSM" removal list
-7. Comparison generates multiple GeoJSON outputs (diff and OSM comparison files)
-8. Optional MapRoulette challenge creation
-9. OSC file generated for bulk renames
+7. **Closed GBFS stations** (per `station_status.json`) are detected and excluded from "missing in OSM" and from rename/move detection (see "Closed Station Handling" below)
+8. Comparison generates multiple GeoJSON outputs (diff and OSM comparison files)
+9. Optional MapRoulette challenge creation
+10. OSC file generated for bulk renames
 
 ## Disused Station Handling
 Stations tagged with `disused:amenity=bicycle_rental` in OSM are considered temporarily closed. These are:
@@ -115,6 +117,16 @@ Stations tagged with `disused:amenity=bicycle_rental` in OSM are considered temp
 - Logged with a warning listing each skipped station's ID, name, and OSM element
 
 Custom `stations.overpass` files should include `["disused:amenity"=bicycle_rental]` queries to detect these stations. Default generated queries include them automatically.
+
+## Closed Station Handling (GBFS side)
+The mirror of disused-OSM handling, on the GBFS feed. Each run also fetches `station_status.json` (URL derived from `gbfs_api` by swapping the last path segment to `station_status`, via `BikeShareSystem.GetStationStatusUrl()`). A station is "closed" when its status entry reports `is_installed=false` (decommissioned) or `is_installed=true` but `is_renting=false`/`is_returning=false` (temporarily out of service). These are:
+- Marked with `IsClosed = true` on the `GeoPoint` model (set in `BikeShareDataFetcher`)
+- **Excluded from `bikeshare_missing_in_osm.geojson`** so mappers aren't told to add closed stations
+- **Excluded from rename/move detection** (`bikeshare_renamed_in_osm.geojson`, `bikeshare_moved_in_osm.geojson`, and the rename `.osc`) so no edits are auto-generated for stations the operator decommissioned
+- **Written to `bikeshare_closed.geojson`** (the full set, including those that exist in OSM) for manual review — e.g. deciding whether an OSM node needs `disused:amenity=bicycle_rental`
+- Logged with a warning listing each closed station's ID and name
+
+Fetching/parsing `station_status.json` is a soft dependency: a 404, network error, malformed body, or empty `data.stations` is logged and the run proceeds with no stations flagged closed. Older feeds (PBSC v1 like Toronto/àVélo, legacy SoBi like Hamilton) hardcode the status flags to true, so this is a graceful no-op for them.
 
 ## Testing Strategy
 - Unit tests for all core services

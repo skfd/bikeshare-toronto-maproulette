@@ -1,3 +1,4 @@
+using System;
 using System.Text.Json.Serialization;
 
 namespace prepareBikeParking
@@ -55,6 +56,32 @@ namespace prepareBikeParking
         public string GetStationInformationUrl()
         {
             return GbfsApi;
+        }
+
+        /// <summary>
+        /// Derives the station_status endpoint URL from the configured station_information URL
+        /// by swapping the last path segment (e.g. ".../station_information.json" -> ".../station_status.json",
+        /// ".../station_information" -> ".../station_status"). Returns the original URL unchanged if the
+        /// last segment doesn't look like a station_information feed.
+        /// </summary>
+        public string GetStationStatusUrl()
+        {
+            var url = GbfsApi;
+            if (string.IsNullOrWhiteSpace(url)) return url;
+
+            var lastSlash = url.LastIndexOf('/');
+            if (lastSlash < 0) return url;
+
+            var prefix = url.Substring(0, lastSlash + 1);
+            var lastSegment = url.Substring(lastSlash + 1);
+
+            const string infoToken = "station_information";
+            if (lastSegment.StartsWith(infoToken, StringComparison.OrdinalIgnoreCase))
+            {
+                lastSegment = "station_status" + lastSegment.Substring(infoToken.Length);
+            }
+
+            return prefix + lastSegment;
         }
     }
 }
