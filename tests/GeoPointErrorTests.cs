@@ -15,26 +15,26 @@ public class GeoPointErrorTests
     public void MissingAddress_Throws()
     {
     var json = WrapFeatureProps("{\"name\":\"X\",\"latitude\":\"1\",\"longitude\":\"2\"}");
-        Assert.Throws<System.Text.Json.JsonException>(() => GeoPoint.ParseLine(json));
+        Assert.Throws<System.Text.Json.JsonException>((Action)(() => GeoPoint.ParseLine(json)));
     }
 
     [Test]
     public void MissingLatitude_Throws()
     {
     var json = WrapFeatureProps("{\"address\":\"1\",\"name\":\"X\",\"longitude\":\"2\"}");
-        Assert.Throws<System.Text.Json.JsonException>(() => GeoPoint.ParseLine(json));
+        Assert.Throws<System.Text.Json.JsonException>((Action)(() => GeoPoint.ParseLine(json)));
     }
 
     [Test]
     public void MissingName_Throws()
     {
     var json = WrapFeatureProps("{\"address\":\"1\",\"latitude\":\"1\",\"longitude\":\"2\"}");
-        Assert.Throws<System.Text.Json.JsonException>(() => GeoPoint.ParseLine(json));
+        Assert.Throws<System.Text.Json.JsonException>((Action)(() => GeoPoint.ParseLine(json)));
     }
 
     [Test]
     public void EmptyLine_Throws()
     {
-        Assert.Throws<ArgumentException>(() => GeoPoint.ParseLine(""));
+        Assert.Throws<ArgumentException>((Action)(() => GeoPoint.ParseLine("")));
     }
 }

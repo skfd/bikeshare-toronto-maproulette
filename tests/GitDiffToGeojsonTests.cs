@@ -36,6 +36,6 @@ public class GitDiffToGeojsonTests
     [Test]
     public void GetLastCommittedVersion_UntrackedFile_Throws()
     {
-        Assert.Throws<System.IO.FileNotFoundException>(() => prepareBikeParking.GitDiffToGeojson.GetLastCommittedVersion("not-a-file.geojson"));
+        Assert.Throws<System.IO.FileNotFoundException>((Action)(() => prepareBikeParking.GitDiffToGeojson.GetLastCommittedVersion("not-a-file.geojson")));
     }
 }

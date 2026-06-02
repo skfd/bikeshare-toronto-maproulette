@@ -31,7 +31,7 @@ public class PerformanceSecurityTests
     public void InvalidGbfsUrl_Throws()
     {
         var fetcher = new BikeShareDataFetcher();
-        Assert.ThrowsAsync<ArgumentException>(async () => await fetcher.FetchFromApiAsync(""));
+        Assert.ThrowsAsync<ArgumentException>((Func<Task>)(async () => await fetcher.FetchFromApiAsync("")));
     }
 
     [Test]

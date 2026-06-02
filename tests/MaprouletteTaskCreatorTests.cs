@@ -70,7 +70,7 @@ public class MaprouletteTaskCreatorTests
     {
         using var _ = OverrideEnv("MAPROULETTE_API_KEY","key");
         MaprouletteTaskCreator.HttpFactory = new Factory(new StubHandler(new[]{ new HttpResponseMessage(HttpStatusCode.NotFound){ Content = new StringContent("{}") } }));
-        Assert.ThrowsAsync<ArgumentException>(async () => await MaprouletteTaskCreator.ValidateProjectAsync(9));
+        Assert.ThrowsAsync<ArgumentException>((Func<Task>)(async () => await MaprouletteTaskCreator.ValidateProjectAsync(9)));
     }
 
     [Test]
@@ -78,7 +78,7 @@ public class MaprouletteTaskCreatorTests
     {
         using var _ = OverrideEnv("MAPROULETTE_API_KEY","key");
         MaprouletteTaskCreator.HttpFactory = new Factory(new StubHandler(new[]{ new HttpResponseMessage(HttpStatusCode.Unauthorized){ Content = new StringContent("{}") } }));
-        Assert.ThrowsAsync<UnauthorizedAccessException>(async () => await MaprouletteTaskCreator.ValidateProjectAsync(9));
+        Assert.ThrowsAsync<UnauthorizedAccessException>((Func<Task>)(async () => await MaprouletteTaskCreator.ValidateProjectAsync(9)));
     }
 
     [Test]
@@ -105,7 +105,7 @@ public class MaprouletteTaskCreatorTests
         await FileManager.WriteSystemTextFileAsync(system, "bikeshare_missing_in_osm.geojson", "line");
         var projectObj = new { id=1, name="Proj", enabled=true };
         MaprouletteTaskCreator.HttpFactory = new Factory(new StubHandler(new[]{ JsonResponse(HttpStatusCode.OK, projectObj) }));
-        Assert.ThrowsAsync<InvalidOperationException>(async () => await MaprouletteTaskCreator.CreateTasksAsync(1, DateTime.UtcNow.AddDays(-2), system, isNewSystem:true));
+        Assert.ThrowsAsync<InvalidOperationException>((Func<Task>)(async () => await MaprouletteTaskCreator.CreateTasksAsync(1, DateTime.UtcNow.AddDays(-2), system, isNewSystem:true)));
     }
 
     [Test]

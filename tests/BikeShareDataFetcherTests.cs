@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Text.Json;
 using System.Collections.Generic;
 using System.Linq;
+using System;
 
 namespace prepareBikeParking.Tests;
 
@@ -84,14 +85,14 @@ public class BikeShareDataFetcherTests
     public void Fetch_MalformedJson_Throws()
     {
         var fetcher = new BikeShareDataFetcher(new TestFactory(new StubHandler("{ not json")));
-        Assert.ThrowsAsync<System.Exception>(async () => await fetcher.FetchFromApiAsync("http://example"));
+        Assert.ThrowsAsync<System.Exception>((Func<Task>)(async () => await fetcher.FetchFromApiAsync("http://example")));
     }
 
     [Test]
     public void Fetch_NetworkFailure_WrapsException()
     {
         var fetcher = new BikeShareDataFetcher(new TestFactory(new StubHandler("{}", HttpStatusCode.InternalServerError)));
-        Assert.ThrowsAsync<System.Exception>(async () => await fetcher.FetchFromApiAsync("http://example"));
+        Assert.ThrowsAsync<System.Exception>((Func<Task>)(async () => await fetcher.FetchFromApiAsync("http://example")));
     }
 
     private const string InfoUrl = "http://example/en/station_information.json";

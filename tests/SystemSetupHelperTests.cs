@@ -53,7 +53,7 @@ public class SystemSetupHelperTests
     {
         Directory.CreateDirectory(SystemPath);
         // No instruction files -> should throw
-        Assert.Throws<InvalidOperationException>(() => prepareBikeParking.SystemSetupHelper.ValidateInstructionFilesForTaskCreation(_system));
+        Assert.Throws<InvalidOperationException>((Action)(() => prepareBikeParking.SystemSetupHelper.ValidateInstructionFilesForTaskCreation(_system)));
     }
 
     [Test]
@@ -66,7 +66,7 @@ public class SystemSetupHelperTests
         File.WriteAllText(Path.Combine(InstructionsPath, "removed.md"), string.Empty);
         File.WriteAllText(Path.Combine(InstructionsPath, "moved.md"), string.Empty);
         // renamed not required for task creation
-        Assert.Throws<InvalidOperationException>(() => prepareBikeParking.SystemSetupHelper.ValidateInstructionFilesForTaskCreation(_system));
+        Assert.Throws<InvalidOperationException>((Action)(() => prepareBikeParking.SystemSetupHelper.ValidateInstructionFilesForTaskCreation(_system)));
     }
 
     [TearDown]
