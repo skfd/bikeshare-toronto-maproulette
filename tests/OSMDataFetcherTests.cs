@@ -148,7 +148,7 @@ public class OSMDataFetcherTests
         var responses = Enumerable.Repeat((HttpStatusCode.InternalServerError, "fail"), endpoints.Length * maxAttempts);
         var handler = new StubHandler(responses);
         var fetcher = FastRetryFetcher(handler, endpoints, maxAttempts);
-        Assert.ThrowsAsync<Exception>(async () => await fetcher.FetchFromOverpassApiAsync("FailSys"));
+        Assert.ThrowsAsync<Exception>((Func<Task>)(async () => await fetcher.FetchFromOverpassApiAsync("FailSys")));
         Assert.That(handler.SendCount, Is.EqualTo(endpoints.Length * maxAttempts));
     }
 
@@ -246,7 +246,7 @@ public class OSMDataFetcherTests
     {
         var handler = new StubHandler(new[] { (HttpStatusCode.BadRequest, "bad query") });
         var fetcher = FastRetryFetcher(handler, new[] { "https://primary.test/api/interpreter" }, maxAttempts: 3);
-        Assert.ThrowsAsync<Exception>(async () => await fetcher.FetchFromOverpassApiAsync("TestNoRetry4xx"));
+        Assert.ThrowsAsync<Exception>((Func<Task>)(async () => await fetcher.FetchFromOverpassApiAsync("TestNoRetry4xx")));
         Assert.That(handler.SendCount, Is.EqualTo(1), "4xx (other than 429) should not be retried");
     }
 

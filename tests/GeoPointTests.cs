@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using System.Globalization;
+using System;
 
 namespace prepareBikeParking.Tests;
 
@@ -39,6 +40,6 @@ public class GeoPointTests
     public void MalformedJson_Throws()
     {
         var badLine = "\u001e{ not json";
-        Assert.Throws<System.Text.Json.JsonException>(() => GeoPoint.ParseLine(badLine));
+        Assert.Throws<System.Text.Json.JsonException>((Action)(() => GeoPoint.ParseLine(badLine)));
     }
 }

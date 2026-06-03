@@ -16,7 +16,7 @@ public class ResilienceTests
         if (File.Exists(full)) File.Move(full, backup);
         try
         {
-            Assert.Throws<FileNotFoundException>(() => prepareBikeParking.BikeShareSystemLoader.LoadSystemByIdAsync(1).GetAwaiter().GetResult());
+            Assert.Throws<FileNotFoundException>((Action)(() => prepareBikeParking.BikeShareSystemLoader.LoadSystemByIdAsync(1).GetAwaiter().GetResult()));
         }
         finally
         {
@@ -35,7 +35,7 @@ public class ResilienceTests
         try
         {
             File.WriteAllText(tempConfig, "[{\"id\":99,\"name\":\"Broken\",\"city\":\"Nowhere\",\"gbfs_api\":\"https://example.com/x.json\"}]");
-            var ex = Assert.Throws<InvalidOperationException>(() => prepareBikeParking.BikeShareSystemLoader.LoadAllSystemsAsync().GetAwaiter().GetResult());
+            var ex = Assert.Throws<InvalidOperationException>((Action)(() => prepareBikeParking.BikeShareSystemLoader.LoadAllSystemsAsync().GetAwaiter().GetResult()));
             Assert.That(ex!.Message, Does.Contain("gbfs_system_id"));
             Assert.That(ex.Message, Does.Contain("Broken"));
         }
@@ -53,7 +53,7 @@ public class ResilienceTests
         Environment.SetEnvironmentVariable("MAPROULETTE_API_KEY", null);
         try
         {
-            Assert.ThrowsAsync<InvalidOperationException>(async () => await prepareBikeParking.MaprouletteTaskCreator.ValidateProjectAsync(1));
+            Assert.ThrowsAsync<InvalidOperationException>((Func<Task>)(async () => await prepareBikeParking.MaprouletteTaskCreator.ValidateProjectAsync(1)));
         }
         finally
         {

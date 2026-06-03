@@ -57,7 +57,7 @@ public class FileManagerTests
     [Test]
     public void ReadMissingFile_Throws()
     {
-        Assert.Throws<FileNotFoundException>(() => prepareBikeParking.FileManager.ReadTextFile("data_results/"+_tempSystem+"/nope.txt"));
+        Assert.Throws<FileNotFoundException>((Action)(() => prepareBikeParking.FileManager.ReadTextFile("data_results/"+_tempSystem+"/nope.txt")));
     }
 
     [Test]
@@ -91,7 +91,7 @@ public class FileManagerTests
         var rel = "data_results/"+_tempSystem+"/bad.json";
         // Write literal 'null' JSON
         await prepareBikeParking.FileManager.WriteTextFileAsync(rel, "null");
-        Assert.ThrowsAsync<InvalidOperationException>(async () => await prepareBikeParking.FileManager.ReadJsonFileAsync<NullRootDemo>(rel));
+        Assert.ThrowsAsync<InvalidOperationException>((Func<Task>)(async () => await prepareBikeParking.FileManager.ReadJsonFileAsync<NullRootDemo>(rel)));
     }
 
     [TearDown]
