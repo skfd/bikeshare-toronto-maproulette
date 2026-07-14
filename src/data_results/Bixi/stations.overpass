@@ -3,6 +3,10 @@
 (
   area[name="Montréal (Région métropolitaine de recensement)"];
   area[name="Sherbrooke"];
+  area[name="Boisbriand"];
+  area[name="Chambly"];
+  area[name="Sainte-Marthe-sur-le-Lac"];
+  area[name="Sainte-Thérèse"];
 )->.city;
 (
   node(area.city)[bicycle_rental=docking_station];
