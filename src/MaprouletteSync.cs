@@ -40,10 +40,12 @@ public static class MaprouletteSync
     /// </summary>
     /// <param name="osmKeys">Every station key present in this run's OSM fetch.</param>
     /// <param name="gbfsKeys">Every station key present in this run's GBFS fetch.</param>
+    /// <param name="isNewSystem">First run for this system: no removal tasks.</param>
     public static async Task<SyncOutcome> RefreshAsync(
         BikeShareSystem system,
         IReadOnlySet<string> osmKeys,
-        IReadOnlySet<string> gbfsKeys)
+        IReadOnlySet<string> gbfsKeys,
+        bool isNewSystem = false)
     {
         var manifest = MaprouletteManifest.Load(system.Name);
         manifest.ProjectId = system.MaprouletteProjectId;
@@ -54,6 +56,16 @@ public static class MaprouletteSync
 
         foreach (var kind in Kinds)
         {
+            // On a system's first run there is no baseline, so everything already
+            // in OSM looks like it should be deleted. Proposing that unattended
+            // would be catastrophic; added/duplicates are still safe.
+            if (isNewSystem && kind.Key == "removed")
+            {
+                Log.Information("New system {System}: skipping the removal challenge to preserve existing OSM data.", system.Name);
+                notes.Add("removed: skipped (new system)");
+                continue;
+            }
+
             try
             {
                 var (added, shut, note) = await RefreshKindAsync(system, kind, manifest, osmKeys, gbfsKeys);

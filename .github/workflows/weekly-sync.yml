@@ -126,7 +126,6 @@ jobs:
               repo: context.repo.repo,
               title: `Bike share sync — ${today}`,
               body,
-              labels: ['sync-digest'],
             });
         env:
           DIGEST: ${{ steps.digest.outputs.body }}

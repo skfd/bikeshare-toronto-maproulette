@@ -154,6 +154,22 @@ public class ChallengeSyncPlanTests
     }
 
     [Test]
+    public void PositionKeyedTasksAreNeverClosed()
+    {
+        // A ref-less OSM station is keyed by position, and position keys can never
+        // appear in the OSM key set (which holds refs and object ids only). Closing
+        // on their absence would retire every such task on its first refresh, and it
+        // could never come back: the task exists, so it is never re-uploaded.
+        var plan = ChallengeSyncPlan.Build(
+            desiredKeys: System.Array.Empty<string>(),
+            liveTasks: new[] { Task(1, "@43.65,-79.4", MaprouletteApi.StatusCreated) },
+            resolvedKeys: Set("@43.65,-79.4"),
+            retiredKeys: Set("@43.65,-79.4"));
+
+        Assert.That(plan.Closures, Is.Empty);
+    }
+
+    [Test]
     public void EmptyGbfsFetchAbortsTheSync()
     {
         Assert.That(ChallengeSyncPlan.CheckFetchSanity(osmCount: 100, gbfsCount: 0, previousOsmCount: 100),

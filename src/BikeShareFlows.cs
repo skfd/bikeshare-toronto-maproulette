@@ -339,7 +339,7 @@ public class BikeShareFlows
                 .Select(p => p.id)
                 .ToHashSet(StringComparer.Ordinal);
 
-            var outcome = await MaprouletteSync.RefreshAsync(system, osmKeys, gbfsKeys);
+            var outcome = await MaprouletteSync.RefreshAsync(system, osmKeys, gbfsKeys, isNewSystem);
             summary.NewLocationTasksCreated = outcome.Created > 0;
             summary.DuplicateTasksCreated = outcome.Created > 0 && summary.DuplicatesFileExists;
             summary.TasksClosed = outcome.Closed;

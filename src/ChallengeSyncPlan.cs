@@ -60,6 +60,7 @@ public static class ChallengeSyncPlan
         foreach (var task in live)
         {
             if (!MaprouletteApi.RefreshableStatuses.Contains(task.Status)) continue;
+            if (IsPositionKey(task.Name)) continue;
 
             if (resolvedKeys.Contains(task.Name))
             {
@@ -75,6 +76,16 @@ public static class ChallengeSyncPlan
 
         return new Plan(newKeys, closures);
     }
+
+    /// <summary>
+    /// A station with no ref at all is keyed by its position so it still gets a
+    /// task. Such a key is strong enough to avoid uploading the station twice but
+    /// far too weak to close on: the evidence sets are built from refs and OSM
+    /// object ids, so a position key is missing from them by construction. Closing
+    /// on that absence would retire every ref-less station's task on its first
+    /// refresh - and it could never come back, because the task already exists.
+    /// </summary>
+    private static bool IsPositionKey(string key) => key.StartsWith('@');
 
     /// <summary>
     /// Refuse to act on a fetch that looks truncated.
