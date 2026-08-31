@@ -659,7 +659,7 @@ public class BikeShareFlows
             items.Add($"Review bikeshare_moved_in_osm.geojson — {summary.MovedInOsm} station(s) moved vs OSM.");
         }
 
-        if (summary.HasGbfsDiff)
+        if (summary.HasGbfsDiff && !BaselineCommitter.Enabled)
         {
             items.Add($"Commit updated data_results/{system.Name}/bikeshare.geojson as the next baseline.");
         }

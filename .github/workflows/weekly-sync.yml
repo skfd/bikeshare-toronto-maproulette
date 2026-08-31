@@ -106,9 +106,29 @@ jobs:
               echo '---'
               echo
             done
-            echo "[Workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+            echo "The .osc and GeoJSON files named above are in the **sync-output** artifact on the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) — download and unzip it before the JOSM steps."
             echo 'DIGEST_EOF'
           } >> "$GITHUB_OUTPUT"
+
+      # The .osc changesets and comparison GeoJSON are gitignored derived output,
+      # so without this they die with the runner - and the checklist asks you to
+      # open them in JOSM. Ninety days is long enough; they are regenerated weekly.
+      - name: Keep the files the checklist asks for
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sync-output
+          retention-days: 90
+          if-no-files-found: warn
+          path: |
+            src/data_results/*/*.osc
+            src/data_results/*/bikeshare_missing_in_osm.geojson
+            src/data_results/*/bikeshare_extra_in_osm.geojson
+            src/data_results/*/bikeshare_moved_in_osm.geojson
+            src/data_results/*/bikeshare_ref_conflicts.geojson
+            src/data_results/*/bikeshare_osm_duplicates.geojson
+            src/data_results/*/bikeshare_closed.geojson
+            src/data_results/*/last_run.md
 
       - name: Push the new baseline
         if: always()

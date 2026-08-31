@@ -16,6 +16,12 @@ namespace prepareBikeParking;
 /// </summary>
 public static class BaselineCommitter
 {
+    /// <summary>
+    /// Set when --commit-baseline is in play, so the operator checklist does not
+    /// ask for a commit that this run is about to make itself.
+    /// </summary>
+    public static bool Enabled { get; set; }
+
     public static async Task CommitAsync(IReadOnlyList<int> systemIds)
     {
         var names = new List<string>();

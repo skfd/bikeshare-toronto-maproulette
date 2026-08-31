@@ -70,8 +70,15 @@ combined checklist. It needs the `MAPROULETTE_API_KEY` repository secret. Trigge
 it by hand from the Actions tab, optionally unticking *Create and close MapRoulette
 tasks* for a side-effect-free fetch-and-diff.
 
-The JOSM half of the work stays manual — the issue tells you which `.osc` files
-are waiting.
+The JOSM half of the work stays manual. The `.osc` changesets and comparison
+GeoJSON are derived output and are not committed, so the workflow uploads them as
+the **sync-output** artifact on the run (kept 90 days) — download and unzip it
+before working the checklist. The issue links to it.
+
+Only two things a run produces are committed: the refreshed `bikeshare.geojson` /
+`bikeshare_osm.geojson` baselines, and `maproulette_manifest.json`, which is durable
+state — it is how a later run finds the challenge it already created instead of
+making a second one.
 
 ## Challenge Lifecycle
 
@@ -177,7 +184,7 @@ bikeshare_extra_in_osm.geojson        # OSM stations not in GBFS
 bikeshare_renames.osc                 # JOSM changeset for renames
 stations.overpass                     # Overpass query for OSM data
 maproulette_manifest.json             # Which challenge holds which tasks (committed)
-last_run.md / last_run.json           # The operator checklist from the last run
+last_run.md / last_run.json           # The operator checklist from the last run (not committed)
 instructions/*.md                     # MapRoulette task templates
 ```
 All GeoJSON lines are record‑separated with an initial `\u001e` control character. Keep this format.

@@ -82,6 +82,7 @@ try
         ConsoleUI.IsVerbose = parseResult.GetValue(verboseOption);
         ConsoleUI.IsQuiet = parseResult.GetValue(quietOption);
         PromptService.AutoConfirm = parseResult.GetValue(yesOption);
+        BaselineCommitter.Enabled = parseResult.GetValue(commitOption);
         ConsoleUI.ConfigureLogging();
 
         var spec = parseResult.GetValue(systemIdArg) ?? "";
@@ -116,7 +117,7 @@ try
             }
         }
 
-        if (parseResult.GetValue(commitOption))
+        if (BaselineCommitter.Enabled)
         {
             await BaselineCommitter.CommitAsync(ids);
         }
