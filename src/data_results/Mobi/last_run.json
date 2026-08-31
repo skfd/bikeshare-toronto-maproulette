@@ -1,0 +1,27 @@
+﻿{
+  "System": "Mobi",
+  "City": "Vancouver",
+  "RanAtUtc": "2026-08-31T23:37:07.7951883Z",
+  "Succeeded": true,
+  "Error": null,
+  "Counts": {
+    "Added vs last baseline": 2,
+    "Removed vs last baseline": 3,
+    "Moved vs last baseline": 4,
+    "Renamed vs last baseline": 0,
+    "Missing in OSM": 2,
+    "Extra in OSM": 8,
+    "Moved vs OSM": 8,
+    "Renamed vs OSM": 0,
+    "To reactivate in OSM": 0,
+    "Closed in GBFS": 3,
+    "Ref conflicts": 0
+  },
+  "Checklist": [
+    "Review data_results/Mobi/bikeshare_closed.geojson \u2014 3 station(s) closed in GBFS; check whether any need disused:amenity in OSM.",
+    "Complete MapRoulette tasks for 2 station(s) missing in OSM.",
+    "Review bikeshare_extra_in_osm.geojson \u2014 8 OSM station(s) not present in GBFS.",
+    "Review bikeshare_moved_in_osm.geojson \u2014 8 station(s) moved vs OSM.",
+    "Commit updated data_results/Mobi/bikeshare.geojson as the next baseline."
+  ]
+}

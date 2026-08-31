@@ -1,0 +1,32 @@
+{
+  "project_id": 60735,
+  "last_osm_count": 269,
+  "challenges": {
+    "added": {
+      "challenge_id": 56672,
+      "name": "Mobi \u2014 Stations missing in OSM",
+      "created_at": "2026-08-31T23:37:03.8479994Z",
+      "refreshed_at": "2026-08-31T23:37:04.6576126Z",
+      "task_keys": [
+        "0403",
+        "0645"
+      ]
+    },
+    "removed": {
+      "challenge_id": 56673,
+      "name": "Mobi \u2014 OSM stations no longer in the feed",
+      "created_at": "2026-08-31T23:37:05.2357391Z",
+      "refreshed_at": "2026-08-31T23:37:07.7930833Z",
+      "task_keys": [
+        "0112",
+        "0115",
+        "0167",
+        "0170",
+        "0208",
+        "0211",
+        "osm_12723498674",
+        "osm_way_1524227447"
+      ]
+    }
+  }
+}

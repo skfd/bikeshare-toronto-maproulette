@@ -1,0 +1,28 @@
+﻿{
+  "System": "Citi Bike",
+  "City": "New York City",
+  "RanAtUtc": "2026-08-31T23:36:59.2389054Z",
+  "Succeeded": true,
+  "Error": null,
+  "Counts": {
+    "Added vs last baseline": 127,
+    "Removed vs last baseline": 24,
+    "Moved vs last baseline": 1,
+    "Renamed vs last baseline": 0,
+    "Missing in OSM": 86,
+    "Extra in OSM": 30,
+    "Moved vs OSM": 28,
+    "Renamed vs OSM": 2232,
+    "To reactivate in OSM": 0,
+    "Closed in GBFS": 105,
+    "Ref conflicts": 0
+  },
+  "Checklist": [
+    "Load data_results/Citi Bike/bikeshare_renames.osc in JOSM, verify, and upload \u2014 2232 rename(s) pending.",
+    "Review data_results/Citi Bike/bikeshare_closed.geojson \u2014 105 station(s) closed in GBFS; check whether any need disused:amenity in OSM.",
+    "Complete MapRoulette tasks for 86 station(s) missing in OSM.",
+    "Review bikeshare_extra_in_osm.geojson \u2014 30 OSM station(s) not present in GBFS.",
+    "Review bikeshare_moved_in_osm.geojson \u2014 28 station(s) moved vs OSM.",
+    "Commit updated data_results/Citi Bike/bikeshare.geojson as the next baseline."
+  ]
+}

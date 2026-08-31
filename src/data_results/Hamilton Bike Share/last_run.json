@@ -1,0 +1,25 @@
+﻿{
+  "System": "Hamilton Bike Share",
+  "City": "Hamilton",
+  "RanAtUtc": "2026-08-31T23:37:13.1320991Z",
+  "Succeeded": true,
+  "Error": null,
+  "Counts": {
+    "Added vs last baseline": 0,
+    "Removed vs last baseline": 1,
+    "Moved vs last baseline": 1,
+    "Renamed vs last baseline": 0,
+    "Missing in OSM": 0,
+    "Extra in OSM": 1,
+    "Moved vs OSM": 5,
+    "Renamed vs OSM": 0,
+    "To reactivate in OSM": 0,
+    "Closed in GBFS": 0,
+    "Ref conflicts": 0
+  },
+  "Checklist": [
+    "Review bikeshare_extra_in_osm.geojson \u2014 1 OSM station(s) not present in GBFS.",
+    "Review bikeshare_moved_in_osm.geojson \u2014 5 station(s) moved vs OSM.",
+    "Commit updated data_results/Hamilton Bike Share/bikeshare.geojson as the next baseline."
+  ]
+}

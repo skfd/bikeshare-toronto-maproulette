@@ -1,0 +1,13 @@
+{
+  "project_id": 60735,
+  "last_osm_count": 226,
+  "challenges": {
+    "duplicates": {
+      "challenge_id": 56669,
+      "name": "\u00E0V\u00E9lo \u2014 Duplicate ref values",
+      "created_at": "2026-08-31T23:35:51.6548458Z",
+      "refreshed_at": "0001-01-01T00:00:00",
+      "task_keys": []
+    }
+  }
+}
