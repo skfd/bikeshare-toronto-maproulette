@@ -9,6 +9,8 @@ on:
     paths-ignore:
       - '**.md'
       - 'docs/**'
+      # The weekly sync commits refreshed snapshots; rebuilding on data is noise.
+      - 'src/data_results/**'
   pull_request:
     branches: [ main ]
   workflow_dispatch:  # Allow manual runs

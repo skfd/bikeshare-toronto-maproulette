@@ -1,0 +1,132 @@
+name: Weekly sync
+
+# Refreshes every configured system against GBFS and OSM, keeps the MapRoulette
+# challenges in step, commits the new baseline, and files the operator checklist
+# as an issue to read later.
+#
+# Runs while nobody is at the machine on purpose: everything it does is either
+# reversible or additive, and the JOSM half of the work (the .osc uploads) is
+# left for a human, described in the issue it opens.
+#
+# Requires the MAPROULETTE_API_KEY repository secret.
+
+on:
+  schedule:
+    # 11:00 UTC Wednesday - roughly 06:00/07:00 Toronto, so the digest is waiting
+    # by evening. Cron here is always UTC.
+    - cron: '0 11 * * 3'
+  workflow_dispatch:
+    inputs:
+      systems:
+        description: "System IDs to run: a number, a comma-separated list, or 'all'"
+        default: 'all'
+        required: false
+      create_tasks:
+        description: 'Create and close MapRoulette tasks'
+        type: boolean
+        default: true
+        required: false
+
+# Needed to push the refreshed baseline and open the digest issue.
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: weekly-sync
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  sync:
+    name: Sync systems
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # The tool reads the previous snapshot with `git show HEAD:...`, so it
+          # needs real history, not a shallow clone.
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build
+        run: dotnet build --configuration Release
+
+      - name: Identify the committer
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Run the sync
+        id: sync
+        working-directory: src
+        env:
+          MAPROULETTE_API_KEY: ${{ secrets.MAPROULETTE_API_KEY }}
+          SYSTEMS: ${{ inputs.systems || 'all' }}
+          # Scheduled runs always sync; a manual run can opt out to get a pure
+          # fetch-and-diff, which is how to re-run after a failure without
+          # touching MapRoulette.
+          CREATE_TASKS: ${{ github.event_name != 'workflow_dispatch' || inputs.create_tasks }}
+        run: |
+          set -o pipefail
+          confirm=""
+          if [ "$CREATE_TASKS" = "true" ]; then
+            confirm="--yes"
+          fi
+
+          dotnet run --configuration Release --no-build -- \
+            run "$SYSTEMS" $confirm --commit-baseline 2>&1 | tee run.log
+
+      - name: Assemble the digest
+        # Runs even when a system failed: the failure is the most important thing
+        # in the digest.
+        if: always()
+        id: digest
+        run: |
+          {
+            echo 'body<<DIGEST_EOF'
+            if [ "${{ steps.sync.outcome }}" != "success" ]; then
+              echo '**The sync did not finish cleanly.** See the workflow run for the full log.'
+              echo
+            fi
+            for report in src/data_results/*/last_run.md; do
+              [ -e "$report" ] || continue
+              cat "$report"
+              echo
+              echo '---'
+              echo
+            done
+            echo "[Workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+            echo 'DIGEST_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Push the new baseline
+        if: always()
+        run: git push || echo "nothing to push"
+
+      - name: File the digest
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = process.env.DIGEST;
+            const today = new Date().toISOString().slice(0, 10);
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Bike share sync — ${today}`,
+              body,
+              labels: ['sync-digest'],
+            });
+        env:
+          DIGEST: ${{ steps.digest.outputs.body }}

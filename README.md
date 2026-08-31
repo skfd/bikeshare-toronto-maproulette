@@ -34,11 +34,23 @@ dotnet build
 ```
 Add or edit `bikeshare_systems.json` (example already present). Then run:
 ```bash
-dotnet run -- list      # show systems
-dotnet run -- 1         # run system with id 1
-dotnet run -- 1 -v      # run with verbose output
-dotnet run -- 1 -q      # run with quiet output
+dotnet run -- list          # show systems
+dotnet run -- 1             # run system with id 1
+dotnet run -- 1,3,5         # run several
+dotnet run -- all           # run every configured system
+dotnet run -- 1 -v          # verbose output
+dotnet run -- 1 -q          # quiet output
 ```
+
+Flags for unattended runs:
+
+| Flag | Effect |
+|---|---|
+| `--yes` / `-y` | Answer every confirmation with yes. Separate from `--quiet` on purpose: quiet changes what you see, `--yes` changes what the tool does. |
+| `--commit-baseline` | Commit the refreshed GeoJSON as the next baseline when it changed. |
+
+Every run writes `data_results/<SYSTEM>/last_run.md` and `last_run.json` — the
+operator checklist, kept after the console scrolls away.
 
 ## Typical Run Flow
 1. Tool fetches GBFS stations
@@ -46,9 +58,44 @@ dotnet run -- 1 -q      # run with quiet output
 3. Diffs against last committed version (if any)
 4. Downloads OSM stations using `stations.overpass` (auto-created first run)
 5. Writes comparison + diff files
-6. Prompts you: create Maproulette tasks? (y/N)
-7. If accepted & `MAPROULETTE_API_KEY` set + project id configured → challenges created
+6. Prompts you: sync MapRoulette challenges? (y/N)
+7. If accepted & `MAPROULETTE_API_KEY` set + project id configured → challenges refreshed
 8. Separately apply rename changes using generated `bikeshare_renames.osc` in JOSM
+
+## Scheduled Operation
+
+`.github/workflows/weekly-sync.yml` runs every system weekly (Wednesday 11:00 UTC),
+refreshes the challenges, commits the new baseline and opens an issue with the
+combined checklist. It needs the `MAPROULETTE_API_KEY` repository secret. Trigger
+it by hand from the Actions tab, optionally unticking *Create and close MapRoulette
+tasks* for a side-effect-free fetch-and-diff.
+
+The JOSM half of the work stays manual — the issue tells you which `.osc` files
+are waiting.
+
+## Challenge Lifecycle
+
+There is **one long-lived challenge per system per change type**, recorded in
+`data_results/<SYSTEM>/maproulette_manifest.json` (committed). A run updates it in
+place rather than creating a new one, which is what makes running on a schedule safe:
+
+| Situation | What happens |
+|---|---|
+| Nobody works the tasks | They stay open. The next run adds only genuinely new stations — no duplicate challenge, no duplicate tasks. |
+| Somebody fixes a few | Those stations are in OSM now and drop out of the comparison; their tasks are already marked Fixed. Nothing to do. |
+| Fixed in OSM without touching MapRoulette | The next run sees the station in the OSM fetch and closes the task as *Already Fixed*. |
+| Station disappears from GBFS | The task is closed as *Deleted* — it no longer describes anything real. |
+| Mapper marked it *Not an Issue* / *Too Difficult* | Never touched. Only `created` and `skipped` tasks are ever modified. |
+
+Two rules make this safe to run unattended:
+
+- **Tasks are only closed on primary evidence** from that run's fetches — the
+  station appearing in OSM, or leaving the GBFS feed. Never because it merely fell
+  out of the comparison file, which a threshold change or a partial Overpass
+  response can cause on its own.
+- **A fetch that looks truncated aborts the run** before anything is closed. If
+  the OSM query returns nothing, or under half the stations seen last time, the run
+  fails loudly instead of closing every open task.
 
 ## Required To Create Tasks
 Set `MAPROULETTE_API_KEY` before running. Pick whichever matches your shell:
@@ -85,7 +132,7 @@ Ensure system entry has `"maproulette_project_id": <id>`.
 - **Check for `bikeshare_osm_duplicates.geojson`** - if present, fix duplicate ref values in OSM
 - Complete Maproulette tasks (added / etc.)
 - Load `bikeshare_renames.osc` in JOSM and upload after verifying on imagery / ground truth
-- Commit updated `bikeshare.geojson` so next run has a baseline
+- Commit updated `bikeshare.geojson` so next run has a baseline (or pass `--commit-baseline`)
 
 ## MapRoulette Workflow
 
@@ -129,6 +176,8 @@ bikeshare_missing_in_osm.geojson      # Stations not in OSM
 bikeshare_extra_in_osm.geojson        # OSM stations not in GBFS
 bikeshare_renames.osc                 # JOSM changeset for renames
 stations.overpass                     # Overpass query for OSM data
+maproulette_manifest.json             # Which challenge holds which tasks (committed)
+last_run.md / last_run.json           # The operator checklist from the last run
 instructions/*.md                     # MapRoulette task templates
 ```
 All GeoJSON lines are record‑separated with an initial `\u001e` control character. Keep this format.
