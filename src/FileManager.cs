@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using System.Text.Json;
 
 namespace prepareBikeParking
@@ -23,12 +23,14 @@ namespace prepareBikeParking
             // 2. src/ relative to current directory (running from project root)
             // 3. ../../../../src (running from bin/Debug/netX.Y)
             // 4. ../../../../ (fallback if data_results later moved to root)
+            // Built with Path.Combine so the probes resolve on Linux too - the
+            // scheduled workflow runs on a non-Windows runner.
             var possibleBasePaths = new[]
             {
-                "",                    // from src directory
-                "src\\",              // from project root
-                "..\\..\\..\\src\\", // from bin output directory back to src
-                "..\\..\\..\\"        // fallback root (future-proof if layout changes)
+                "",                                     // from src directory
+                "src",                                  // from project root
+                Path.Combine("..", "..", "..", "src"),  // from bin output directory back to src
+                Path.Combine("..", "..", "..")          // fallback root (future-proof if layout changes)
             };
 
             foreach (var basePath in possibleBasePaths)

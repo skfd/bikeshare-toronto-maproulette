@@ -1,4 +1,4 @@
-using Serilog;
+﻿using Serilog;
 using prepareBikeParking.Services;
 using prepareBikeParking.ServicesImpl;
 using prepareBikeParking;
@@ -645,6 +645,30 @@ public class BikeShareFlows
         }
 
         ConsoleUI.PrintChecklist($"Next steps for {system.Name}:", items);
+
+        // The checklist is the product of the run; persist it so an unattended
+        // run still hands its work items to somebody.
+        RunReport.Write(new RunReport.Result(
+            System: system.Name,
+            City: system.City,
+            RanAtUtc: DateTime.UtcNow,
+            Succeeded: true,
+            Error: null,
+            Counts: new Dictionary<string, int>
+            {
+                ["Added vs last baseline"] = summary.GbfsAddedVsGit,
+                ["Removed vs last baseline"] = summary.GbfsRemovedVsGit,
+                ["Moved vs last baseline"] = summary.GbfsMovedVsGit,
+                ["Renamed vs last baseline"] = summary.GbfsRenamedVsGit,
+                ["Missing in OSM"] = summary.MissingInOsm,
+                ["Extra in OSM"] = summary.ExtraInOsm,
+                ["Moved vs OSM"] = summary.MovedInOsm,
+                ["Renamed vs OSM"] = summary.RenamedInOsm,
+                ["To reactivate in OSM"] = summary.ReactivatedInOsm,
+                ["Closed in GBFS"] = summary.ClosedSkipped,
+                ["Ref conflicts"] = summary.RefConflicts,
+            },
+            Checklist: items));
     }
 
     private sealed class FlowSummary

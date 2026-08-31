@@ -1,4 +1,4 @@
-using prepareBikeParking.Services;
+﻿using prepareBikeParking.Services;
 using Spectre.Console;
 
 namespace prepareBikeParking.ServicesImpl;
@@ -71,8 +71,23 @@ public class FilePathProvider : IFilePathProvider
 
 public class PromptService : IPromptService
 {
+    /// <summary>
+    /// When true, every confirmation is answered "yes" without prompting. Set by
+    /// --yes so a scheduled run can act unattended. Deliberately separate from
+    /// quiet mode: --quiet only suppresses output and must never change what the
+    /// tool decides to do.
+    /// </summary>
+    public static bool AutoConfirm { get; set; }
+
     public char ReadConfirmation(string message, char defaultAnswer = 'n')
     {
+        if (AutoConfirm)
+        {
+            Serilog.Log.Information("Auto-confirming prompt (--yes): {Message}", message);
+            ConsoleUI.PrintInfo($"Auto-confirmed (--yes): {message}");
+            return 'y';
+        }
+
         // In quiet mode, auto-decline without prompting
         if (ConsoleUI.IsQuiet)
         {

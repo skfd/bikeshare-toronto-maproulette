@@ -1,0 +1,24 @@
+﻿{
+  "System": "ClosedTest",
+  "City": "CityC",
+  "RanAtUtc": "2026-08-31T20:29:05.6937378Z",
+  "Succeeded": true,
+  "Error": null,
+  "Counts": {
+    "Added vs last baseline": 0,
+    "Removed vs last baseline": 0,
+    "Moved vs last baseline": 0,
+    "Renamed vs last baseline": 0,
+    "Missing in OSM": 1,
+    "Extra in OSM": 0,
+    "Moved vs OSM": 0,
+    "Renamed vs OSM": 0,
+    "To reactivate in OSM": 0,
+    "Closed in GBFS": 2,
+    "Ref conflicts": 0
+  },
+  "Checklist": [
+    "Review data_results/ClosedTest/bikeshare_closed.geojson \u2014 2 station(s) closed in GBFS; check whether any need disused:amenity in OSM.",
+    "Add 1 station(s) missing in OSM (see bikeshare_missing_in_osm.geojson) \u2014 no MapRoulette tasks were created."
+  ]
+}

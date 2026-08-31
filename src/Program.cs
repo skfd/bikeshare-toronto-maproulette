@@ -61,32 +61,76 @@ try
     root.Options.Add(verboseOption);
     root.Options.Add(quietOption);
 
-    // run command & root default
-    var systemIdArg = new Argument<int>("system-id") { Description = "Numeric system ID from bikeshare_systems.json" };
-    var runCommand = new Command("run", "Run comparison for a system");
+    // --yes is deliberately separate from --quiet: quiet changes what you see,
+    // --yes changes what the tool does. A scheduled run needs the second without
+    // being forced into the first.
+    var yesOption = new Option<bool>("--yes", "-y") { Description = "Answer every confirmation with yes (for unattended runs)" };
+    var commitOption = new Option<bool>("--commit-baseline") { Description = "Commit the refreshed GeoJSON as the next baseline when it changed" };
+    root.Options.Add(yesOption);
+    root.Options.Add(commitOption);
+
+    // run command & root default. The argument takes a single id, a comma-separated
+    // list, or "all" - operating six systems by hand was the main daily friction.
+    var systemIdArg = new Argument<string>("system-id") { Description = "System ID from bikeshare_systems.json, a comma-separated list, or 'all'" };
+    var runCommand = new Command("run", "Run comparison for one system, several, or all of them");
     runCommand.Arguments.Add(systemIdArg);
-    runCommand.SetAction(async (ParseResult parseResult) =>
+
+    async Task<int> RunAction(ParseResult parseResult)
     {
-        var id = parseResult.GetValue(systemIdArg);
-        var verbose = parseResult.GetValue(verboseOption);
-        var quiet = parseResult.GetValue(quietOption);
-        ConsoleUI.IsVerbose = verbose;
-        ConsoleUI.IsQuiet = quiet;
+        ConsoleUI.IsVerbose = parseResult.GetValue(verboseOption);
+        ConsoleUI.IsQuiet = parseResult.GetValue(quietOption);
+        PromptService.AutoConfirm = parseResult.GetValue(yesOption);
         ConsoleUI.ConfigureLogging();
-        await provider.GetRequiredService<BikeShareFlows>().RunSystemFlow(id);
-    });
+
+        var spec = parseResult.GetValue(systemIdArg) ?? "";
+        List<int> ids;
+        try
+        {
+            ids = await SystemSelection.ResolveAsync(spec);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Could not resolve system selection {Spec}", spec);
+            ConsoleUI.PrintError(ex.Message);
+            return 1;
+        }
+
+        var flows = provider.GetRequiredService<BikeShareFlows>();
+        var failures = new List<string>();
+
+        foreach (var id in ids)
+        {
+            try
+            {
+                await flows.RunSystemFlow(id);
+            }
+            catch (Exception ex)
+            {
+                // Keep going: one system's dead GBFS feed must not cost us the
+                // other five. The failures are reported together at the end.
+                Log.Error(ex, "System {Id} failed", id);
+                ConsoleUI.PrintError($"System {id} failed: {ex.Message}");
+                failures.Add($"{id}: {ex.Message}");
+            }
+        }
+
+        if (parseResult.GetValue(commitOption))
+        {
+            await BaselineCommitter.CommitAsync(ids);
+        }
+
+        if (failures.Count > 0)
+        {
+            ConsoleUI.PrintError($"{failures.Count} of {ids.Count} system(s) failed.");
+            return 1;
+        }
+        return 0;
+    }
+
+    runCommand.SetAction(RunAction);
 
     root.Arguments.Add(systemIdArg); // treat root invocation same as run
-    root.SetAction(async (ParseResult parseResult) =>
-    {
-        var id = parseResult.GetValue(systemIdArg);
-        var verbose = parseResult.GetValue(verboseOption);
-        var quiet = parseResult.GetValue(quietOption);
-        ConsoleUI.IsVerbose = verbose;
-        ConsoleUI.IsQuiet = quiet;
-        ConsoleUI.ConfigureLogging();
-        await provider.GetRequiredService<BikeShareFlows>().RunSystemFlow(id);
-    });
+    root.SetAction(RunAction);
 
     // list systems
     var listCommand = new Command("list", "List available systems");
