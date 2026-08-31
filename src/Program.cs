@@ -55,8 +55,10 @@ try
     var root = new RootCommand("Bike Share Location Comparison Tool");
 
     // Global options for verbosity
-    var verboseOption = new Option<bool>("--verbose", "-v") { Description = "Show detailed logging output" };
-    var quietOption = new Option<bool>("--quiet", "-q") { Description = "Show minimal output (errors and summary only)" };
+    // Recursive so they also apply to subcommands: `run all --yes` has to work,
+    // not just the bare root invocation.
+    var verboseOption = new Option<bool>("--verbose", "-v") { Description = "Show detailed logging output", Recursive = true };
+    var quietOption = new Option<bool>("--quiet", "-q") { Description = "Show minimal output (errors and summary only)", Recursive = true };
 
     root.Options.Add(verboseOption);
     root.Options.Add(quietOption);
@@ -64,8 +66,8 @@ try
     // --yes is deliberately separate from --quiet: quiet changes what you see,
     // --yes changes what the tool does. A scheduled run needs the second without
     // being forced into the first.
-    var yesOption = new Option<bool>("--yes", "-y") { Description = "Answer every confirmation with yes (for unattended runs)" };
-    var commitOption = new Option<bool>("--commit-baseline") { Description = "Commit the refreshed GeoJSON as the next baseline when it changed" };
+    var yesOption = new Option<bool>("--yes", "-y") { Description = "Answer every confirmation with yes (for unattended runs)", Recursive = true };
+    var commitOption = new Option<bool>("--commit-baseline") { Description = "Commit the refreshed GeoJSON as the next baseline when it changed", Recursive = true };
     root.Options.Add(yesOption);
     root.Options.Add(commitOption);
 

@@ -44,6 +44,21 @@ jobs:
     - name: Run tests
       run: dotnet test --configuration Release --no-build --verbosity normal
 
+    # The unattended flags are only exercised by the weekly workflow, which is not
+    # run on PRs. A flag landing on the wrong command parses fine locally as the
+    # root invocation and then fails in the scheduled run, so check the exact
+    # form the workflow uses.
+    - name: Check the unattended CLI form parses
+      shell: bash
+      working-directory: src
+      run: |
+        output=$(dotnet run --configuration Release --no-build --           run 999999 --yes --commit-baseline 2>&1 || true)
+        echo "$output"
+        if grep -qi "unrecognized command or argument" <<< "$output"; then
+          echo "::error::The scheduled workflow's flags are not accepted by the run command."
+          exit 1
+        fi
+
     - name: Summary
       if: success()
       run: echo "✅ Build and tests passed!"
