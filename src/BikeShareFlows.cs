@@ -271,41 +271,18 @@ public class BikeShareFlows
 
         await _geoWriter.WriteMainAsync(locationsList, system.Name);
         await CompareAndGenerateDiffFiles(locationsList, system, isNewSystem, summary);
-        var osmOk = await CompareWithOSMData(locationsList, system, summary);
-        if (!osmOk)
+        var osmPoints = await CompareWithOSMData(locationsList, system, summary);
+        if (osmPoints == null)
         {
             return;
         }
 
-        // Check for duplicate ref values and prompt to create tasks
         var duplicatesFile = _paths.GetSystemFullPath(system.Name, "bikeshare_osm_duplicates.geojson");
         summary.DuplicatesFileExists = File.Exists(duplicatesFile);
-        if (summary.DuplicatesFileExists && system.MaprouletteProjectId > 0 && projectValidForTasks)
+        if (summary.DuplicatesFileExists)
         {
-            var confirmDuplicates = _prompt.ReadConfirmation("Duplicate ref values found in OSM. Create MapRoulette tasks to fix them?", 'n');
-            if (confirmDuplicates.ToString().ToLower() == "y")
-            {
-                try
-                {
-                    // Ensure duplicates instruction file exists (for existing systems)
-                    await _systemSetup.EnsureDuplicatesInstructionFileAsync(system.Name);
-
-                    await _maproulette.CreateDuplicateTasksAsync(system.MaprouletteProjectId, system.Name);
-                    Log.Information("Duplicate detection tasks created successfully");
-                    ConsoleUI.PrintSuccess("Duplicate detection tasks created.");
-                    summary.DuplicateTasksCreated = true;
-                }
-                catch (Exception ex)
-                {
-                    Log.Error(ex, "Error creating duplicate detection tasks for {Name}", system.Name);
-                    ConsoleUI.PrintError($"Error creating duplicate detection tasks: {ex.Message}");
-                }
-            }
-            else
-            {
-                Log.Information("User declined duplicate detection task creation.");
-                ConsoleUI.PrintInfo("Duplicate detection task creation skipped.");
-            }
+            // The instruction file is only scaffolded for newer systems.
+            await _systemSetup.EnsureDuplicatesInstructionFileAsync(system.Name);
         }
 
         // Gate task creation entirely if no valid project configured
@@ -317,20 +294,25 @@ public class BikeShareFlows
             return;
         }
 
-        bool hasNewLocationTasks = summary.MissingInOsm > 0 || (!isNewSystem && summary.ExtraInOsm > 0);
-        if (!hasNewLocationTasks)
+        // Refuse to touch live challenges on a fetch that looks truncated. Overpass
+        // rate-limits, and a half-empty answer is indistinguishable from "everything
+        // got fixed overnight" - which would close every open task in the project.
+        var manifest = MaprouletteManifest.Load(system.Name);
+        var abortReason = ChallengeSyncPlan.CheckFetchSanity(osmPoints.Count, locationsList.Count, manifest.LastOsmCount);
+        if (abortReason != null)
         {
-            Log.Information("No added/removed stations vs OSM for {Name}; skipping task creation prompt.", system.Name);
-            ConsoleUI.PrintInfo("No added or removed stations vs OSM; no MapRoulette tasks to create.");
+            Log.Error("Refusing to sync MapRoulette challenges for {Name}: {Reason}", system.Name, abortReason);
+            ConsoleUI.PrintError($"Refusing to sync MapRoulette challenges for {system.Name}: {abortReason}.");
+            ConsoleUI.PrintAction("Re-run once the data source is healthy. No tasks were created or closed.");
             PrintOperatorChecklist(system, summary);
-            return;
+            throw new InvalidOperationException($"Fetch sanity check failed for {system.Name}: {abortReason}");
         }
 
-        var confirm = _prompt.ReadConfirmation("Create Maproulette tasks for new locations?", 'n');
+        var confirm = _prompt.ReadConfirmation($"Sync MapRoulette challenges for {system.Name}?", 'n');
         if (confirm.ToString().ToLower() != "y")
         {
-            Log.Information("User declined task creation.");
-            ConsoleUI.PrintInfo("Task creation skipped.");
+            Log.Information("User declined challenge sync.");
+            ConsoleUI.PrintInfo("Challenge sync skipped.");
             PrintOperatorChecklist(system, summary);
             return;
         }
@@ -338,19 +320,52 @@ public class BikeShareFlows
         try
         {
             _systemSetup.ValidateInstructionFiles(system.Name);
-            await _maproulette.CreateTasksAsync(system.MaprouletteProjectId, lastSyncDate ?? DateTime.UtcNow, system.Name, isNewSystem);
-            summary.NewLocationTasksCreated = true;
+
+            // Keys as seen by this run's fetches. Both the GBFS ref and the OSM
+            // object form go in, because a task's key is whichever of the two
+            // identifies its subject.
+            var osmKeys = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var point in osmPoints)
+            {
+                if (!string.IsNullOrEmpty(point.id)) osmKeys.Add(point.id);
+                if (!string.IsNullOrEmpty(point.osmType) && !string.IsNullOrEmpty(point.osmId))
+                {
+                    osmKeys.Add($"{point.osmType}/{point.osmId}");
+                }
+            }
+
+            var gbfsKeys = locationsList
+                .Where(p => !string.IsNullOrEmpty(p.id))
+                .Select(p => p.id)
+                .ToHashSet(StringComparer.Ordinal);
+
+            var outcome = await MaprouletteSync.RefreshAsync(system, osmKeys, gbfsKeys);
+            summary.NewLocationTasksCreated = outcome.Created > 0;
+            summary.DuplicateTasksCreated = outcome.Created > 0 && summary.DuplicatesFileExists;
+            summary.TasksClosed = outcome.Closed;
+
+            foreach (var note in outcome.Notes)
+            {
+                ConsoleUI.PrintInfo(note);
+            }
+
+            ConsoleUI.PrintSuccess($"Challenges synced: {outcome.Created} task(s) created, {outcome.Closed} closed.");
+
+            // Remember the healthy OSM count so the next run can spot a bad fetch.
+            var saved = MaprouletteManifest.Load(system.Name);
+            saved.LastOsmCount = osmPoints.Count;
+            saved.Save(system.Name);
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("instruction files"))
         {
-            Log.Error(ex, "Instruction file issue prevented task creation for {Name}", system.Name);
-            ConsoleUI.PrintError($"Instruction file issue prevented task creation: {ex.Message}");
+            Log.Error(ex, "Instruction file issue prevented challenge sync for {Name}", system.Name);
+            ConsoleUI.PrintError($"Instruction file issue prevented challenge sync: {ex.Message}");
             throw;
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Error creating Maproulette tasks for {Name}", system.Name);
-            ConsoleUI.PrintError($"Error creating MapRoulette tasks for {system.Name}: {ex.Message}");
+            Log.Error(ex, "Error syncing Maproulette challenges for {Name}", system.Name);
+            ConsoleUI.PrintError($"Error syncing MapRoulette challenges for {system.Name}: {ex.Message}");
             throw;
         }
 
@@ -411,7 +426,12 @@ public class BikeShareFlows
         summary.GbfsAddedVsGit = currentPoints.Count;
     }
 
-    private async Task<bool> CompareWithOSMData(List<GeoPoint> bikeshareApiPoints, BikeShareSystem system, FlowSummary summary)
+    /// <summary>
+    /// Runs the OSM comparison. Returns the fetched OSM stations, or null if the
+    /// fetch failed. The caller needs the stations themselves, not just a flag:
+    /// closing a MapRoulette task is only allowed on evidence from this fetch.
+    /// </summary>
+    private async Task<List<GeoPoint>?> CompareWithOSMData(List<GeoPoint> bikeshareApiPoints, BikeShareSystem system, FlowSummary summary)
     {
         ConsoleUI.PrintStep($"Fetching OSM stations for {system.Name}");
         Log.Information("Fetching OSM stations for {Name}", system.Name);
@@ -427,7 +447,7 @@ public class BikeShareFlows
                 system.Name, system.Id);
             ConsoleUI.PrintError($"OSM API fetch failed for {system.Name}: {ex.Message}");
             ConsoleUI.PrintAction($"bikeshare.geojson has already been overwritten. Run: dotnet run -- reset {system.Id}");
-            return false;
+            return null;
         }
         Log.Information("Fetched {Count} OSM stations for {Name}", osmPoints.Count, system.Name);
         ConsoleUI.PrintSuccess($"Fetched {osmPoints.Count} OSM stations.");
@@ -573,7 +593,7 @@ public class BikeShareFlows
         summary.ClosedSkipped = closedStations.Count;
         summary.RefConflicts = refResult.Conflicts.Count;
         summary.RefConflictAutoFixes = refConflictAutoFixes;
-        return true;
+        return osmPoints;
     }
 
     private static void PrintOperatorChecklist(BikeShareSystem system, FlowSummary summary)
@@ -688,6 +708,7 @@ public class BikeShareFlows
         public bool DuplicatesFileExists { get; set; }
         public bool DuplicateTasksCreated { get; set; }
         public bool NewLocationTasksCreated { get; set; }
+        public int TasksClosed { get; set; }
 
         public bool HasGbfsDiff => GbfsAddedVsGit + GbfsRemovedVsGit + GbfsMovedVsGit + GbfsRenamedVsGit > 0;
     }
