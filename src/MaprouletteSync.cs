@@ -234,16 +234,25 @@ public static class MaprouletteSync
         return instruction;
     }
 
-    private static List<(string Key, string Line)> ReadEntries(string path)
+    internal static List<(string Key, string Line)> ReadEntries(string path) =>
+        ReadEntryLines(File.ReadAllLines(path));
+
+    /// <summary>
+    /// One entry per task key. The duplicates file legitimately repeats a node -
+    /// once under its duplicated ref and once under its duplicated ref:gbfs - and
+    /// repeated keys must collapse to one task, not crash the refresh.
+    /// </summary>
+    internal static List<(string Key, string Line)> ReadEntryLines(IEnumerable<string> rawLines)
     {
         var entries = new List<(string, string)>();
-        foreach (var raw in File.ReadAllLines(path))
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var raw in rawLines)
         {
             var line = raw.TrimStart('').Trim();
             if (line.Length == 0) continue;
 
             var key = TaskKey(line);
-            if (key != null) entries.Add((key, line));
+            if (key != null && seen.Add(key)) entries.Add((key, line));
         }
         return entries;
     }

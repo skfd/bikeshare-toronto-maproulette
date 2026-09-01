@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using System.Linq;
 using System.Text.Json;
 
 namespace prepareBikeParking.Tests;
@@ -46,6 +47,20 @@ public class MaprouletteIdentityTests
     public void UnparseableLineYieldsNoKey()
     {
         Assert.That(MaprouletteSync.TaskKey("not json at all"), Is.Null);
+    }
+
+    [Test]
+    public void RepeatedKeysCollapseToOneEntry()
+    {
+        // The duplicates file lists the same node once under its duplicated ref
+        // and once under its duplicated ref:gbfs. That must become one task, not
+        // a duplicate-dictionary-key crash that aborts the whole upload.
+        var node = Line("\"address\":\"7042\",\"osmType\":\"node\",\"osmId\":\"123456\"");
+        var other = Line("\"address\":\"7042\",\"osmType\":\"node\",\"osmId\":\"999999\"");
+
+        var entries = MaprouletteSync.ReadEntryLines(new[] { Rs + node, Rs + node, Rs + other });
+
+        Assert.That(entries.Select(e => e.Key), Is.EqualTo(new[] { "node/123456", "node/999999" }));
     }
 
     [Test]
