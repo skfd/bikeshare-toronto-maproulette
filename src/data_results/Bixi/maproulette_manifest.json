@@ -6,7 +6,7 @@
       "challenge_id": 56666,
       "name": "Bixi \u2014 Stations missing in OSM",
       "created_at": "2026-08-31T23:34:39.1912389Z",
-      "refreshed_at": "2026-08-31T23:34:56.7284991Z",
+      "refreshed_at": "2026-09-01T00:06:58.2174142Z",
       "task_keys": [
         "103",
         "1175",
@@ -80,7 +80,7 @@
       "challenge_id": 56667,
       "name": "Bixi \u2014 OSM stations no longer in the feed",
       "created_at": "2026-08-31T23:34:57.3342644Z",
-      "refreshed_at": "2026-08-31T23:35:47.1862133Z",
+      "refreshed_at": "2026-09-01T00:06:58.5050712Z",
       "task_keys": [
         "333",
         "529",

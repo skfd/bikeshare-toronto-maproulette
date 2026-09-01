@@ -6,7 +6,7 @@
       "challenge_id": 56663,
       "name": "Bike Share Toronto \u2014 Stations missing in OSM",
       "created_at": "2026-08-31T23:33:41.524766Z",
-      "refreshed_at": "2026-08-31T23:33:54.0273188Z",
+      "refreshed_at": "2026-09-01T00:06:26.1943901Z",
       "task_keys": [
         "7005",
         "7067",
@@ -56,7 +56,7 @@
       "challenge_id": 56664,
       "name": "Bike Share Toronto \u2014 OSM stations no longer in the feed",
       "created_at": "2026-08-31T23:33:54.6105893Z",
-      "refreshed_at": "2026-08-31T23:33:58.764608Z",
+      "refreshed_at": "2026-09-01T00:06:26.5890029Z",
       "task_keys": [
         "7018",
         "7141",
