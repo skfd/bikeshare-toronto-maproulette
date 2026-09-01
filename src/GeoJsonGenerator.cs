@@ -1,4 +1,4 @@
-using Serilog;
+﻿using Serilog;
 
 namespace prepareBikeParking
 {
@@ -168,7 +168,8 @@ namespace prepareBikeParking
                 }
             }
 
-            return "{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":["
+            // \u001e = RFC 7464 record separator; JOSM needs it to read the multi-line file as a GeoJSON text sequence
+            return "\u001e{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":["
                 + lon + "," + lat + "]},\"properties\":{" + props + "}}]}";
         }
 

@@ -1,4 +1,5 @@
-using NUnit.Framework;
+﻿using NUnit.Framework;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -246,6 +247,8 @@ public class RefConflictDetectorTests
         await GeoJsonGenerator.GenerateRefConflictsFileAsync(conflicts, TempSystem);
 
         var content = await FileManager.ReadSystemTextFileAsync(TempSystem, GeoFile);
+        foreach (var line in content.Split('\n', System.StringSplitOptions.RemoveEmptyEntries))
+            Assert.That(line, Does.StartWith("\u001e"), "each line must carry the RFC 7464 record separator so JOSM can open the file");
         Assert.That(content, Does.Contain("\"action\":\"fix-ref\""));
         Assert.That(content, Does.Contain("\"resolvedRef\":\"73\""));
         Assert.That(content, Does.Contain("\"action\":\"review-ref\""));
