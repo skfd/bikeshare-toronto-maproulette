@@ -6,7 +6,7 @@
       "challenge_id": 56670,
       "name": "Citi Bike \u2014 Stations missing in OSM",
       "created_at": "2026-08-31T23:36:18.3723493Z",
-      "refreshed_at": "2026-09-01T00:07:51.9867102Z",
+      "refreshed_at": "2026-09-02T11:08:31.5728315Z",
       "task_keys": [
         "1846085256331594490",
         "2111353842893366258",
@@ -100,7 +100,7 @@
       "challenge_id": 56671,
       "name": "Citi Bike \u2014 OSM stations no longer in the feed",
       "created_at": "2026-08-31T23:36:51.1966316Z",
-      "refreshed_at": "2026-09-01T00:07:52.212838Z",
+      "refreshed_at": "2026-09-02T11:08:32.2244052Z",
       "task_keys": [
         "1286480d-5d6d-4a47-9fac-e156dba2b6fc",
         "1786686999403592506",
@@ -131,7 +131,8 @@
         "osm_12865256202",
         "osm_419360569",
         "osm_419366847",
-        "osm_8576802825"
+        "osm_8576802825",
+        "66dd4f31-0aca-11e7-82f6-3863bb44ef7c"
       ]
     }
   }

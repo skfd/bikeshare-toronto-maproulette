@@ -6,7 +6,7 @@
       "challenge_id": 56672,
       "name": "Mobi \u2014 Stations missing in OSM",
       "created_at": "2026-08-31T23:37:03.8479994Z",
-      "refreshed_at": "2026-09-01T00:08:23.8860205Z",
+      "refreshed_at": "2026-09-02T11:13:17.5868332Z",
       "task_keys": [
         "0403",
         "0645"
@@ -16,7 +16,7 @@
       "challenge_id": 56673,
       "name": "Mobi \u2014 OSM stations no longer in the feed",
       "created_at": "2026-08-31T23:37:05.2357391Z",
-      "refreshed_at": "2026-09-01T00:08:24.0219896Z",
+      "refreshed_at": "2026-09-02T11:13:17.7548517Z",
       "task_keys": [
         "0112",
         "0115",
