@@ -4,10 +4,18 @@ Licence clearance for contributing station data from this repo's six GBFS feeds 
 OpenStreetMap (ODbL 1.0). Compiled 2026-09-02. Every quote below was fetched from the
 cited URL; nothing here is recalled or paraphrased.
 
-**This applies to the MapRoulette challenges too, not only to a future bulk import.** A
+**This applies to what we already publish, not only to a future bulk import.** A
 MapRoulette task embeds station coordinates and names, so it is a redistribution of the
 source data. Whatever bucket a source falls into governs the challenges we already
 generate.
+
+More directly: this repo is **public** (<https://github.com/skfd/bikeshare-toronto-maproulette>)
+and commits per-system snapshots. `src/data_results/Citi Bike/bikeshare.geojson` (2,508
+stations) and `src/data_results/Mobi/bikeshare.geojson` (263 stations) are stand-alone
+redistributions of those two feeds, published now — squarely within what Citi Bike clause
+2(b) and Mobi §2.1(b) prohibit. That is independent of any import and predates this
+review. Whether to remove them, make the repo private, or leave them pending a grant is an
+operator decision; it is recorded here so it is not discovered later.
 
 ## Bottom line
 
