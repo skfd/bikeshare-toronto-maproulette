@@ -19,6 +19,12 @@ public static class RunReport
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
+    // No byte order mark: the weekly workflow concatenates every system's
+    // last_run.md into one issue body, and a BOM in front of "# System" stops
+    // GitHub from rendering it as a heading (only the first file's BOM, at the
+    // very start of the body, is tolerated).
+    private static readonly Encoding Utf8NoBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+
     public sealed record Result(
         string System,
         string City,
@@ -40,11 +46,11 @@ public static class RunReport
             var dir = Path.GetDirectoryName(jsonPath);
             if (dir != null) Directory.CreateDirectory(dir);
 
-            File.WriteAllText(jsonPath, JsonSerializer.Serialize(result, JsonOptions), Encoding.UTF8);
+            File.WriteAllText(jsonPath, JsonSerializer.Serialize(result, JsonOptions), Utf8NoBom);
             File.WriteAllText(
                 FileManager.GetSystemFullPath(result.System, "last_run.md"),
                 BuildMarkdown(result),
-                Encoding.UTF8);
+                Utf8NoBom);
 
             Serilog.Log.Information("Run report written for {System}", result.System);
         }
