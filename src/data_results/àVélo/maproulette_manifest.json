@@ -6,8 +6,12 @@
       "challenge_id": 56669,
       "name": "\u00E0V\u00E9lo \u2014 Duplicate ref values",
       "created_at": "2026-08-31T23:35:51.6548458Z",
-      "refreshed_at": "0001-01-01T00:00:00",
-      "task_keys": []
+      "refreshed_at": "2026-09-09T11:03:35.3838486Z",
+      "task_keys": [
+        "node/12646637097",
+        "node/13639059265",
+        "GBFS/official"
+      ]
     }
   }
 }
