@@ -6,7 +6,7 @@
       "challenge_id": 56663,
       "name": "Bike Share Toronto \u2014 Stations missing in OSM",
       "created_at": "2026-08-31T23:33:41.524766Z",
-      "refreshed_at": "2026-09-09T11:02:35.1795163Z",
+      "refreshed_at": "2026-09-16T11:06:31.2092967Z",
       "task_keys": [
         "7005",
         "7067",
@@ -51,14 +51,18 @@
         "8262",
         "8263",
         "8264",
-        "8265"
+        "8265",
+        "8266",
+        "8267",
+        "8268",
+        "8269"
       ]
     },
     "removed": {
       "challenge_id": 56664,
       "name": "Bike Share Toronto \u2014 OSM stations no longer in the feed",
       "created_at": "2026-08-31T23:33:54.6105893Z",
-      "refreshed_at": "2026-09-09T11:02:35.7174612Z",
+      "refreshed_at": "2026-09-16T11:06:31.7816813Z",
       "task_keys": [
         "7018",
         "7141",
@@ -75,14 +79,16 @@
         "8118",
         "osm_13523160288",
         "osm_13625833806",
-        "osm_14115687640"
+        "osm_14115687640",
+        "7197",
+        "7898"
       ]
     },
     "duplicates": {
       "challenge_id": 56665,
       "name": "Bike Share Toronto \u2014 Duplicate ref values",
       "created_at": "2026-08-31T23:33:59.3169688Z",
-      "refreshed_at": "2026-09-09T11:02:36.9238937Z",
+      "refreshed_at": "2026-09-16T11:06:32.198427Z",
       "task_keys": [
         "node/12004029329",
         "way/730428816",
