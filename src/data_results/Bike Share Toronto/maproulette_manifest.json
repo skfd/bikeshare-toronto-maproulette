@@ -99,7 +99,7 @@
       "challenge_id": 56665,
       "name": "Bike Share Toronto \u2014 Duplicate ref values",
       "created_at": "2026-08-31T23:33:59.3169688Z",
-      "refreshed_at": "2026-10-28T11:03:17.3762762Z",
+      "refreshed_at": "2026-11-04T11:03:18.2558837Z",
       "task_keys": [
         "node/12004029329",
         "way/730428816",
