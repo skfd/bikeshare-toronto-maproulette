@@ -1,0 +1,4 @@
+{
+  "command": "dotnet test tests/prepareBikeParking.Tests.csproj -v q -nologo",
+  "timeoutSeconds": 120
+}
